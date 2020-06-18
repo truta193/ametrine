@@ -6,10 +6,9 @@
 #include <GL/gl.h>
 #define WNDCLASSNAME "GLClass"
 #define WNDNAME	"My app"
-//TEXTURE DRAWING NOT WORKING, PIXELS GETTING SQUARED DIMENSIONS
-//ADD DRAW, SET AND CHECK PIXEL WITH SCALING IN MIND THIS TIME
 //FUNCTION TO SET WINDOW TITLE
 //FRAME TIMER
+//MOUSE EVENTS EG WM_LBUTTONDOWN WM_RBUTTONUP
 //Get mouse pos based on scale
 //% positioning, e.g 0.5 away from X origin = X axis middle (0.0 - 1.0)
 //Work on fullscreen
@@ -33,6 +32,7 @@ vector2d vWinSize;
 vector2d vViewPos;
 uint32_t vScale = 1;
 GLuint id=0;
+vector2d vMousePos;
 
 typedef enum rcode {FAIL = 0, OK = 1} rcode;
 
@@ -50,6 +50,14 @@ typedef struct TextureStruct {
 	PixelS TexData[];
 
 } TextureS;
+
+typedef struct MState {
+	BOOL LButton;
+	BOOL RButton;
+	BOOL MButton;
+} MState;
+
+MState vMouseState; 
 
 typedef enum keyMapping {
 	key_0 = 0x30, key_1 = 0x31, key_2 = 0x32, key_3 = 0x33, key_4 = 0x34, key_5 = 0x35, key_6 = 0x36, key_7 = 0x37, key_8 = 0x38, key_09 = 0x39, 
@@ -84,8 +92,8 @@ uint32_t DeleteTexture(uint32_t id);
 void DrawLayer(PixelS tint); 
 void Terminate();
 void CreateLayer(TextureS *texture);
-rcode SetDataPixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture);
-PixelS CheckDataPixel(uint32_t x, uint32_t y, TextureS *texture);
+rcode WritePixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture);
+PixelS ReadPixel(uint32_t x, uint32_t y, TextureS *texture);
 rcode DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
 PixelS CheckPixel(uint32_t x, uint32_t y); // on default layer
 rcode DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
@@ -103,6 +111,8 @@ uint32_t ScreenWidth();
 uint32_t ScreenHeight(); 
 void SetCurrentTargeti(uint32_t index);
 void SetCurrentTargetp(TextureS *texture);
+void MouseUpdate(uint32_t button,BOOL state);
+void MouseUpdatePos(int32_t x,int32_t y);
 
 
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
@@ -129,6 +139,18 @@ TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData){
 LRESULT CALLBACK WindowEvent(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	switch(uMsg){
 	case WM_SIZE: UpdateWinSize(lParam & 0xFFFF, (lParam >> 16) & 0xFFFF); break;
+	case WM_MOUSEMOVE:{
+	uint16_t x = lParam & 0xFFFF; uint16_t y = (lParam >> 16) & 0xFFFF;
+	int16_t ix = *(int16_t*)&x;   int16_t iy = *(int16_t*)&y;
+	MouseUpdatePos(ix,iy);
+	break; 
+	};
+	case WM_LBUTTONDOWN: MouseUpdate(0,TRUE); break;
+	case WM_LBUTTONUP: MouseUpdate(0,FALSE); break;
+	case WM_RBUTTONDOWN: MouseUpdate(1,TRUE); break;
+	case WM_RBUTTONUP: MouseUpdate(1,FALSE); break;
+	case WM_MBUTTONDOWN: MouseUpdate(2,TRUE); break;
+	case WM_MBUTTONUP: MouseUpdate(2,FALSE); break;
 	case WM_DESTROY: PostQuitMessage(0); break;
 	case WM_CLOSE: Terminate(); break;
 	};
@@ -308,14 +330,14 @@ void CreateLayer(TextureS *texture){
     textureNumber++;
 };
 
-rcode SetDataPixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture){
+rcode WritePixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture){
 	if ((x<texture->width) && (y<texture->height)){
 		texture->TexData[(texture->width)*y+x] = pixel;
 		return OK;
 	};
 	return FAIL;
 };
-PixelS CheckDataPixel(uint32_t x, uint32_t y, TextureS *texture){
+PixelS ReadPixel(uint32_t x, uint32_t y, TextureS *texture){
 	if ((x<texture->width) && (y<texture->height)){
 		return texture->TexData[(texture->width)*y+x];
 	};
@@ -327,17 +349,13 @@ rcode DrawPixel(uint32_t x, uint32_t y, PixelS pixel){
 	y = y*vScale;
 	if ((x<layers[0]->width) && (y<layers[0]->height)){
 		if (vScale>1){
-			for (int32_t i = 0; i < vScale; i++){
-				for (int32_t j = 0; j < vScale; j++){
-					for (uint32_t is = 0; is < vScale; is++){
-						for (uint32_t js = 0; js < vScale; js++){
-							SetDataPixel(x + i*vScale + is, y + j*vScale + js,pixel,layers[0]);
-						};
-					};
-				};	
+			for (int i = 0;i < vScale;i++){
+				for (int j = 0;j < vScale;j++){
+					WritePixel(x+i,y+j,pixel,layers[0]);
+				};
 			};
 		} else {
-			SetDataPixel(x,y,pixel,layers[0]);
+			WritePixel(x,y,pixel,layers[0]);
 		};
 		return OK;
 	};
@@ -356,23 +374,21 @@ PixelS CheckPixel(uint32_t x, uint32_t y){
 rcode DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
 	x = x*vScale;
 	y = y*vScale;
-    int32_t fx = 0;
-    int32_t fy = 0;
 
     if (vScale > 1){
-        for (int32_t i = 0; i < texture->width; i++, fx++){
-            for (int32_t j = 0; j < texture->height; j++, fy++){
+        for (uint32_t i = 0; i < texture->width; i++){
+            for (uint32_t j = 0; j < texture->height; j++){
                 for (uint32_t is = 0; is < vScale; is++){
                     for (uint32_t js = 0; js < vScale; js++){
-						SetDataPixel(x + (i*vScale) + is, y + (j*vScale) + js,CheckDataPixel(fx,fy,texture),layers[0]);
+						WritePixel(x + (i*vScale) + is, y + (j*vScale) + js,ReadPixel(i,j,texture),layers[0]);
 					};
 				};
 			};	
         };
     } else {
-        for (int32_t i = 0; i < texture->width; i++, fx++){
-            for (int32_t j = 0; j < texture->height; j++, fy++){
-				SetDataPixel(x+i, y+j,CheckDataPixel(fx,fy,texture),layers[0]);
+        for (int32_t i = 0; i < texture->width; i++){
+            for (int32_t j = 0; j < texture->height; j++){
+				WritePixel(x+i, y+j,ReadPixel(i,j,texture),layers[0]);
 			};
         };
     };
@@ -420,6 +436,8 @@ rcode Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, BOOL boolFul
 };
 
 rcode Start(){
+	vMouseState.LButton = FALSE; vMouseState.RButton = FALSE; vMouseState.MButton = FALSE; 
+	vMousePos.X = 0; vMousePos.Y = 0;
     vector2d wp;
     wp.X = 50;
     wp.Y = 50;
@@ -473,6 +491,21 @@ void SetCurrentTargeti(uint32_t index){
 void SetCurrentTargetp(TextureS *texture){
 	currentTarget = texture;
 };
+
+void MouseUpdate(uint32_t button,BOOL state){
+	switch (button){
+	case 0: vMouseState.LButton = state; break;
+	case 1: vMouseState.RButton = state; break;
+	case 2: vMouseState.MButton = state; break;
+	default: break;
+	};
+};
+
+void MouseUpdatePos(int32_t x,int32_t y){
+	vMousePos.X = x;
+	vMousePos.Y = y;
+};
+
 BOOL OnInitU(){
 	PixelS *data1 = malloc(sizeof(PixelS)*20*20);
 	for (uint32_t i = 0; i < 20*20;i++){
@@ -482,13 +515,14 @@ BOOL OnInitU(){
 	free(data1);
 	DrawTexture(1,1,layers[1]);
 	DrawPixel(2,2,Pixel(255,255,90,255));
+	DrawPixel(2,3,Pixel(255,99,90,255));
 	return TRUE;
 }; 
 BOOL OnUpdateU(){
 	return TRUE;
 };
 int main(){
-    Construct(60,40,16,FALSE,FALSE);
+    Construct(300,200,2,FALSE,FALSE);
 	Start();
 }
 
