@@ -8,7 +8,6 @@
 #define WNDNAME	"My app"
 //FUNCTION TO SET WINDOW TITLE
 //FRAME TIMER
-//MOUSE EVENTS EG WM_LBUTTONDOWN WM_RBUTTONUP
 //Get mouse pos based on scale
 //% positioning, e.g 0.5 away from X origin = X axis middle (0.0 - 1.0)
 //Work on fullscreen
