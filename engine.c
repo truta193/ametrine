@@ -11,6 +11,7 @@
 //% positioning, e.g 0.5 away from X origin = X axis middle (0.0 - 1.0)
 //Work on fullscreen
 //Will need to rework mouse/keyboard input 
+//REDRAW DEFAULT LAYER ON WINDOW RESIZE
 
 typedef struct XandY {
     uint32_t X;
@@ -549,6 +550,7 @@ BOOL OnInitU(){
 	DrawPixel(2,3,Pixel(255,99,90,255));
 	return TRUE;
 }; 
+
 BOOL OnUpdateU(){
 	if (vKBCache==key_W){
 		printf("Pressed W");
