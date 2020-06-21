@@ -8,9 +8,9 @@
 #define WNDNAME	"My app"
 //FUNCTION TO SET WINDOW TITLE
 //FRAME TIMER
-//Get mouse pos based on scale
 //% positioning, e.g 0.5 away from X origin = X axis middle (0.0 - 1.0)
 //Work on fullscreen
+//Will need to rework mouse/keyboard input 
 
 typedef struct XandY {
     uint32_t X;
@@ -24,6 +24,7 @@ HANDLE engineThread;
 BOOL isRunning;
 BOOL isFullscreen=FALSE;
 BOOL isVsync=FALSE;
+BOOL isFocused=FALSE;
 
 vector2d vScreenSize;
 vector2d vViewSize;
@@ -32,6 +33,7 @@ vector2d vViewPos;
 uint32_t vScale = 1;
 GLuint id=0;
 vector2d vMousePos;
+int  vKBCache;
 
 typedef enum rcode {FAIL = 0, OK = 1} rcode;
 
@@ -57,6 +59,8 @@ typedef struct MState {
 } MState;
 
 MState vMouseState; 
+
+
 
 typedef enum keyMapping {
 	key_0 = 0x30, key_1 = 0x31, key_2 = 0x32, key_3 = 0x33, key_4 = 0x34, key_5 = 0x35, key_6 = 0x36, key_7 = 0x37, key_8 = 0x38, key_09 = 0x39, 
@@ -112,6 +116,8 @@ void SetCurrentTargeti(uint32_t index);
 void SetCurrentTargetp(TextureS *texture);
 void MouseUpdate(uint32_t button,BOOL state);
 void MouseUpdatePos(int32_t x,int32_t y);
+void Set_Focus(BOOL state);
+void SetKeyState(BOOL state, int key);
 
 
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
@@ -144,6 +150,10 @@ LRESULT CALLBACK WindowEvent(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	MouseUpdatePos(ix,iy);
 	break; 
 	};
+	case WM_SETFOCUS: Set_Focus(TRUE); break;
+	case WM_KILLFOCUS: Set_Focus(FALSE); break;
+	case WM_KEYDOWN: SetKeyState(TRUE,wParam); break;
+	case WM_KEYUP: break; //SetKeyState(FALSE,wParam); 
 	case WM_LBUTTONDOWN: MouseUpdate(0,TRUE); break;
 	case WM_LBUTTONUP: MouseUpdate(0,FALSE); break;
 	case WM_RBUTTONDOWN: MouseUpdate(1,TRUE); break;
@@ -519,5 +529,10 @@ void MouseUpdatePos(int32_t x,int32_t y){
 	vMousePos.Y = y/vScale;
 };
 
+void Set_Focus(BOOL state){
+	isFocused = state;
+};
 
-
+void SetKeyState(BOOL state, int key){
+	vKBCache = key;
+};
