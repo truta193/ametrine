@@ -182,8 +182,22 @@ rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize){
 	DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
 	DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
 
-	int32_t vTopLeftX = winPos.X;
-	int32_t vTopLeftY = winPos.Y;
+	vector2d vTopLeft;
+	vTopLeft.X = winPos.X;
+	vTopLeft.Y = winPos.Y;
+	/*
+	if (boolFullscreen){
+		dwExStyle = 0;
+		dwStyle = WS_VISIBLE | WS_POPUP;
+		HMONITOR hmon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO mi;
+		mi.cbSize = sizeof(mi);
+		if (!GetMonitorInfo(hmon, &mi)) return FAIL;
+		vWinSize.X = mi.rcMonitor.right;
+		vWinSize.Y = mi.rcMonitor.bottom;
+		vTopLeft.X = 0;
+		vTopLeft.Y = 0;
+	}*/
 
 	RECT rWndRect;
 	rWndRect.left = 0; rWndRect.top = 0;
@@ -192,7 +206,7 @@ rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize){
 	int width = rWndRect.right - rWndRect.left;
 	int height = rWndRect.bottom - rWndRect.top;
 
-	hWnd = CreateWindowEx(dwExStyle, WNDCLASSNAME, WNDNAME, dwStyle, vTopLeftX, vTopLeftY, width, height, NULL, NULL, GetModuleHandle(NULL), NULL);
+	hWnd = CreateWindowEx(dwExStyle, WNDCLASSNAME, WNDNAME, dwStyle, vTopLeft.X, vTopLeft.Y, width, height, NULL, NULL, GetModuleHandle(NULL), NULL);
 	return OK;
 };
 
@@ -501,8 +515,8 @@ void MouseUpdate(uint32_t button,BOOL state){
 };
 
 void MouseUpdatePos(int32_t x,int32_t y){
-	vMousePos.X = x;
-	vMousePos.Y = y;
+	vMousePos.X = x/vScale;
+	vMousePos.Y = y/vScale;
 };
 
 BOOL OnInitU(){
@@ -521,7 +535,7 @@ BOOL OnUpdateU(){
 	return TRUE;
 };
 int main(){
-    Construct(300,200,2,FALSE,FALSE);
+    Construct(1929,1080,1,TRUE,FALSE);
 	Start();
 }
 
