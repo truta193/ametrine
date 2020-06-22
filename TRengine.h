@@ -1,4 +1,3 @@
-#define _CRT_RAND_S
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,9 +7,9 @@
 #define WNDNAME	"My app"
 //FUNCTION TO SET WINDOW TITLE
 //FRAME TIMER
-//% positioning, e.g 0.5 away from X origin = X axis middle (0.0 - 1.0)
-//Work on fullscreen
-//Will need to rework mouse/keyboard input 
+//% positioning, e.g 0.5 away from X origin = X axis middle (0.0 to 1.0)
+//Fullscreen unsupported, need to implement
+//REDRAW DEFAULT LAYER ON WINDOW RESIZE
 
 typedef struct XandY {
     uint32_t X;
@@ -19,12 +18,15 @@ typedef struct XandY {
 
 HDC glDeviceContext;
 HGLRC glRenderContext;
-HWND hWnd;
+HWND windowHandle;
 HANDLE engineThread;
-BOOL isRunning;
-BOOL isFullscreen=FALSE;
-BOOL isVsync=FALSE;
-BOOL isFocused=FALSE;
+BOOL applicationIsRunning=FALSE;
+BOOL fullscreenIsEnabled=FALSE;
+BOOL vsyncIsEnabled=FALSE;
+BOOL keyboardOldState[100];
+BOOL keyboardNewState[100];
+BOOL mouseOldState[3];
+BOOL mouseNewState[3];
 
 vector2d vScreenSize;
 vector2d vViewSize;
@@ -33,7 +35,6 @@ vector2d vViewPos;
 uint32_t vScale = 1;
 GLuint id=0;
 vector2d vMousePos;
-int  vKBCache;
 
 typedef enum rcode {FAIL = 0, OK = 1} rcode;
 
@@ -52,23 +53,22 @@ typedef struct TextureStruct {
 
 } TextureS;
 
-typedef struct MState {
-	BOOL LButton;
-	BOOL RButton;
-	BOOL MButton;
-} MState;
+typedef struct ButtonInput {
+	BOOL pressed;
+	BOOL released;
+	BOOL held;
+} ButtonInput;
 
-MState vMouseState; 
+ButtonInput vMouse[3]; 
+ButtonInput vKeyboard[100];
 
-
-
-typedef enum keyMapping {
+typedef enum KeyMapping {
 	key_0 = 0x30, key_1 = 0x31, key_2 = 0x32, key_3 = 0x33, key_4 = 0x34, key_5 = 0x35, key_6 = 0x36, key_7 = 0x37, key_8 = 0x38, key_09 = 0x39, 
 	key_A = 0x41, key_B = 0x42, key_C = 0x43, key_D = 0x44, key_E = 0x45, key_F = 0x46, key_G = 0x47, key_H = 0x48, key_I = 0x49, key_J = 0x4A,
 	key_K = 0x4B, key_L = 0x4C, key_M = 0x4D, key_N = 0x4E, key_O = 0x4F, key_P = 0x50, key_Q = 0x51, key_R = 0x52, key_S = 0x53, key_T = 0x54,
 	key_U = 0x55, key_V = 0x56, key_W = 0x57, key_X = 0x58, key_Y = 0x59, key_Z = 0x5A, key_Arrow_Left = 0x25, key_Arrow_Up = 0x26, key_Arrow_Right = 0x27,
 	key_Arrow_Down = 0x28, key_Esc = 0x1B, key_Ctrl = 0x11, key_Shift = 0x10, key_Enter = 0x0D, key_Backspace = 0x08, key_Spacebar = 0x20, key_Delete = 0x2E
-} keyMapping;
+} KeyMapping;
 
 TextureS *currentTarget=NULL;
 TextureS *layers[32];
@@ -76,10 +76,10 @@ int32_t textureNumber=0;
 
 TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData);
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
-LRESULT CALLBACK WindowEvent(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMsg, WPARAM wParam, LPARAM lParam);
 rcode StartSystemLoop(); 
 rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize);
-rcode CreateDevice(HWND hWnd, BOOL boolFullscreen, BOOL boolVsync); 
+rcode CreateDevice(HWND windowHandle, BOOL boolFullscreen, BOOL boolVsync); 
 rcode CreateGraphics(BOOL boolFullscreen, BOOL boolVsync, vector2d viewPos, vector2d viewSize); 
 void DisplayFrame(); 
 void PrepareDrawing(); 
@@ -107,17 +107,15 @@ rcode Start();
 void CoreUpdate();
 BOOL OnInitU(); 
 BOOL OnUpdateU(); 
-
 void UpdateWinSize(uint32_t x, uint32_t y); 
 void SetScale(uint32_t scale);
 uint32_t ScreenWidth(); 
 uint32_t ScreenHeight(); 
 void SetCurrentTargeti(uint32_t index);
 void SetCurrentTargetp(TextureS *texture);
-void MouseUpdate(uint32_t button,BOOL state);
-void MouseUpdatePos(int32_t x,int32_t y);
-void Set_Focus(BOOL state);
-void SetKeyState(BOOL state, int key);
+void UpdateMousePos(int32_t x,int32_t y);
+void UpdateMouseState(BOOL state, int32_t button);
+void SetKeyState(BOOL state, int32_t key);
 
 
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
@@ -141,29 +139,27 @@ TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData){
     return texture;  
 };
 
-LRESULT CALLBACK WindowEvent(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	switch(uMsg){
 	case WM_SIZE: UpdateWinSize(lParam & 0xFFFF, (lParam >> 16) & 0xFFFF); break;
 	case WM_MOUSEMOVE:{
 	uint16_t x = lParam & 0xFFFF; uint16_t y = (lParam >> 16) & 0xFFFF;
 	int16_t ix = *(int16_t*)&x;   int16_t iy = *(int16_t*)&y;
-	MouseUpdatePos(ix,iy);
+	UpdateMousePos(ix,iy);
 	break; 
 	};
-	case WM_SETFOCUS: Set_Focus(TRUE); break;
-	case WM_KILLFOCUS: Set_Focus(FALSE); break;
 	case WM_KEYDOWN: SetKeyState(TRUE,wParam); break;
-	case WM_KEYUP: break; //SetKeyState(FALSE,wParam); 
-	case WM_LBUTTONDOWN: MouseUpdate(0,TRUE); break;
-	case WM_LBUTTONUP: MouseUpdate(0,FALSE); break;
-	case WM_RBUTTONDOWN: MouseUpdate(1,TRUE); break;
-	case WM_RBUTTONUP: MouseUpdate(1,FALSE); break;
-	case WM_MBUTTONDOWN: MouseUpdate(2,TRUE); break;
-	case WM_MBUTTONUP: MouseUpdate(2,FALSE); break;
+	case WM_KEYUP: SetKeyState(FALSE,wParam); break;
+	case WM_LBUTTONDOWN: UpdateMouseState(TRUE,0); break;
+	case WM_LBUTTONUP: UpdateMouseState(FALSE,0); break;
+	case WM_RBUTTONDOWN: UpdateMouseState(TRUE,1); break;
+	case WM_RBUTTONUP: UpdateMouseState(FALSE,1); break;
+	case WM_MBUTTONDOWN: UpdateMouseState(TRUE,2); break;
+	case WM_MBUTTONUP: UpdateMouseState(FALSE,2); break;
 	case WM_DESTROY: PostQuitMessage(0); break;
 	case WM_CLOSE: Terminate(); break;
 	};
-	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	return DefWindowProc(windowHandle, uMsg, wParam, lParam);
 };
 
 rcode StartSystemLoop(){
@@ -199,7 +195,7 @@ rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize){
 	if (boolFullscreen){
 		dwExStyle = 0;
 		dwStyle = WS_VISIBLE | WS_POPUP;
-		HMONITOR hmon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+		HMONITOR hmon = MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
 		MONITORINFO mi;
 		mi.cbSize = sizeof(mi);
 		if (!GetMonitorInfo(hmon, &mi)) return FAIL;
@@ -216,13 +212,13 @@ rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize){
 	int width = rWndRect.right - rWndRect.left;
 	int height = rWndRect.bottom - rWndRect.top;
 
-	hWnd = CreateWindowEx(dwExStyle, WNDCLASSNAME, WNDNAME, dwStyle, vTopLeft.X, vTopLeft.Y, width, height, NULL, NULL, GetModuleHandle(NULL), NULL);
+	windowHandle = CreateWindowEx(dwExStyle, WNDCLASSNAME, WNDNAME, dwStyle, vTopLeft.X, vTopLeft.Y, width, height, NULL, NULL, GetModuleHandle(NULL), NULL);
 	return OK;
 };
 
-rcode CreateDevice(HWND hWnd, BOOL boolFullscreen, BOOL boolVsync){
+rcode CreateDevice(HWND windowHandle, BOOL boolFullscreen, BOOL boolVsync){
     //POSSIBLE TO REMOVE FRAME CAP
-	glDeviceContext = GetDC(hWnd);
+	glDeviceContext = GetDC(windowHandle);
 	PIXELFORMATDESCRIPTOR pfd;
 	pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR); pfd.nVersion = 1; pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
 	pfd.iPixelType = PFD_TYPE_RGBA; pfd.cColorBits = 32; pfd.cAccumBits = 0;
@@ -245,7 +241,7 @@ rcode CreateDevice(HWND hWnd, BOOL boolFullscreen, BOOL boolVsync){
 };
 
 rcode CreateGraphics(BOOL boolFullscreen, BOOL boolVsync, vector2d viewPos, vector2d viewSize){
-	if (CreateDevice(hWnd,isFullscreen,isVsync)==OK){
+	if (CreateDevice(windowHandle,fullscreenIsEnabled,vsyncIsEnabled)==OK){
 		UpdateViewportEngine(viewPos.X,viewPos.Y,viewSize.X,viewSize.Y);
 		return OK;
 	} else {
@@ -270,7 +266,7 @@ rcode DestroyDevice(){
 
 rcode ThreadCleanup(){
 	DestroyDevice();
-	PostMessage(hWnd,WM_DESTROY,0,0);
+	PostMessage(windowHandle,WM_DESTROY,0,0);
 	return OK;
 };
 
@@ -345,7 +341,8 @@ void Terminate(){
 	for (int i=0;i<textureNumber;i++){
 		free(&layers[i]);
 	};
-	isRunning = FALSE;
+	applicationIsRunning = FALSE;
+	printf("[DONE] Memory cleanup\n");
 };
 
 void CreateLayer(TextureS *texture){
@@ -432,14 +429,14 @@ void PrepareEngine(){
 
 DWORD WINAPI EngineThread(){
 	printf("[INIT]Engine thread\n");
-	CreateGraphics(isFullscreen,isVsync,vViewPos,vViewSize);
+	CreateGraphics(fullscreenIsEnabled,vsyncIsEnabled,vViewPos,vViewSize);
 	printf("[DONE]Create graphics\n");
 	PrepareEngine();
 	printf("[DONE]Engine prep\n");
 	if (!OnInitU()){
-		isRunning = FALSE;
+		applicationIsRunning = FALSE;
 	};
-	while (isRunning){
+	while (applicationIsRunning){
 		CoreUpdate();
 	};
 	ThreadCleanup();
@@ -452,24 +449,35 @@ rcode Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, BOOL boolFul
 	SetScale(scale);
 	vWinSize.X = vScreenSize.X * scale;
 	vWinSize.Y = vScreenSize.Y * scale;
-	isFullscreen = boolFullscreen;
-	isVsync = boolVsync;
+	fullscreenIsEnabled = boolFullscreen;
+	vsyncIsEnabled = boolVsync;
     printf("[DONE]Construct finished\n");
 	return OK;
 };
 
 rcode Start(){
-	vMouseState.LButton = FALSE; vMouseState.RButton = FALSE; vMouseState.MButton = FALSE; 
-	vMousePos.X = 0; vMousePos.Y = 0;
+	for (int i = 0; i < 3; i++){
+		vMouse[i].released = FALSE;
+		vMouse[i].pressed = FALSE;
+		vMouse[i].held = FALSE;
+	};
+	for (int i = 0; i < 100; i++){
+		vKeyboard[i].held = FALSE;
+		vKeyboard[i].pressed = FALSE;
+		vKeyboard[i].released = FALSE;
+	};
+	vMousePos.X = 0; vMousePos.Y = 0; 
     vector2d wp;
     wp.X = 50;
     wp.Y = 50;
 	CreateWindowPane(FALSE,wp,vWinSize);
 	UpdateWinSize(vWinSize.X,vWinSize.Y);
-	isRunning = TRUE;
+	applicationIsRunning = TRUE;
 	engineThread = CreateThread(NULL,0,*EngineThread,NULL,0,NULL);
 	StartSystemLoop();
-	if (engineThread != NULL) {WaitForSingleObject(engineThread,INFINITE);};
+	if (engineThread != NULL){
+		WaitForSingleObject(engineThread,INFINITE);
+	};
 	printf("[DONE]Start ended\n");
 	return OK;
 };
@@ -477,8 +485,37 @@ rcode Start(){
 void CoreUpdate(){
 	ClearBuffer(Pixel(0,0,0,255),TRUE);
 	if (!OnUpdateU()){
-		isRunning = FALSE;
+		applicationIsRunning = FALSE;
 	};
+	for (int i = 0; i < 3; i++){
+		vMouse[i].pressed = FALSE;
+		vMouse[i].released = FALSE;
+		if (mouseOldState[i] != mouseNewState[i]){
+			if (mouseNewState[i]){
+				vMouse[i].pressed = !vMouse[i].held;
+				vMouse[i].held = TRUE;
+			} else {
+				vMouse[i].released = TRUE;
+				vMouse[i].held = FALSE;
+			};
+		};
+		mouseOldState[i] = mouseNewState[i];
+	};
+	for (int i = 0; i < 100; i++){
+		vKeyboard[i].pressed = FALSE;
+		vKeyboard[i].released = FALSE;
+		if (keyboardOldState[i] != keyboardNewState[i]){
+			if (keyboardNewState[i]){
+				vKeyboard[i].pressed = !vKeyboard[i].held;
+				vKeyboard[i].held = TRUE;
+			} else {
+				vKeyboard[i].released = TRUE;
+				vKeyboard[i].held = FALSE;
+			};
+		};
+		keyboardOldState[i] = keyboardNewState[i];
+	};
+
 	UpdateViewportEngine(vViewPos.X,vViewPos.Y,vViewSize.X,vViewSize.Y);
 	ClearBuffer(Pixel(0,0,0,255),TRUE);
 	PrepareDrawing();
@@ -515,24 +552,15 @@ void SetCurrentTargetp(TextureS *texture){
 	currentTarget = texture;
 };
 
-void MouseUpdate(uint32_t button,BOOL state){
-	switch (button){
-	case 0: vMouseState.LButton = state; break;
-	case 1: vMouseState.RButton = state; break;
-	case 2: vMouseState.MButton = state; break;
-	default: break;
-	};
-};
-
-void MouseUpdatePos(int32_t x,int32_t y){
+void UpdateMousePos(int32_t x,int32_t y){
 	vMousePos.X = x/vScale;
 	vMousePos.Y = y/vScale;
 };
 
-void Set_Focus(BOOL state){
-	isFocused = state;
+void UpdateMouseState(BOOL state, int32_t button){
+	mouseNewState[button] = state;
 };
 
-void SetKeyState(BOOL state, int key){
-	vKBCache = key;
+void SetKeyState(BOOL state, int32_t key){
+	keyboardNewState[key] = state;
 };
