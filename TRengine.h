@@ -11,32 +11,12 @@
 //Fullscreen unsupported, need to implement
 //REDRAW DEFAULT LAYER ON WINDOW RESIZE
 
-typedef struct XandY {
+typedef enum {false,true} bool;
+
+typedef struct vector2d {
     uint32_t X;
     uint32_t Y;
 } vector2d;
-
-HDC glDeviceContext;
-HGLRC glRenderContext;
-HWND windowHandle;
-HANDLE engineThread;
-BOOL applicationIsRunning=FALSE;
-BOOL fullscreenIsEnabled=FALSE;
-BOOL vsyncIsEnabled=FALSE;
-BOOL keyboardOldState[100];
-BOOL keyboardNewState[100];
-BOOL mouseOldState[3];
-BOOL mouseNewState[3];
-
-vector2d vScreenSize;
-vector2d vViewSize;
-vector2d vWinSize;
-vector2d vViewPos;
-uint32_t vScale = 1;
-GLuint id=0;
-vector2d vMousePos;
-
-typedef enum rcode {FAIL = 0, OK = 1} rcode;
 
 typedef struct PixelStruct {
 	union {
@@ -54,13 +34,10 @@ typedef struct TextureStruct {
 } TextureS;
 
 typedef struct ButtonInput {
-	BOOL pressed;
-	BOOL released;
-	BOOL held;
+	bool pressed;
+	bool released;
+	bool held;
 } ButtonInput;
-
-ButtonInput vMouse[3]; 
-ButtonInput vKeyboard[100];
 
 typedef enum KeyMapping {
 	key_0 = 0x30, key_1 = 0x31, key_2 = 0x32, key_3 = 0x33, key_4 = 0x34, key_5 = 0x35, key_6 = 0x36, key_7 = 0x37, key_8 = 0x38, key_09 = 0x39, 
@@ -70,22 +47,42 @@ typedef enum KeyMapping {
 	key_Arrow_Down = 0x28, key_Esc = 0x1B, key_Ctrl = 0x11, key_Shift = 0x10, key_Enter = 0x0D, key_Backspace = 0x08, key_Spacebar = 0x20, key_Delete = 0x2E
 } KeyMapping;
 
+HDC glDeviceContext;
+HGLRC glRenderContext;
+HWND windowHandle;
+HANDLE engineThread;
+bool applicationIsRunning=false;
+bool fullscreenIsEnabled=false;
+bool vsyncIsEnabled=false;
+bool keyboardOldState[100];
+bool keyboardNewState[100];
+bool mouseOldState[3];
+bool mouseNewState[3];
+vector2d vScreenSize;
+vector2d vViewSize;
+vector2d vWindowSize;
+vector2d vViewPosition;
+uint32_t vScale = 1;
+GLuint id=0;
+vector2d vMousePosition;
+ButtonInput vMouse[3]; 
+ButtonInput vKeyboard[100];
 TextureS *currentTarget=NULL;
 TextureS *layers[32];
 int32_t textureNumber=0;
 
 TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData);
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
-LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMsg, WPARAM wParam, LPARAM lParam);
-rcode StartSystemLoop(); 
-rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize);
-rcode CreateDevice(HWND windowHandle, BOOL boolFullscreen, BOOL boolVsync); 
-rcode CreateGraphics(BOOL boolFullscreen, BOOL boolVsync, vector2d viewPos, vector2d viewSize); 
+LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter);
+bool StartSystemLoop(); 
+bool CreateWindowPane(bool boolFullscreen, vector2d winPos, vector2d winSize);
+bool CreateDevice(HWND windowHandle, bool boolFullscreen, bool boolVsync); 
+bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPos, vector2d viewSize); 
 void DisplayFrame(); 
 void PrepareDrawing(); 
-rcode DestroyDevice(); 
-rcode ThreadCleanup(); 
-void ClearBuffer(PixelS pixel,BOOL boolDepth);
+bool DestroyDevice(); 
+bool ThreadCleanup(); 
+void ClearBuffer(PixelS pixel,bool boolDepth);
 void UpdateViewportEngine(uint32_t posx,uint32_t posy,uint32_t width,uint32_t height); 
 void UpdateViewport(); 
 uint32_t CreateTexture(uint32_t width, uint32_t height); 
@@ -95,18 +92,18 @@ uint32_t DeleteTexture(uint32_t id);
 void DrawLayer(PixelS tint); 
 void Terminate();
 void CreateLayer(TextureS *texture);
-rcode WritePixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture);
+bool WritePixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture);
 PixelS ReadPixel(uint32_t x, uint32_t y, TextureS *texture);
-rcode DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
+bool DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
 PixelS CheckPixel(uint32_t x, uint32_t y); // on default layer
-rcode DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
+bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
 void PrepareEngine(); 
 DWORD WINAPI EngineThread(); 
-rcode Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, BOOL boolFullscreen, BOOL boolVsync); 
-rcode Start(); 
+bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync); 
+bool Start(); 
 void CoreUpdate();
-BOOL OnInitU(); 
-BOOL OnUpdateU(); 
+bool OnInitU(); 
+bool OnUpdateU(); 
 void UpdateWinSize(uint32_t x, uint32_t y); 
 void SetScale(uint32_t scale);
 uint32_t ScreenWidth(); 
@@ -114,9 +111,8 @@ uint32_t ScreenHeight();
 void SetCurrentTargeti(uint32_t index);
 void SetCurrentTargetp(TextureS *texture);
 void UpdateMousePos(int32_t x,int32_t y);
-void UpdateMouseState(BOOL state, int32_t button);
-void SetKeyState(BOOL state, int32_t key);
-
+void UpdateMouseState(bool state, int32_t button);
+void SetKeyState(bool state, int32_t key);
 
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
     PixelS pixel;
@@ -139,58 +135,58 @@ TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData){
     return texture;  
 };
 
-LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	switch(uMsg){
-	case WM_SIZE: UpdateWinSize(lParam & 0xFFFF, (lParam >> 16) & 0xFFFF); break;
+LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter) {
+	switch(uMessage){
+	case WM_SIZE: UpdateWinSize(lParameter & 0xFFFF, (lParameter >> 16) & 0xFFFF); break;
 	case WM_MOUSEMOVE:{
-	uint16_t x = lParam & 0xFFFF; uint16_t y = (lParam >> 16) & 0xFFFF;
-	int16_t ix = *(int16_t*)&x;   int16_t iy = *(int16_t*)&y;
-	UpdateMousePos(ix,iy);
-	break; 
+		uint16_t x = lParameter & 0xFFFF; uint16_t y = (lParameter >> 16) & 0xFFFF;
+		int16_t ix = *(int16_t*)&x;   int16_t iy = *(int16_t*)&y;
+		UpdateMousePos(ix,iy);
+		break; 
 	};
-	case WM_KEYDOWN: SetKeyState(TRUE,wParam); break;
-	case WM_KEYUP: SetKeyState(FALSE,wParam); break;
+	case WM_KEYDOWN: SetKeyState(TRUE,wParameter); break;
+	case WM_KEYUP: SetKeyState(false,wParameter); break;
 	case WM_LBUTTONDOWN: UpdateMouseState(TRUE,0); break;
-	case WM_LBUTTONUP: UpdateMouseState(FALSE,0); break;
+	case WM_LBUTTONUP: UpdateMouseState(false,0); break;
 	case WM_RBUTTONDOWN: UpdateMouseState(TRUE,1); break;
-	case WM_RBUTTONUP: UpdateMouseState(FALSE,1); break;
+	case WM_RBUTTONUP: UpdateMouseState(false,1); break;
 	case WM_MBUTTONDOWN: UpdateMouseState(TRUE,2); break;
-	case WM_MBUTTONUP: UpdateMouseState(FALSE,2); break;
+	case WM_MBUTTONUP: UpdateMouseState(false,2); break;
 	case WM_DESTROY: PostQuitMessage(0); break;
 	case WM_CLOSE: Terminate(); break;
 	};
-	return DefWindowProc(windowHandle, uMsg, wParam, lParam);
+	return DefWindowProc(windowHandle, uMessage, wParameter, lParameter);
 };
 
-rcode StartSystemLoop(){
-	MSG msg;
-	while (GetMessage(&msg,NULL,0,0) > 0){
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+bool StartSystemLoop(){
+	MSG message;
+	while (GetMessage(&message,NULL,0,0) > 0){
+		TranslateMessage(&message);
+		DispatchMessage(&message);
 	};
-	return OK;
+	return true;
 };
 
-rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize){
+bool CreateWindowPane(bool boolFullscreen, vector2d windowPosition, vector2d windowSize){
     //IMPLEMENT FULLSCREEN 
-	WNDCLASS winC;
-	winC.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	winC.hCursor = LoadCursor(NULL, IDC_ARROW);
-	winC.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-	winC.hInstance = GetModuleHandle(NULL);
-	winC.lpfnWndProc = WindowEvent;
-	winC.cbClsExtra = 0;
-	winC.cbWndExtra = 0;
-	winC.lpszMenuName = NULL;
-	winC.hbrBackground = NULL;
-	winC.lpszClassName = WNDCLASSNAME;
-	RegisterClass(&winC);
+	WNDCLASS windowClass;
+	windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	windowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+	windowClass.hInstance = GetModuleHandle(NULL);
+	windowClass.lpfnWndProc = WindowEvent;
+	windowClass.cbClsExtra = 0;
+	windowClass.cbWndExtra = 0;
+	windowClass.lpszMenuName = NULL;
+	windowClass.hbrBackground = NULL;
+	windowClass.lpszClassName = WNDCLASSNAME;
+	RegisterClass(&windowClass);
 	DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
 	DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
 
 	vector2d vTopLeft;
-	vTopLeft.X = winPos.X;
-	vTopLeft.Y = winPos.Y;
+	vTopLeft.X = windowPosition.X;
+	vTopLeft.Y = windowPosition.Y;
 	/*
 	if (boolFullscreen){
 		dwExStyle = 0;
@@ -198,25 +194,25 @@ rcode CreateWindowPane(BOOL boolFullscreen, vector2d winPos, vector2d winSize){
 		HMONITOR hmon = MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
 		MONITORINFO mi;
 		mi.cbSize = sizeof(mi);
-		if (!GetMonitorInfo(hmon, &mi)) return FAIL;
-		vWinSize.X = mi.rcMonitor.right;
-		vWinSize.Y = mi.rcMonitor.bottom;
+		if (!GetMonitorInfo(hmon, &mi)) return false;
+		vWindowSize.X = mi.rcMonitor.right;
+		vWindowSize.Y = mi.rcMonitor.bottom;
 		vTopLeft.X = 0;
 		vTopLeft.Y = 0;
 	}*/
 
-	RECT rWndRect;
-	rWndRect.left = 0; rWndRect.top = 0;
-	rWndRect.right = winSize.X; rWndRect.bottom = winSize.Y;
-	AdjustWindowRectEx(&rWndRect, dwStyle, FALSE, dwExStyle);
-	int width = rWndRect.right - rWndRect.left;
-	int height = rWndRect.bottom - rWndRect.top;
+	RECT windowRectangle;
+	windowRectangle.left = 0; windowRectangle.top = 0;
+	windowRectangle.right = windowSize.X; windowRectangle.bottom = windowSize.Y;
+	AdjustWindowRectEx(&windowRectangle, dwStyle, false, dwExStyle);
+	int width = windowRectangle.right - windowRectangle.left;
+	int height = windowRectangle.bottom - windowRectangle.top;
 
 	windowHandle = CreateWindowEx(dwExStyle, WNDCLASSNAME, WNDNAME, dwStyle, vTopLeft.X, vTopLeft.Y, width, height, NULL, NULL, GetModuleHandle(NULL), NULL);
-	return OK;
+	return true;
 };
 
-rcode CreateDevice(HWND windowHandle, BOOL boolFullscreen, BOOL boolVsync){
+bool CreateDevice(HWND windowHandle, bool boolFullscreen, bool boolVsync){
     //POSSIBLE TO REMOVE FRAME CAP
 	glDeviceContext = GetDC(windowHandle);
 	PIXELFORMATDESCRIPTOR pfd;
@@ -228,24 +224,24 @@ rcode CreateDevice(HWND windowHandle, BOOL boolFullscreen, BOOL boolVsync){
 
 	int pf = 0;
 	if (!(pf = ChoosePixelFormat(glDeviceContext,&pfd))) {
-		return FAIL;
+		return false;
 	};
 	SetPixelFormat(glDeviceContext,pf,&pfd);
 	if (!(glRenderContext = wglCreateContext(glDeviceContext))){
-		return FAIL;
+		return false;
 	};
 	wglMakeCurrent(glDeviceContext, glRenderContext);
 	glEnable(GL_TEXTURE_2D);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);	
-	return OK;
+	return true;
 };
 
-rcode CreateGraphics(BOOL boolFullscreen, BOOL boolVsync, vector2d viewPos, vector2d viewSize){
-	if (CreateDevice(windowHandle,fullscreenIsEnabled,vsyncIsEnabled)==OK){
-		UpdateViewportEngine(viewPos.X,viewPos.Y,viewSize.X,viewSize.Y);
-		return OK;
+bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, vector2d viewSize){
+	if (CreateDevice(windowHandle,fullscreenIsEnabled,vsyncIsEnabled)==true){
+		UpdateViewportEngine(viewPosition.X,viewPosition.Y,viewSize.X,viewSize.Y);
+		return true;
 	} else {
-		return FAIL;
+		return false;
 	};
 };
 
@@ -259,18 +255,18 @@ void PrepareDrawing(){
 	glEnable(GL_TEXTURE_2D);
 };
 
-rcode DestroyDevice(){
+bool DestroyDevice(){
 	wglDeleteContext(glRenderContext);
-	return OK;
+	return true;
 };
 
-rcode ThreadCleanup(){
+bool ThreadCleanup(){
 	DestroyDevice();
 	PostMessage(windowHandle,WM_DESTROY,0,0);
-	return OK;
+	return true;
 };
 
-void ClearBuffer(PixelS pixel,BOOL boolDepth){
+void ClearBuffer(PixelS pixel,bool boolDepth){
 	glClearColor(((float)pixel.r)/255.0f,((float)pixel.g)/255.0f,((float)pixel.b)/255.0f,((float)pixel.a)/255.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	if (boolDepth){
@@ -278,27 +274,25 @@ void ClearBuffer(PixelS pixel,BOOL boolDepth){
 	};
 };
 
-void UpdateViewportEngine(uint32_t posx,uint32_t posy,uint32_t width,uint32_t height){
-	glViewport(posx,posy,width,height);
+void UpdateViewportEngine(uint32_t positionX,uint32_t positionY,uint32_t width,uint32_t height){
+	glViewport(positionX,positionY,width,height);
 };
 
 void UpdateViewport(){
-	uint32_t ww = vScreenSize.X * vScale;
-	uint32_t wh = vScreenSize.Y * vScale;
-	float ratio = (float)ww / (float)wh;
+	uint32_t windowWidth = vScreenSize.X * vScale;
+	uint32_t windowHeight = vScreenSize.Y * vScale;
+	float ratio = (float)windowWidth / (float)windowHeight;
 
-	vViewSize.X = (uint32_t)vWinSize.X;
+	vViewSize.X = (uint32_t)vWindowSize.X;
 	vViewSize.Y = (uint32_t)((float)vViewSize.X/ratio);
 
-	if (vViewSize.Y > vWinSize.Y){
-		vViewSize.Y = vWinSize.Y;
+	if (vViewSize.Y > vWindowSize.Y){
+		vViewSize.Y = vWindowSize.Y;
 		vViewSize.X = (uint32_t)((float)vViewSize.Y * ratio);
 	};
-	vViewPos.X = (vWinSize.X-vViewSize.X)/2;
-	vViewPos.Y = (vWinSize.Y-vViewSize.Y)/2;
+	vViewPosition.X = (vWindowSize.X-vViewSize.X)/2;
+	vViewPosition.Y = (vWindowSize.Y-vViewSize.Y)/2;
 };
-
-
 
 uint32_t CreateTexture(uint32_t width, uint32_t height){
 	glGenTextures(1,&id);
@@ -341,21 +335,21 @@ void Terminate(){
 	for (int i=0;i<textureNumber;i++){
 		free(&layers[i]);
 	};
-	applicationIsRunning = FALSE;
+	applicationIsRunning = false;
 	printf("[DONE] Memory cleanup\n");
 };
 
 void CreateLayer(TextureS *texture){
-    layers[textureNumber] = texture; //&texture;
+    layers[textureNumber] = texture;
     textureNumber++;
 };
 
-rcode WritePixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture){
+bool WritePixel(uint32_t x, uint32_t y, PixelS pixel, TextureS *texture){
 	if ((x<texture->width) && (y<texture->height)){
 		texture->TexData[(texture->width)*y+x] = pixel;
-		return OK;
+		return true;
 	};
-	return FAIL;
+	return false;
 };
 PixelS ReadPixel(uint32_t x, uint32_t y, TextureS *texture){
 	if ((x<texture->width) && (y<texture->height)){
@@ -364,7 +358,7 @@ PixelS ReadPixel(uint32_t x, uint32_t y, TextureS *texture){
 	return Pixel(0,0,0,0);
 };
 
-rcode DrawPixel(uint32_t x, uint32_t y, PixelS pixel){
+bool DrawPixel(uint32_t x, uint32_t y, PixelS pixel){
 	x = x*vScale;
 	y = y*vScale;
 	if ((x<layers[0]->width) && (y<layers[0]->height)){
@@ -377,9 +371,9 @@ rcode DrawPixel(uint32_t x, uint32_t y, PixelS pixel){
 		} else {
 			WritePixel(x,y,pixel,layers[0]);
 		};
-		return OK;
+		return true;
 	};
-	return FAIL;
+	return false;
 };
 
 PixelS CheckPixel(uint32_t x, uint32_t y){
@@ -391,7 +385,7 @@ PixelS CheckPixel(uint32_t x, uint32_t y){
 	return Pixel(0,0,0,0);
 };
 
-rcode DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
+bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
 	x = x*vScale;
 	y = y*vScale;
 
@@ -412,29 +406,28 @@ rcode DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
 			};
         };
     };
-	return OK;
+	return true;
 };
 
 void PrepareEngine(){
-	PixelS *data = malloc(sizeof(PixelS)*vWinSize.X*vWinSize.Y);
-	for (uint32_t i = 0; i < vWinSize.X*vWinSize.Y;i++){
+	PixelS *data = malloc(sizeof(PixelS)*vWindowSize.X*vWindowSize.Y);
+	for (uint32_t i = 0; i < vWindowSize.X*vWindowSize.Y;i++){
 		data[i] = Pixel(255,255,255,255);
 	};
-	CreateLayer(MakeTex(vWinSize.X,vWinSize.Y, data));
+	CreateLayer(MakeTex(vWindowSize.X,vWindowSize.Y, data));
 	free(data);
 	SetCurrentTargeti(0);
 	UpdateTexture(currentTarget);
-    printf("[DONE]Default texture created\n");
+    printf("[DONE] Default texture created\n");
 };
 
 DWORD WINAPI EngineThread(){
-	printf("[INIT]Engine thread\n");
-	CreateGraphics(fullscreenIsEnabled,vsyncIsEnabled,vViewPos,vViewSize);
-	printf("[DONE]Create graphics\n");
+	printf("[INIT] Engine thread\n");
+	CreateGraphics(fullscreenIsEnabled,vsyncIsEnabled,vViewPosition,vViewSize);
 	PrepareEngine();
-	printf("[DONE]Engine prep\n");
+	printf("[DONE] Engine prep\n");
 	if (!OnInitU()){
-		applicationIsRunning = FALSE;
+		applicationIsRunning = false;
 	};
 	while (applicationIsRunning){
 		CoreUpdate();
@@ -443,92 +436,92 @@ DWORD WINAPI EngineThread(){
 	return 1;
 };
 
-rcode Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, BOOL boolFullscreen, BOOL boolVsync){
+bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync){
 	vScreenSize.X = screenW;
 	vScreenSize.Y = screenH;
 	SetScale(scale);
-	vWinSize.X = vScreenSize.X * scale;
-	vWinSize.Y = vScreenSize.Y * scale;
+	vWindowSize.X = vScreenSize.X * scale;
+	vWindowSize.Y = vScreenSize.Y * scale;
 	fullscreenIsEnabled = boolFullscreen;
 	vsyncIsEnabled = boolVsync;
-    printf("[DONE]Construct finished\n");
-	return OK;
+    printf("[DONE] Construct finished\n");
+	return true;
 };
 
-rcode Start(){
+bool Start(){
 	for (int i = 0; i < 3; i++){
-		vMouse[i].released = FALSE;
-		vMouse[i].pressed = FALSE;
-		vMouse[i].held = FALSE;
+		vMouse[i].released = false;
+		vMouse[i].pressed = false;
+		vMouse[i].held = false;
 	};
 	for (int i = 0; i < 100; i++){
-		vKeyboard[i].held = FALSE;
-		vKeyboard[i].pressed = FALSE;
-		vKeyboard[i].released = FALSE;
+		vKeyboard[i].held = false;
+		vKeyboard[i].pressed = false;
+		vKeyboard[i].released = false;
 	};
-	vMousePos.X = 0; vMousePos.Y = 0; 
-    vector2d wp;
-    wp.X = 50;
-    wp.Y = 50;
-	CreateWindowPane(FALSE,wp,vWinSize);
-	UpdateWinSize(vWinSize.X,vWinSize.Y);
+	vMousePosition.X = 0; vMousePosition.Y = 0; 
+    vector2d windowPosition;
+    windowPosition.X = 50;
+    windowPosition.Y = 50;
+	CreateWindowPane(false,windowPosition,vWindowSize);
+	UpdateWinSize(vWindowSize.X,vWindowSize.Y);
 	applicationIsRunning = TRUE;
 	engineThread = CreateThread(NULL,0,*EngineThread,NULL,0,NULL);
 	StartSystemLoop();
 	if (engineThread != NULL){
 		WaitForSingleObject(engineThread,INFINITE);
 	};
-	printf("[DONE]Start ended\n");
-	return OK;
+	printf("[DONE] Start ended\n");
+	return true;
 };
 
 void CoreUpdate(){
 	ClearBuffer(Pixel(0,0,0,255),TRUE);
 	if (!OnUpdateU()){
-		applicationIsRunning = FALSE;
+		applicationIsRunning = false;
 	};
 	for (int i = 0; i < 3; i++){
-		vMouse[i].pressed = FALSE;
-		vMouse[i].released = FALSE;
+		vMouse[i].pressed = false;
+		vMouse[i].released = false;
 		if (mouseOldState[i] != mouseNewState[i]){
 			if (mouseNewState[i]){
 				vMouse[i].pressed = !vMouse[i].held;
 				vMouse[i].held = TRUE;
 			} else {
 				vMouse[i].released = TRUE;
-				vMouse[i].held = FALSE;
+				vMouse[i].held = false;
 			};
 		};
 		mouseOldState[i] = mouseNewState[i];
 	};
 	for (int i = 0; i < 100; i++){
-		vKeyboard[i].pressed = FALSE;
-		vKeyboard[i].released = FALSE;
+		vKeyboard[i].pressed = false;
+		vKeyboard[i].released = false;
 		if (keyboardOldState[i] != keyboardNewState[i]){
 			if (keyboardNewState[i]){
 				vKeyboard[i].pressed = !vKeyboard[i].held;
 				vKeyboard[i].held = TRUE;
 			} else {
 				vKeyboard[i].released = TRUE;
-				vKeyboard[i].held = FALSE;
+				vKeyboard[i].held = false;
 			};
 		};
 		keyboardOldState[i] = keyboardNewState[i];
 	};
 
-	UpdateViewportEngine(vViewPos.X,vViewPos.Y,vViewSize.X,vViewSize.Y);
+	UpdateViewportEngine(vViewPosition.X,vViewPosition.Y,vViewSize.X,vViewSize.Y);
 	ClearBuffer(Pixel(0,0,0,255),TRUE);
 	PrepareDrawing();
 	ApplyTexture(currentTarget->id);
 	UpdateTexture(currentTarget);
-	DrawLayer(Pixel(255,255,255,255));
+	DrawLayer(Pixel(0,0,0,0));
 	DisplayFrame();
 
 };
 
 void UpdateWinSize(uint32_t x, uint32_t y){
-	vWinSize.X = x;
-	vWinSize.Y = y;
+	vWindowSize.X = x;
+	vWindowSize.Y = y;
 	UpdateViewport();
 };
 
@@ -553,14 +546,14 @@ void SetCurrentTargetp(TextureS *texture){
 };
 
 void UpdateMousePos(int32_t x,int32_t y){
-	vMousePos.X = x/vScale;
-	vMousePos.Y = y/vScale;
+	vMousePosition.X = x/vScale;
+	vMousePosition.Y = y/vScale;
 };
 
-void UpdateMouseState(BOOL state, int32_t button){
+void UpdateMouseState(bool state, int32_t button){
 	mouseNewState[button] = state;
 };
 
-void SetKeyState(BOOL state, int32_t key){
+void SetKeyState(bool state, int32_t key){
 	keyboardNewState[key] = state;
 };
