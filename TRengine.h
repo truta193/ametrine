@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <time.h>
 #include <GL/gl.h>
 #define WNDCLASSNAME "GLClass"
 #define WNDNAME	"My app"
@@ -65,6 +66,11 @@ ButtonInput vKeyboard[100];
 TextureS *currentTarget=NULL;
 TextureS *layers[32];
 int32_t textureNumber=0;
+float framesPerSecond=0.0;
+clock_t timeCounter1, timeCounter2;
+float elapsedTime=0.0;
+float frameTimer=0.0;
+
 
 TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData);
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
@@ -406,7 +412,7 @@ bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
 bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture){
 	x = x*vScale;
 	y = y*vScale;
-TEST STARTING POINT 0,0
+
     if (vScale > 1){
         for (uint32_t i = left; i < right+1; i++){
             for (uint32_t j = top; j < bottom+1; j++){
@@ -437,6 +443,8 @@ void PrepareEngine(){
 	SetCurrentTargeti(0);
 	UpdateTexture(currentTarget);
     printf("[DONE] Default texture created\n");
+	timeCounter1 = clock();
+	timeCounter2 = clock();
 };
 
 DWORD WINAPI EngineThread(){
@@ -494,10 +502,10 @@ bool Start(){
 };
 
 void CoreUpdate(){
-	ClearBuffer(Pixel(0,0,0,255),true);
-	if (!OnUpdateU()){
-		applicationIsRunning = false;
-	};
+	timeCounter2 = clock();
+	elapsedTime = ((float)timeCounter2-(float)timeCounter1)/CLOCKS_PER_SEC;
+	timeCounter1 = timeCounter2;
+
 	for (int i = 0; i < 3; i++){
 		vMouse[i].pressed = false;
 		vMouse[i].released = false;
@@ -527,6 +535,10 @@ void CoreUpdate(){
 		keyboardOldState[i] = keyboardNewState[i];
 	};
 
+	ClearBuffer(Pixel(0,0,0,255),true);
+	if (!OnUpdateU()){
+		applicationIsRunning = false;
+	};
 	UpdateViewportEngine(vViewPosition.X,vViewPosition.Y,vViewSize.X,vViewSize.Y);
 	ClearBuffer(Pixel(0,0,0,255),true);
 	PrepareDrawing();
@@ -534,6 +546,15 @@ void CoreUpdate(){
 	UpdateTexture(currentTarget);
 	DrawLayer(Pixel(0,0,0,0));
 	DisplayFrame();
+
+	frameTimer = frameTimer + elapsedTime;
+	framesPerSecond++;
+	if (frameTimer >= 1.0){
+		frameTimer = frameTimer - 1.0;
+		printf("\n%f",framesPerSecond);
+		//SetWindowText(windowHandle,strcat(WNDNAME,"60"));
+		framesPerSecond = 0.0;
+	};
 };
 
 void UpdateWinSize(uint32_t x, uint32_t y){
