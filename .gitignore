@@ -2,3 +2,4 @@
 *.json
 *.exe
 *pas
+temp.c
