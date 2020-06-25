@@ -5,11 +5,6 @@
 #include <GL/gl.h>
 #define WNDCLASSNAME "GLClass"
 #define WNDNAME	"My app"
-//FUNCTION TO SET WINDOW TITLE
-//FRAME TIMER
-//% positioning, e.g 0.5 away from X origin = X axis middle (0.0 to 1.0)
-//Fullscreen unsupported, need to implement
-//REDRAW DEFAULT LAYER ON WINDOW RESIZE
 
 typedef enum {false,true} bool;
 
@@ -97,6 +92,7 @@ PixelS ReadPixel(uint32_t x, uint32_t y, TextureS *texture);
 bool DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
 PixelS CheckPixel(uint32_t x, uint32_t y); // on default layer
 bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
+bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture);
 void PrepareEngine(); 
 DWORD WINAPI EngineThread(); 
 bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync); 
@@ -105,9 +101,8 @@ void CoreUpdate();
 bool OnInitU(); 
 bool OnUpdateU(); 
 void UpdateWinSize(uint32_t x, uint32_t y); 
-void SetScale(uint32_t scale);
-uint32_t ScreenWidth(); 
-uint32_t ScreenHeight(); 
+uint32_t GetScreenWidth(); 
+uint32_t GetScreenHeight(); 
 void SetCurrentTargeti(uint32_t index);
 void SetCurrentTargetp(TextureS *texture);
 void UpdateMousePos(int32_t x,int32_t y);
@@ -144,13 +139,13 @@ LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMessage, WPARAM wParameter
 		UpdateMousePos(ix,iy);
 		break; 
 	};
-	case WM_KEYDOWN: SetKeyState(TRUE,wParameter); break;
+	case WM_KEYDOWN: SetKeyState(true,wParameter); break;
 	case WM_KEYUP: SetKeyState(false,wParameter); break;
-	case WM_LBUTTONDOWN: UpdateMouseState(TRUE,0); break;
+	case WM_LBUTTONDOWN: UpdateMouseState(true,0); break;
 	case WM_LBUTTONUP: UpdateMouseState(false,0); break;
-	case WM_RBUTTONDOWN: UpdateMouseState(TRUE,1); break;
+	case WM_RBUTTONDOWN: UpdateMouseState(true,1); break;
 	case WM_RBUTTONUP: UpdateMouseState(false,1); break;
-	case WM_MBUTTONDOWN: UpdateMouseState(TRUE,2); break;
+	case WM_MBUTTONDOWN: UpdateMouseState(true,2); break;
 	case WM_MBUTTONUP: UpdateMouseState(false,2); break;
 	case WM_DESTROY: PostQuitMessage(0); break;
 	case WM_CLOSE: Terminate(); break;
@@ -168,7 +163,6 @@ bool StartSystemLoop(){
 };
 
 bool CreateWindowPane(bool boolFullscreen, vector2d windowPosition, vector2d windowSize){
-    //IMPLEMENT FULLSCREEN 
 	WNDCLASS windowClass;
 	windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -187,7 +181,7 @@ bool CreateWindowPane(bool boolFullscreen, vector2d windowPosition, vector2d win
 	vector2d vTopLeft;
 	vTopLeft.X = windowPosition.X;
 	vTopLeft.Y = windowPosition.Y;
-	/*
+	
 	if (boolFullscreen){
 		dwExStyle = 0;
 		dwStyle = WS_VISIBLE | WS_POPUP;
@@ -199,7 +193,7 @@ bool CreateWindowPane(bool boolFullscreen, vector2d windowPosition, vector2d win
 		vWindowSize.Y = mi.rcMonitor.bottom;
 		vTopLeft.X = 0;
 		vTopLeft.Y = 0;
-	}*/
+	};
 
 	RECT windowRectangle;
 	windowRectangle.left = 0; windowRectangle.top = 0;
@@ -409,6 +403,30 @@ bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
 	return true;
 };
 
+bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture){
+	x = x*vScale;
+	y = y*vScale;
+TEST STARTING POINT 0,0
+    if (vScale > 1){
+        for (uint32_t i = left; i < right+1; i++){
+            for (uint32_t j = top; j < bottom+1; j++){
+                for (uint32_t is = 0; is < vScale; is++){
+                    for (uint32_t js = 0; js < vScale; js++){
+						WritePixel(x + ((i-left)*vScale) + is, y + ((j-top)*vScale) + js, ReadPixel(i,j,texture), layers[0]);
+					};
+				};
+			};	
+        };
+    } else {
+        for (int32_t i = left; i < right+1; i++){
+            for (int32_t j = top; j < bottom+1; j++){
+				WritePixel(x + i - left, y + j - top, ReadPixel(i,j,texture), layers[0]);
+			};
+        };
+    };
+	return true;
+};
+
 void PrepareEngine(){
 	PixelS *data = malloc(sizeof(PixelS)*vWindowSize.X*vWindowSize.Y);
 	for (uint32_t i = 0; i < vWindowSize.X*vWindowSize.Y;i++){
@@ -439,7 +457,7 @@ DWORD WINAPI EngineThread(){
 bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync){
 	vScreenSize.X = screenW;
 	vScreenSize.Y = screenH;
-	SetScale(scale);
+	vScale = scale;
 	vWindowSize.X = vScreenSize.X * scale;
 	vWindowSize.Y = vScreenSize.Y * scale;
 	fullscreenIsEnabled = boolFullscreen;
@@ -463,9 +481,9 @@ bool Start(){
     vector2d windowPosition;
     windowPosition.X = 50;
     windowPosition.Y = 50;
-	CreateWindowPane(false,windowPosition,vWindowSize);
+	CreateWindowPane(fullscreenIsEnabled,windowPosition,vWindowSize);
 	UpdateWinSize(vWindowSize.X,vWindowSize.Y);
-	applicationIsRunning = TRUE;
+	applicationIsRunning = true;
 	engineThread = CreateThread(NULL,0,*EngineThread,NULL,0,NULL);
 	StartSystemLoop();
 	if (engineThread != NULL){
@@ -476,7 +494,7 @@ bool Start(){
 };
 
 void CoreUpdate(){
-	ClearBuffer(Pixel(0,0,0,255),TRUE);
+	ClearBuffer(Pixel(0,0,0,255),true);
 	if (!OnUpdateU()){
 		applicationIsRunning = false;
 	};
@@ -486,9 +504,9 @@ void CoreUpdate(){
 		if (mouseOldState[i] != mouseNewState[i]){
 			if (mouseNewState[i]){
 				vMouse[i].pressed = !vMouse[i].held;
-				vMouse[i].held = TRUE;
+				vMouse[i].held = true;
 			} else {
-				vMouse[i].released = TRUE;
+				vMouse[i].released = true;
 				vMouse[i].held = false;
 			};
 		};
@@ -500,9 +518,9 @@ void CoreUpdate(){
 		if (keyboardOldState[i] != keyboardNewState[i]){
 			if (keyboardNewState[i]){
 				vKeyboard[i].pressed = !vKeyboard[i].held;
-				vKeyboard[i].held = TRUE;
+				vKeyboard[i].held = true;
 			} else {
-				vKeyboard[i].released = TRUE;
+				vKeyboard[i].released = true;
 				vKeyboard[i].held = false;
 			};
 		};
@@ -510,13 +528,12 @@ void CoreUpdate(){
 	};
 
 	UpdateViewportEngine(vViewPosition.X,vViewPosition.Y,vViewSize.X,vViewSize.Y);
-	ClearBuffer(Pixel(0,0,0,255),TRUE);
+	ClearBuffer(Pixel(0,0,0,255),true);
 	PrepareDrawing();
 	ApplyTexture(currentTarget->id);
 	UpdateTexture(currentTarget);
 	DrawLayer(Pixel(0,0,0,0));
 	DisplayFrame();
-
 };
 
 void UpdateWinSize(uint32_t x, uint32_t y){
@@ -525,15 +542,11 @@ void UpdateWinSize(uint32_t x, uint32_t y){
 	UpdateViewport();
 };
 
-void SetScale(uint32_t scale){
-	vScale = scale;
-};
-
-uint32_t ScreenWidth(){
+uint32_t GetScreenWidth(){
 	return vScreenSize.X;
 };
 
-uint32_t ScreenHeight(){
+uint32_t GetScreenHeight(){
 	return vScreenSize.Y;
 };
 
