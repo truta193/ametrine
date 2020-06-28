@@ -66,10 +66,11 @@ ButtonInput vKeyboard[100];
 TextureS *currentTarget=NULL;
 TextureS *layers[32];
 int32_t textureNumber=0;
-float framesPerSecond=0.0;
+int32_t framesPerSecond=0;
 clock_t timeCounter1, timeCounter2;
 float elapsedTime=0.0;
 float frameTimer=0.0;
+char windowTitle[20];
 
 
 TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData);
@@ -99,6 +100,7 @@ bool DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
 PixelS CheckPixel(uint32_t x, uint32_t y); // on default layer
 bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
 bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture);
+TextureS *LoadPNG(char *imagePath[]);
 void PrepareEngine(); 
 DWORD WINAPI EngineThread(); 
 bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync); 
@@ -114,6 +116,7 @@ void SetCurrentTargetp(TextureS *texture);
 void UpdateMousePos(int32_t x,int32_t y);
 void UpdateMouseState(bool state, int32_t button);
 void SetKeyState(bool state, int32_t key);
+void IntToStr(uint32_t value, char destination[]);
 
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
     PixelS pixel;
@@ -433,6 +436,10 @@ bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uin
 	return true;
 };
 
+TextureS *LoadPNG(char *imagePath[]){
+
+};
+
 void PrepareEngine(){
 	PixelS *data = malloc(sizeof(PixelS)*vWindowSize.X*vWindowSize.Y);
 	for (uint32_t i = 0; i < vWindowSize.X*vWindowSize.Y;i++){
@@ -489,6 +496,7 @@ bool Start(){
     vector2d windowPosition;
     windowPosition.X = 50;
     windowPosition.Y = 50;
+	windowTitle[0] = 'A'; windowTitle[1] = 'p'; windowTitle[2] = 'p';
 	CreateWindowPane(fullscreenIsEnabled,windowPosition,vWindowSize);
 	UpdateWinSize(vWindowSize.X,vWindowSize.Y);
 	applicationIsRunning = true;
@@ -503,7 +511,7 @@ bool Start(){
 
 void CoreUpdate(){
 	timeCounter2 = clock();
-	elapsedTime = ((float)timeCounter2-(float)timeCounter1)/CLOCKS_PER_SEC;
+	elapsedTime += ((float)timeCounter2-(float)timeCounter1)/CLOCKS_PER_SEC;
 	timeCounter1 = timeCounter2;
 
 	for (int i = 0; i < 3; i++){
@@ -539,6 +547,7 @@ void CoreUpdate(){
 	if (!OnUpdateU()){
 		applicationIsRunning = false;
 	};
+	
 	UpdateViewportEngine(vViewPosition.X,vViewPosition.Y,vViewSize.X,vViewSize.Y);
 	ClearBuffer(Pixel(0,0,0,255),true);
 	PrepareDrawing();
@@ -547,13 +556,13 @@ void CoreUpdate(){
 	DrawLayer(Pixel(0,0,0,0));
 	DisplayFrame();
 
-	frameTimer = frameTimer + elapsedTime;
 	framesPerSecond++;
-	if (frameTimer >= 1.0){
-		frameTimer = frameTimer - 1.0;
-		printf("\n%f",framesPerSecond);
-		//SetWindowText(windowHandle,strcat(WNDNAME,"60"));
-		framesPerSecond = 0.0;
+	if (elapsedTime >= 1.0f){
+		elapsedTime -= 1.0f;
+		IntToStr(framesPerSecond,windowTitle);
+		SetWindowText(windowHandle,windowTitle);
+		framesPerSecond = 0;
+		
 	};
 };
 
@@ -590,4 +599,19 @@ void UpdateMouseState(bool state, int32_t button){
 
 void SetKeyState(bool state, int32_t key){
 	keyboardNewState[key] = state;
+};
+
+void IntToStr(uint32_t value, char destination[]){
+    char const digit[] = "0123456789";
+    char* p = destination;
+    uint32_t shifter = value;
+    do {
+        ++p;
+        shifter = shifter/10;
+    } while(shifter);
+    *p = '\0';
+    do {
+        *--p = digit[value%10];
+        value = value/10;
+    } while(value);
 };
