@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <time.h>
 #include <GL/gl.h>
 #define WNDCLASSNAME "GLClass"
 #define WNDNAME	"My app"
@@ -65,6 +66,12 @@ ButtonInput vKeyboard[100];
 TextureS *currentTarget=NULL;
 TextureS *layers[32];
 int32_t textureNumber=0;
+int32_t framesPerSecond=0;
+clock_t timeCounter1, timeCounter2;
+float elapsedTime=0.0;
+float frameTimer=0.0;
+char windowTitle[20];
+
 
 TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData);
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
@@ -93,6 +100,7 @@ bool DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
 PixelS CheckPixel(uint32_t x, uint32_t y); // on default layer
 bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
 bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture);
+TextureS *LoadPNG(char *imagePath[]);
 void PrepareEngine(); 
 DWORD WINAPI EngineThread(); 
 bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync); 
@@ -108,6 +116,7 @@ void SetCurrentTargetp(TextureS *texture);
 void UpdateMousePos(int32_t x,int32_t y);
 void UpdateMouseState(bool state, int32_t button);
 void SetKeyState(bool state, int32_t key);
+void IntToStr(uint32_t value, char destination[]);
 
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
     PixelS pixel;
@@ -406,7 +415,7 @@ bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture){
 bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture){
 	x = x*vScale;
 	y = y*vScale;
-TEST STARTING POINT 0,0
+
     if (vScale > 1){
         for (uint32_t i = left; i < right+1; i++){
             for (uint32_t j = top; j < bottom+1; j++){
@@ -427,6 +436,10 @@ TEST STARTING POINT 0,0
 	return true;
 };
 
+TextureS *LoadPNG(char *imagePath[]){
+
+};
+
 void PrepareEngine(){
 	PixelS *data = malloc(sizeof(PixelS)*vWindowSize.X*vWindowSize.Y);
 	for (uint32_t i = 0; i < vWindowSize.X*vWindowSize.Y;i++){
@@ -437,6 +450,8 @@ void PrepareEngine(){
 	SetCurrentTargeti(0);
 	UpdateTexture(currentTarget);
     printf("[DONE] Default texture created\n");
+	timeCounter1 = clock();
+	timeCounter2 = clock();
 };
 
 DWORD WINAPI EngineThread(){
@@ -481,6 +496,7 @@ bool Start(){
     vector2d windowPosition;
     windowPosition.X = 50;
     windowPosition.Y = 50;
+	windowTitle[0] = 'A'; windowTitle[1] = 'p'; windowTitle[2] = 'p';
 	CreateWindowPane(fullscreenIsEnabled,windowPosition,vWindowSize);
 	UpdateWinSize(vWindowSize.X,vWindowSize.Y);
 	applicationIsRunning = true;
@@ -494,10 +510,10 @@ bool Start(){
 };
 
 void CoreUpdate(){
-	ClearBuffer(Pixel(0,0,0,255),true);
-	if (!OnUpdateU()){
-		applicationIsRunning = false;
-	};
+	timeCounter2 = clock();
+	elapsedTime += ((float)timeCounter2-(float)timeCounter1)/CLOCKS_PER_SEC;
+	timeCounter1 = timeCounter2;
+
 	for (int i = 0; i < 3; i++){
 		vMouse[i].pressed = false;
 		vMouse[i].released = false;
@@ -527,6 +543,11 @@ void CoreUpdate(){
 		keyboardOldState[i] = keyboardNewState[i];
 	};
 
+	ClearBuffer(Pixel(0,0,0,255),true);
+	if (!OnUpdateU()){
+		applicationIsRunning = false;
+	};
+	
 	UpdateViewportEngine(vViewPosition.X,vViewPosition.Y,vViewSize.X,vViewSize.Y);
 	ClearBuffer(Pixel(0,0,0,255),true);
 	PrepareDrawing();
@@ -534,6 +555,15 @@ void CoreUpdate(){
 	UpdateTexture(currentTarget);
 	DrawLayer(Pixel(0,0,0,0));
 	DisplayFrame();
+
+	framesPerSecond++;
+	if (elapsedTime >= 1.0f){
+		elapsedTime -= 1.0f;
+		IntToStr(framesPerSecond,windowTitle);
+		SetWindowText(windowHandle,windowTitle);
+		framesPerSecond = 0;
+		
+	};
 };
 
 void UpdateWinSize(uint32_t x, uint32_t y){
@@ -571,6 +601,21 @@ void SetKeyState(bool state, int32_t key){
 	keyboardNewState[key] = state;
 };
 
+void IntToStr(uint32_t value, char destination[]){
+    char const digit[] = "0123456789";
+    char* p = destination;
+    uint32_t shifter = value;
+    do {
+        ++p;
+        shifter = shifter/10;
+    } while(shifter);
+    *p = '\0';
+    do {
+        *--p = digit[value%10];
+        value = value/10;
+    } while(value);
+};
+
 bool OnInitU(){
 	PixelS *data1 = malloc(sizeof(PixelS)*20*20);
 	for (uint32_t i = 0; i < 20*20;i++){
@@ -578,7 +623,7 @@ bool OnInitU(){
 	};
 	CreateLayer(MakeTex(20, 20, data1));
 	free(data1);
-	DrawPartialTexture(1,1,3,3,8,8,layers[1]);
+	DrawPartialTexture(3,3,0,0,8,8,layers[1]);
 	DrawPixel(2,2,Pixel(255,255,90,255));
 	DrawPixel(2,3,Pixel(255,99,90,255));
 	return true;
