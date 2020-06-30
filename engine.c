@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <time.h>
 #include <GL/gl.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 #define WNDCLASSNAME "GLClass"
 #define WNDNAME	"My app"
 
@@ -73,7 +75,7 @@ float frameTimer=0.0;
 char windowTitle[20];
 
 
-TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData);
+TextureS *MakeTexture(uint32_t width,uint32_t height, PixelS *imgData);
 PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 LRESULT CALLBACK WindowEvent(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter);
 bool StartSystemLoop(); 
@@ -100,7 +102,7 @@ bool DrawPixel(uint32_t x, uint32_t y, PixelS pixel); // on default layer
 PixelS CheckPixel(uint32_t x, uint32_t y); // on default layer
 bool DrawTexture(uint32_t x, uint32_t y, TextureS *texture);
 bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureS *texture);
-TextureS *LoadPNG(char *imagePath[]);
+bool LoadImageFromPath(char imagePath[]);
 void PrepareEngine(); 
 DWORD WINAPI EngineThread(); 
 bool Construct(uint32_t screenW, uint32_t screenH, uint32_t scale, bool boolFullscreen, bool boolVsync); 
@@ -125,7 +127,7 @@ PixelS Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
     return pixel;
 };
 
-TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData){
+TextureS *MakeTexture(uint32_t width,uint32_t height, PixelS *imgData){
     TextureS *texture = malloc(sizeof(TextureS)+sizeof(PixelS)*width*height);
 	texture->id = CreateTexture(width, height);
     texture->height = height;
@@ -135,7 +137,7 @@ TextureS *MakeTex(uint32_t width,uint32_t height, PixelS *imgData){
         texture->TexData[i] = imgData[i];
 	};
 	
-    printf("[DONE] MakeTex\n");
+    printf("[DONE] MakeTexture\n");
     return texture;  
 };
 
@@ -436,8 +438,16 @@ bool DrawPartialTexture(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uin
 	return true;
 };
 
-TextureS *LoadPNG(char *imagePath[]){
-
+bool LoadImageFromPath(char imagePath[]){
+	int width, height, numberOfComponents;
+	unsigned char *data = stbi_load(imagePath, &width, &height, &numberOfComponents, 4);
+	if (data==NULL){
+		printf("[FAIL] Unable to load image");
+		return false;
+	};
+	CreateLayer(MakeTexture(width,height,(PixelS*)data));
+	stbi_image_free(data);
+	return true;
 };
 
 void PrepareEngine(){
@@ -445,7 +455,7 @@ void PrepareEngine(){
 	for (uint32_t i = 0; i < vWindowSize.X*vWindowSize.Y;i++){
 		data[i] = Pixel(255,255,255,255);
 	};
-	CreateLayer(MakeTex(vWindowSize.X,vWindowSize.Y, data));
+	CreateLayer(MakeTexture(vWindowSize.X,vWindowSize.Y, data));
 	free(data);
 	SetCurrentTargeti(0);
 	UpdateTexture(currentTarget);
@@ -617,15 +627,18 @@ void IntToStr(uint32_t value, char destination[]){
 };
 
 bool OnInitU(){
+	
 	PixelS *data1 = malloc(sizeof(PixelS)*20*20);
 	for (uint32_t i = 0; i < 20*20;i++){
 		data1[i] = Pixel(255,100,255,255);
 	};
-	CreateLayer(MakeTex(20, 20, data1));
+	CreateLayer(MakeTexture(20, 20, data1));
 	free(data1);
 	DrawPartialTexture(3,3,0,0,8,8,layers[1]);
 	DrawPixel(2,2,Pixel(255,255,90,255));
-	DrawPixel(2,3,Pixel(255,99,90,255));
+	DrawPixel(2,3,Pixel(255,99,90,255)); 
+	LoadImageFromPath("C:\\Users\\dfgdf\\Desktop\\Scoala\\raport.jpg");
+	DrawPartialTexture(50,50,0,0,800,500,layers[2]);
 	return true;
 }; 
 
@@ -640,7 +653,7 @@ bool OnUpdateU(){
 };
 
 int main(){
-    Construct(300,250,2,false,false);
+    Construct(1000,600,1,false,false);
 	Start();
 }
 
