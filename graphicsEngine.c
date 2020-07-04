@@ -37,6 +37,14 @@ typedef struct ButtonInput {
 	bool held;
 } ButtonInputType;
 
+typedef struct Layer { //WIP
+    bool bVisible;
+    bool bUpdate;
+    PixelType tint;
+
+    TextureType *texture;
+} LayerType;
+
 typedef enum KeyMapping {
 	key_0 = 0x30, key_1 = 0x31, key_2 = 0x32, key_3 = 0x33, key_4 = 0x34, key_5 = 0x35, key_6 = 0x36, key_7 = 0x37, key_8 = 0x38, key_09 = 0x39, 
 	key_A = 0x41, key_B = 0x42, key_C = 0x43, key_D = 0x44, key_E = 0x45, key_F = 0x46, key_G = 0x47, key_H = 0x48, key_I = 0x49, key_J = 0x4A,
@@ -67,18 +75,25 @@ ButtonInputType biKeyboard[100];
 uint32_t iScale = 1;
 GLuint iId = 0;
 uint32_t iTextureNumber = 0;
+uint32_t iLayerNumber = 0;
 uint32_t iFramesPerSecond = 0;
 clock_t clTimeCounter1;
 clock_t clTimeCounter2;
 float fElapsedTime = 0.0f;
 char cWindowTitle[40];
-TextureType *tCurrentTarget = NULL;
-TextureType *tLayers[32];
+TextureType *currentDrawTarget = NULL;
+TextureType *tWorkaround = NULL;
+TextureType *texturePack[32];
+LayerType *tLayers[32];
 
+void LayerCreate(PixelType tint); // Creating it with vScreenSize size; it stretches to vWindowSize to fit
+void LayerUpdate(LayerType *layer);
+void LayerApply(uint32_t id);
+void LayerDelete(uint32_t id);
 void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData);
 void TextureUpdate(TextureType *texture);
 void TextureApply(uint32_t id); 
-void TextureDelete(uint32_t id); // Should also delete from tLayers and push back others
+void TextureDelete(uint32_t id); // Should also delete from texturePack and push back others
 bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture);
 bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture);
 PixelType Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
@@ -86,6 +101,15 @@ bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture);
 bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel);
 PixelType PixelRead(uint32_t x, uint32_t y, TextureType *texture);
 PixelType PixelCheck(uint32_t x, uint32_t y);
+
+bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y);
+bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel); 
+bool RectangleFill();
+bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
+bool TriangleFill();
+bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
+bool CircleFill();
+
 bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync);
 bool Start();
 DWORD WINAPI EngineThread();
@@ -96,11 +120,11 @@ void ClearBuffer(PixelType pixel,bool boolDepth);
 bool CreateWindowPane(bool boolFullscreen, vector2d windowPosition, vector2d windowSize);
 bool CreateDevice(HWND windowHandle, bool boolFullscreen, bool boolVsync);
 bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, vector2d viewSize);
+void Clear(PixelType pixel);
 LRESULT CALLBACK WindowEventHandler(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter);
 void WindowUpdateSize(uint32_t x, uint32_t y);
 void ViewportUpdate();
 void Terminate();
-void CurrentTargetSetI(uint32_t index);
 void CurrentTargetSetP(TextureType *texture);
 void IntToStr(uint32_t value, char destination[]);
 bool LoadImageFromPath(char imagePath[]);
@@ -108,9 +132,40 @@ void MouseUpdatePosition(int32_t x, int32_t y);
 void MouseUpdateState(bool state, int32_t button);
 void KeySetState(bool state, int32_t key);
 
+void LayerCreate(PixelType tint){
+    TextureType *texture = malloc(sizeof(TextureType) + sizeof(PixelType)*vScreenSize.X*vScreenSize.Y);
+    glGenTextures(1, &iId);
+    glBindTexture(GL_TEXTURE_2D, iId);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+    texture->id = iId;
+    texture->height = vScreenSize.Y;
+    texture->width = vScreenSize.X;
+    PixelType pixel = Pixel(0,0,0,0);
+    for (uint32_t i = 0; i < vScreenSize.X*vScreenSize.Y; i++){
+        texture->textureData[i] = pixel;
+    };
+
+    LayerType *layer = malloc(sizeof(LayerType));
+    layer->bUpdate = true;
+    layer->bVisible = true;
+    layer->texture = texture;
+    layer->tint = tint;
+
+    TextureUpdate(texture);
+
+    tLayers[iLayerNumber] = layer;
+    iLayerNumber++;
+
+};
+
 
 void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData){
-    TextureType *texture = malloc(sizeof(TextureType)+sizeof(PixelType)*width*height);
+    TextureType *texture = malloc(sizeof(TextureType) + sizeof(PixelType)*width*height);
 
     glGenTextures(1, &iId);
     glBindTexture(GL_TEXTURE_2D, iId);
@@ -123,11 +178,11 @@ void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData){
     texture->id = iId;
     texture->height = height;
     texture->width = width;
+
     for (int i = 0; i < width*height; i++){
         texture->textureData[i] = imageData[i];
     };
-
-    tLayers[iTextureNumber] = texture;
+    texturePack[iTextureNumber] = texture;
     iTextureNumber++;
 };
 
@@ -143,8 +198,8 @@ void TextureDelete(uint32_t id){
     glDeleteTextures(1, &id);
 };
 
-bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
-    if (((x + texture->width) < vScreenSize.X) && ((y + texture->height) < vScreenSize.Y)){
+bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){ 
+    if (((x + texture->width - 1) < vScreenSize.X) && ((y + texture->height - 1) < vScreenSize.Y)){
         x = x*iScale;
         y = y*iScale;
         if (iScale > 1){
@@ -152,7 +207,7 @@ bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
                 for (uint32_t j = 0; j < texture->height; j++){
                     for (uint32_t i2 = 0; i2 < iScale; i2++){
                         for (uint32_t j2 = 0; j2 < iScale; j2++){
-                            PixelWrite(x + (i*iScale) + i2, y + (j*iScale) + j2, PixelRead(i, j, texture), tLayers[0]);
+                            PixelWrite(x + (i*iScale) + i2, y + (j*iScale) + j2, PixelRead(i, j, texture), currentDrawTarget);
                         };
                     };
                 };
@@ -160,7 +215,7 @@ bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
         } else {
             for (uint32_t i = 0; i < texture->width; i++){
                 for (uint32_t j = 0; j < texture->height; j++){
-                    PixelWrite(x + i, y + j, PixelRead(i, j, texture), tLayers[0]);
+                    PixelWrite(x + i, y + j, PixelRead(i, j, texture), currentDrawTarget);
                 }
             };
         };
@@ -169,8 +224,8 @@ bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
     return false;
 };
 
-bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture){
-    if ((bottom < texture->height) && (right < texture->width)){
+bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture){ 
+    if ((bottom < texture->height) && (right < texture->width) && (right-left+x < vScreenSize.X) && (bottom-top+y < vScreenSize.Y)){
         x = x*iScale;
         y = y*iScale;
         if (iScale > 1){
@@ -178,7 +233,7 @@ bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uin
                     for (uint32_t j = top; j < bottom + 1; j++){
                         for (uint32_t i2 = 0; i2 < iScale; i2++){
                             for (uint32_t j2 = 0; j2 < iScale; j2++){
-                                PixelWrite(x + ((i - left)*iScale) + i2, y + ((j - top)*iScale) + j2, PixelRead(i, j, texture), tLayers[0]);
+                                PixelWrite(x + ((i - left)*iScale) + i2, y + ((j - top)*iScale) + j2, PixelRead(i, j, texture), currentDrawTarget);
                             };
                         };
                     };	
@@ -186,7 +241,7 @@ bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uin
         } else {
             for (uint32_t i = left; i < right + 1; i++){
                 for (uint32_t j = top; j < bottom + 1; j++){
-                    PixelWrite(x + i - left, y + j - top, PixelRead(i, j, texture), tLayers[0]);
+                    PixelWrite(x + i - left, y + j - top, PixelRead(i, j, texture), currentDrawTarget);
                 };
             };
         };
@@ -202,7 +257,7 @@ PixelType Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
     return pixel;   
 };
 
-bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){
+bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){ 
     if ((x < texture->width) && (y < texture->height)){
         texture->textureData[(texture->width)*y + x] = pixel;
         return true;
@@ -210,18 +265,18 @@ bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){
     return false;
 };
 
-bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel){
-    if ((x < tLayers[0]->width) && (y < tLayers[0]->height)){
+bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel){ 
+    if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
         x = x*iScale;
         y = y*iScale;
         if (iScale > 1){
             for (uint32_t i = 0; i < iScale; i++){
                 for (uint32_t j = 0; j < iScale; j++){
-                    PixelWrite(x + i, y + j, pixel, tLayers[0]);
+                    PixelWrite(x + i, y + j, pixel, currentDrawTarget);
                 };
             };
         } else {
-            PixelWrite(x, y, pixel, tLayers[0]);
+            PixelWrite(x, y, pixel, currentDrawTarget);
         };
     };
 };
@@ -234,12 +289,56 @@ PixelType PixelRead(uint32_t x, uint32_t y, TextureType *texture){
 };
 
 PixelType PixelCheck(uint32_t x, uint32_t y){
-    x = x*iScale;
-    y = y*iScale;
-    if ((x < tLayers[0]->width) && (y < tLayers[0]->height)){
-        return tLayers[0]->textureData[(tLayers[0]->width)*y + x];
+    if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
+        x = x*iScale;
+        y = y*iScale;
+        return currentDrawTarget->textureData[(vScreenSize.X)*y + x];
     };
     return Pixel(0, 0, 0, 0);
+};
+
+bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel){ 
+    if (((width + x - 1) < vScreenSize.X) && ((height + y - 1) < vScreenSize.Y)){
+        for (uint32_t i = 0; i < width; i++){
+            PixelDraw(x + i, y, pixel);
+            PixelDraw(x + i, y + height - 1, pixel);
+        };
+        for (uint32_t i = 0; i < height - 2; i++){
+            PixelDraw(x, y + i + 1, pixel);
+            PixelDraw(x + width - 1, y + i + 1, pixel);
+        };
+    };
+};
+
+bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){ // NOT OWRKING PROBS SCALE PROBLEM
+    int pointX = 0, pointY = radius;
+    int decisionValue = 3 - 2*radius;
+    PixelDraw(centerX+pointX, centerY+pointY, pixel);
+    PixelDraw(centerX-pointX, centerY+pointY, pixel);
+    PixelDraw(centerX+pointX, centerY-pointY, pixel);
+    PixelDraw(centerX-pointX, centerY-pointY, pixel);
+    PixelDraw(centerX+pointY, centerY+pointX, pixel);
+    PixelDraw(centerX-pointY, centerY+pointX, pixel);
+    PixelDraw(centerX+pointY, centerY-pointX, pixel);
+    PixelDraw(centerX-pointY, centerY-pointX, pixel);
+    while (pointY > pointX){
+        if (decisionValue > 0){
+            pointY--;
+            decisionValue = decisionValue + 4*(pointX - pointY) + 10;
+        } else {
+            decisionValue = decisionValue + 4*pointX + 6;
+        };
+        pointX++;
+        PixelDraw(centerX+pointX, centerY+pointY, pixel);
+        PixelDraw(centerX-pointX, centerY+pointY, pixel);
+        PixelDraw(centerX+pointX, centerY-pointY, pixel);
+        PixelDraw(centerX-pointX, centerY-pointY, pixel);
+        PixelDraw(centerX+pointY, centerY+pointX, pixel);
+        PixelDraw(centerX-pointY, centerY+pointX, pixel);
+        PixelDraw(centerX+pointY, centerY-pointX, pixel);
+        PixelDraw(centerX-pointY, centerY-pointX, pixel);
+    };
+
 };
 
 bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync){
@@ -286,14 +385,8 @@ bool Start(){
 
 DWORD WINAPI EngineThread(){
     CreateGraphics(bFullscreenIsEnabled, bVsyncIsEnabled, vViewPosition, vViewSize);
-    PixelType *data = malloc(sizeof(PixelType)*vWindowSize.X*vWindowSize.Y);
-    for (uint32_t i = 0; i < vWindowSize.X*vWindowSize.Y; i++){
-        data[i] = Pixel(255,200,255,255);
-    };
-    TextureCreate(vWindowSize.X, vWindowSize.Y, data);
-    free(data);
-    tCurrentTarget = tLayers[0];
-    TextureUpdate(tCurrentTarget);
+    LayerCreate(Pixel(0,0,0,255));
+    currentDrawTarget = tLayers[0]->texture;
 
     clTimeCounter1 = clock();
     clTimeCounter2 = clock();
@@ -353,18 +446,31 @@ void CoreUpdate(){
     glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_TEXTURE_2D);
-    TextureApply(tCurrentTarget->id);
-    TextureUpdate(tCurrentTarget);
-    glBegin(GL_QUADS);
-	glTexCoord2f(0.0f, 0.0f);
-	glVertex3f(-1.0f, 1.0f, 0.0f);
-	glTexCoord2f(0.0f, 1.0f);
-	glVertex3f(-1.0f, -1.0f, 0.0f);
-	glTexCoord2f(1.0f, 1.0f);
-	glVertex3f(1.0f, -1.0f, 0.0f);
-	glTexCoord2f(1.0f, 0.0f);
-	glVertex3f(1.0f, 1.0f, 0.0f);
-	glEnd();
+    tLayers[0]->bUpdate = true;
+    tLayers[0]->bVisible = true;
+    
+    for (uint32_t i = 0; i < iLayerNumber; ++i){ //FIGURE OUT PROBLEM HERE
+        if (tLayers[i]->bVisible){
+            TextureApply(tLayers[i]->texture->id);
+            if (tLayers[i]->bUpdate){
+                TextureUpdate(tLayers[i]->texture);
+                
+            };
+            glBegin(GL_QUADS);
+            glTexCoord2f(0.0f*iScale, 0.0f*iScale);
+            glVertex3f(-1.0f, 1.0f, 0.0f);
+            glTexCoord2f(0.0f*iScale, 1.0f*iScale);
+            glVertex3f(-1.0f, -1.0f, 0.0f);
+            glTexCoord2f(1.0f*iScale, 1.0f*iScale);
+            glVertex3f(1.0f, -1.0f, 0.0f);
+            glTexCoord2f(1.0f*iScale, 0.0f*iScale);
+            glVertex3f(1.0f, 1.0f, 0.0f);
+            glEnd();     
+        };
+        
+    };
+    //TextureApply(currentDrawTarget->id);
+    //TextureUpdate(currentDrawTarget);
     SwapBuffers(glDeviceContext);
 
     iFramesPerSecond++;
@@ -456,6 +562,13 @@ bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, 
     glViewport(viewPosition.X,viewPosition.Y,viewSize.X,viewSize.Y);
     return true;
 };
+/*
+void Clear(PixelType pixel){
+    uint32_t pixelCount = tCurrentTarget->width*tCurrentTarget->height;
+    for (uint32_t i = 0; i < pixelCount; i++){
+        tCurrentTarget->textureData[i] = pixel;
+    };
+};*/
 
 LRESULT CALLBACK WindowEventHandler(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter){
     switch(uMessage){
@@ -504,18 +617,17 @@ void ViewportUpdate(){
 
 void Terminate(){
 	for (uint32_t i = 0; i < iTextureNumber; i++){
-		free(&tLayers[i]);
+		free(texturePack[i]);
 	};
+    for (uint32_t i = 0; i < iLayerNumber; i++){
+        free(tLayers[i]);
+    }
 	bApplicationIsRunning = false;
 };
-
-void CurrentTargetSetI(uint32_t index){
-    tCurrentTarget = tLayers[index];
-};
-
+/*
 void CurrentTargetSetP(TextureType *texture){
     tCurrentTarget = texture;
-};
+};*/
 
 void IntToStr(uint32_t value, char destination[]){
     char const digit[] = "0123456789";
@@ -558,21 +670,23 @@ void KeySetState(bool state, int32_t key){
 
 
 bool OnUserInitialize(){
+    /*
 	PixelType *data1 = malloc(sizeof(PixelType)*20*20);
 	for (uint32_t i = 0; i < 20*20;i++){
 		data1[i] = Pixel(255,100,255,255);
 	};
 	TextureCreate(20,20,data1);
 	free(data1);
-	TextureDrawPartial(1,1,3,3,8,8,tLayers[1]);
-	TextureDraw(40,40, tLayers[1]);
-    LoadImageFromPath("C:\\Users\\dfgdf\\Desktop\\Scoala\\raport.jpg");
-    TextureDrawPartial(80,80,0,0,900,500,tLayers[2]);    
+	//TextureDrawPartial(280,180,0,0,19,19,texturePack[1]);  
+    TextureDraw(281,180,texturePack[1]);*/
+    //CircleDraw(100,100,20,Pixel(255,0,0,255));
     return true;};
+
 bool OnUserUpdate(){
+    RectangleDraw(3,3,50,40,Pixel(255,67,67,255)); 
     return true;};
 
 int main(){
-    Construct(1000,600,1,false,false);
+    Construct(300,200,2,false,false);
     Start();
 };
