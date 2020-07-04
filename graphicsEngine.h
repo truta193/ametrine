@@ -41,7 +41,6 @@ typedef struct Layer { //WIP
     bool bVisible;
     bool bUpdate;
     PixelType tint;
-
     TextureType *texture;
 } LayerType;
 
@@ -160,7 +159,6 @@ void LayerCreate(PixelType tint){
 
     tLayers[iLayerNumber] = layer;
     iLayerNumber++;
-
 };
 
 
@@ -617,6 +615,7 @@ void Terminate(){
 		free(texturePack[i]);
 	};
     for (uint32_t i = 0; i < iLayerNumber; i++){
+        free(tLayers[i]->texture);
         free(tLayers[i]);
     }
 	bApplicationIsRunning = false;
