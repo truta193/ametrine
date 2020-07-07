@@ -99,11 +99,11 @@ PixelType PixelCheck(uint32_t x, uint32_t y);
 
 bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, PixelType pixel);
 bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel); 
-bool RectangleFill();
+bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel);
 bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
-bool TriangleFill();
+bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
 bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
-bool CircleFill();
+bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
 
 bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync);
 bool Start();
@@ -389,10 +389,27 @@ bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Pixe
     };
 };
 
+bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel){
+    if (((width + x - 1) < vScreenSize.X) && ((height + y - 1) < vScreenSize.Y)){
+        for (uint32_t i = 0; i < height; i++){
+            for (uint32_t j = 0; j < width; j++){
+                PixelWrite(x + j, y + i, pixel, tCurrentDrawTarget);
+            }
+        }
+    };
+};
+
 bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
     LineDraw(point1x, point1y, point2x, point2y, pixel);
     LineDraw(point2x, point2y, point3x, point3y, pixel);
     LineDraw(point3x, point3y, point1x, point1y, pixel);
+};
+
+bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
+
+    //Draw the lines and store the coordinates of each vertex
+    //Go from lowest y point to highest y point, see which vertices have that y coordinate, add them to another array
+    //Draw line between the first vertex of the new array to the last vertex (if consecutive pixels, start from the one that's followed by blank)
 };
 
 bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){ 
@@ -423,7 +440,28 @@ bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType p
         PixelWrite(centerX+pointY, centerY-pointX, pixel, tCurrentDrawTarget);
         PixelWrite(centerX-pointY, centerY-pointX, pixel, tCurrentDrawTarget);
     };
+};
 
+bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){
+    int pointX = 0, pointY = radius;
+    int decisionValue = 3 - 2*radius;
+    LineDraw(centerX+pointX, centerY+pointY, centerX-pointX, centerY+pointY, pixel);
+    LineDraw(centerX+pointX, centerY-pointY, centerX-pointX, centerY-pointY, pixel);
+    LineDraw(centerX+pointY, centerY+pointX, centerX-pointY, centerY+pointX, pixel);
+    LineDraw(centerX+pointY, centerY-pointX, centerX-pointY, centerY-pointX, pixel);
+    while (pointY > pointX){
+        if (decisionValue > 0){
+            pointY--;
+            decisionValue = decisionValue + 4*(pointX - pointY) + 10;
+        } else {
+            decisionValue = decisionValue + 4*pointX + 6;
+        };
+        pointX++;
+        LineDraw(centerX+pointX, centerY+pointY, centerX-pointX, centerY+pointY, pixel);
+        LineDraw(centerX+pointX, centerY-pointY, centerX-pointX, centerY-pointY, pixel);
+        LineDraw(centerX+pointY, centerY+pointX, centerX-pointY, centerY+pointX, pixel);
+        LineDraw(centerX+pointY, centerY-pointX, centerX-pointY, centerY-pointX, pixel);
+    };
 };
 
 bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync){
@@ -489,7 +527,7 @@ DWORD WINAPI EngineThread(){
 
 void CoreUpdate(){
     clTimeCounter2 = clock();
-    fElapsedTime = ((float)clTimeCounter2 - (float)clTimeCounter1)/CLOCKS_PER_SEC;
+    fElapsedTime += ((float)clTimeCounter2 - (float)clTimeCounter1)/CLOCKS_PER_SEC;
     clTimeCounter1 = clTimeCounter2;
 
     for (int i = 0; i < 3; i++){
@@ -554,7 +592,7 @@ void CoreUpdate(){
         
     };
     SwapBuffers(glDeviceContext);
-
+    
     iFramesPerSecond++;
     if (fElapsedTime >= 1.0f){
         fElapsedTime -= 1.0f;
