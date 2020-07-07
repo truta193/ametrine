@@ -99,11 +99,11 @@ PixelType PixelCheck(uint32_t x, uint32_t y);
 
 bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, PixelType pixel);
 bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel); 
-bool RectangleFill();
+bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel);
 bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
-bool TriangleFill();
+bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
 bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
-bool CircleFill();
+bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
 
 bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync);
 bool Start();
@@ -122,6 +122,7 @@ void ViewportUpdate();
 void Terminate();
 void CurrentTargetSetP(TextureType *texture);
 void IntToStr(uint32_t value, char destination[]);
+void Swap(uint32_t *number1, uint32_t *number2);
 bool LoadImageFromPath(char imagePath[]);
 void MouseUpdatePosition(int32_t x, int32_t y);
 void MouseUpdateState(bool state, int32_t button);
@@ -389,10 +390,137 @@ bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Pixe
     };
 };
 
+bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel){
+    if (((width + x - 1) < vScreenSize.X) && ((height + y - 1) < vScreenSize.Y)){
+        for (uint32_t i = 0; i < height; i++){
+            for (uint32_t j = 0; j < width; j++){
+                PixelWrite(x + j, y + i, pixel, tCurrentDrawTarget);
+            };
+        };
+    };
+};
+
 bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
     LineDraw(point1x, point1y, point2x, point2y, pixel);
     LineDraw(point2x, point2y, point3x, point3y, pixel);
     LineDraw(point3x, point3y, point1x, point1y, pixel);
+};
+
+bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
+    uint32_t temporary1x, temporary2x, y, minX, maxX, temporary1xp, temporary2xp, e1, e2;
+    bool changed1 = false;
+    bool changed2 = false;
+    int32_t sign1x, sign2x, difference1x, difference1y, difference2x, difference2y;
+
+    if (point1y > point2y) { Swap(&point1y, &point2y); Swap(&point1x, &point2x); };
+    if (point1y > point3y) { Swap(&point1y, &point3y); Swap(&point1x, &point3x); };
+    if (point2y > point3y) { Swap(&point3y, &point2y); Swap(&point3x, &point2x); };
+
+    temporary1x = point1x;
+    temporary2x = point1x;
+    y = point1y;
+
+    difference1x = (int32_t)(point2x - point1x);
+    if (difference1x < 0) { difference1x = -difference1x; sign1x = -1; } else sign1x = 1;
+    difference1y = (int32_t)(point2y - point1y);
+
+    difference2x = (int32_t)(point3x - point1x);
+    if (difference2x < 0) { difference2x = -difference2x; sign2x = -1; } else sign2x = 1;
+    difference2y = (int32_t)(point3y - point1y);
+
+    if (difference1y > difference1x) { Swap(&difference1y, &difference1x); changed1 = true; };
+    if (difference2y > difference2x) { Swap(&difference2y, &difference2x); changed2 = true; };
+
+    e2 = (uint32_t)(difference2x >> 1);
+    if (point1y == point2y) goto next;
+    e1 = (uint32_t)(difference1x >> 1);
+
+    for (uint32_t i = 0; i < difference1x;) {
+        temporary1xp = 0;
+        temporary2xp = 0;
+        if (temporary1x < temporary2x) { minX = temporary1x; maxX = temporary2x; } else { minX = temporary2x; maxX = temporary1x; };
+        while (i < difference1x) {
+            i++;
+            e1 += difference1y;
+            while (e1 >= difference1x) {
+                e1 -= difference1x;
+                if (changed1) temporary1xp = sign1x; else goto next1;
+            };
+            if (changed1) break; else temporary1x += sign1x;
+        };
+
+        next1:
+        while(true){
+            e2 += difference2y;
+            while (e2 >= difference2x) {
+                e2 -= difference2x;
+                if (changed2) temporary2xp = sign2x; else goto next2;
+            };
+            if (changed2) break; else temporary2x += sign2x;
+        };
+
+        next2:
+        if (minX > temporary1x) minX = temporary1x;
+        if (minX > temporary2x) minX = temporary2x;
+        if (maxX < temporary1x) maxX = temporary1x;
+        if (maxX < temporary2x) maxX = temporary2x;
+        uint32_t a = minX, b = maxX;
+        for (;a < b; a++) PixelWrite(a, y, pixel, tCurrentDrawTarget);
+        if (!changed1) temporary1x += sign1x;
+        temporary1x += temporary1xp;
+        if (!changed2) temporary2x += sign2x;
+        temporary2x += temporary2xp;
+        y += 1;
+        if (y == point2y) break;
+    };
+
+    next:
+    difference1x = (int32_t)(point3x - point2x);
+    if (difference1x < 0) { difference1x = -difference1x; sign1x = -1; } else sign1x = 1;
+    difference1y = (int32_t)(point3y - point2y);
+    temporary1x = point2x;
+
+    if (difference1y > difference1x) { Swap(&difference1y, &difference1x); changed1 = true; } else changed1 = false;
+    e1 = (uint32_t)(difference1x >> 1);
+
+    for (uint32_t i = 0; i <= difference1x; i++) {
+        temporary1xp = 0; 
+        temporary2xp = 0;
+        if (temporary1x < temporary2x) { minX = temporary1x; maxX = temporary2x; } else { minX = temporary2x; maxX = temporary1x; };
+        while ( i < difference1x) {
+            e1 += difference1y;
+            while (e1 >= difference1x){
+                e1 -= difference1x;
+                if (changed1) { temporary1xp = sign1x; break; } else goto next3;
+            };
+            if (changed1) break; else temporary1x += sign1x;
+            if (i < difference1x) i++;
+        };
+
+        next3:
+        while (temporary2x != point3x) {
+            e2 += difference2y;
+            while (e2 >= difference2x) {
+                e2 -= difference2x;
+                if (changed2) temporary2xp = sign2x; else goto next4;
+            };
+            if (changed2) break; else temporary2x += sign2x;
+        };
+
+        next4:
+        if (minX > temporary1x) minX = temporary1x;
+        if (minX > temporary2x) minX = temporary2x;
+        if (maxX < temporary1x) maxX = temporary1x;
+        if (maxX < temporary2x) maxX = temporary2x;
+        uint32_t a = minX, b = maxX;
+        for (;a < b; a++) PixelWrite(a, y, pixel, tCurrentDrawTarget);
+        if (!changed1) temporary1x += sign1x;
+        temporary1x += temporary1xp;
+        if (!changed2) temporary2x += sign2x;
+        temporary2x += temporary2xp;
+        y += 1;
+        if (y > point3y) return true;
+    };
 };
 
 bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){ 
@@ -423,7 +551,28 @@ bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType p
         PixelWrite(centerX+pointY, centerY-pointX, pixel, tCurrentDrawTarget);
         PixelWrite(centerX-pointY, centerY-pointX, pixel, tCurrentDrawTarget);
     };
+};
 
+bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){
+    int pointX = 0, pointY = radius;
+    int decisionValue = 3 - 2*radius;
+    LineDraw(centerX+pointX, centerY+pointY, centerX-pointX, centerY+pointY, pixel);
+    LineDraw(centerX+pointX, centerY-pointY, centerX-pointX, centerY-pointY, pixel);
+    LineDraw(centerX+pointY, centerY+pointX, centerX-pointY, centerY+pointX, pixel);
+    LineDraw(centerX+pointY, centerY-pointX, centerX-pointY, centerY-pointX, pixel);
+    while (pointY > pointX){
+        if (decisionValue > 0){
+            pointY--;
+            decisionValue = decisionValue + 4*(pointX - pointY) + 10;
+        } else {
+            decisionValue = decisionValue + 4*pointX + 6;
+        };
+        pointX++;
+        LineDraw(centerX+pointX, centerY+pointY, centerX-pointX, centerY+pointY, pixel);
+        LineDraw(centerX+pointX, centerY-pointY, centerX-pointX, centerY-pointY, pixel);
+        LineDraw(centerX+pointY, centerY+pointX, centerX-pointY, centerY+pointX, pixel);
+        LineDraw(centerX+pointY, centerY-pointX, centerX-pointY, centerY-pointX, pixel);
+    };
 };
 
 bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync){
@@ -489,7 +638,7 @@ DWORD WINAPI EngineThread(){
 
 void CoreUpdate(){
     clTimeCounter2 = clock();
-    fElapsedTime = ((float)clTimeCounter2 - (float)clTimeCounter1)/CLOCKS_PER_SEC;
+    fElapsedTime += ((float)clTimeCounter2 - (float)clTimeCounter1)/CLOCKS_PER_SEC;
     clTimeCounter1 = clTimeCounter2;
 
     for (int i = 0; i < 3; i++){
@@ -554,7 +703,7 @@ void CoreUpdate(){
         
     };
     SwapBuffers(glDeviceContext);
-
+    
     iFramesPerSecond++;
     if (fElapsedTime >= 1.0f){
         fElapsedTime -= 1.0f;
@@ -723,6 +872,12 @@ void IntToStr(uint32_t value, char destination[]){
     } while(value);
 };
 
+void Swap(uint32_t *number1, uint32_t *number2){
+    uint32_t t = *number2;
+    *number2 = *number1;
+    *number1 = t;
+};
+
 bool LoadImageFromPath(char imagePath[]){
 	int width, height, numberOfComponents;
 	unsigned char *data = stbi_load(imagePath, &width, &height, &numberOfComponents, 4);
@@ -748,27 +903,21 @@ void KeySetState(bool state, int32_t key){
 };
 
 
+
 bool OnUserInitialize(){
     /*
-	PixelType *data1 = malloc(sizeof(PixelType)*20*20);
-	for (uint32_t i = 0; i < 20*20;i++){
-		data1[i] = Pixel(255,100,255,255);
-	};
-	TextureCreate(20,20,data1);
-	free(data1);
-	//TextureDrawPartial(280,180,0,0,19,19,texturePack[1]);  
-    TextureDraw(281,180,texturePack[1]);*/
-    //CircleDraw(100,100,20,Pixel(255,0,0,255));
     RectangleDraw(250,130, 40,60, Pixel(255,67,67,255)); 
     LineDraw(20,30, 296,185, Pixel(67,67,67,255));
     CircleDraw(150,100, 50, Pixel(10,255,60,255));
     TriangleDraw(20,10, 280,12, 0,180, Pixel(0,0,255,255));
+    CircleFill(100,50, 20, Pixel(0,255,0,255));*/
+    TriangleFill(27,33, 82,67, 40,125, Pixel(125,125,200,255));
     return true;};
 
 bool OnUserUpdate(){
     return true;};
 
 int main(){
-    Construct(300,200,3,false,false);
+    Construct(300,200,1,false,false);
     Start();
 };
