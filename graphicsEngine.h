@@ -122,6 +122,7 @@ void ViewportUpdate();
 void Terminate();
 void CurrentTargetSetP(TextureType *texture);
 void IntToStr(uint32_t value, char destination[]);
+void Swap(uint32_t *number1, uint32_t *number2);
 bool LoadImageFromPath(char imagePath[]);
 void MouseUpdatePosition(int32_t x, int32_t y);
 void MouseUpdateState(bool state, int32_t button);
@@ -394,8 +395,8 @@ bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, Pixe
         for (uint32_t i = 0; i < height; i++){
             for (uint32_t j = 0; j < width; j++){
                 PixelWrite(x + j, y + i, pixel, tCurrentDrawTarget);
-            }
-        }
+            };
+        };
     };
 };
 
@@ -406,10 +407,120 @@ bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t
 };
 
 bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
+    uint32_t temporary1x, temporary2x, y, minX, maxX, temporary1xp, temporary2xp, e1, e2;
+    bool changed1 = false;
+    bool changed2 = false;
+    int32_t sign1x, sign2x, difference1x, difference1y, difference2x, difference2y;
 
-    //Draw the lines and store the coordinates of each vertex
-    //Go from lowest y point to highest y point, see which vertices have that y coordinate, add them to another array
-    //Draw line between the first vertex of the new array to the last vertex (if consecutive pixels, start from the one that's followed by blank)
+    if (point1y > point2y) { Swap(&point1y, &point2y); Swap(&point1x, &point2x); };
+    if (point1y > point3y) { Swap(&point1y, &point3y); Swap(&point1x, &point3x); };
+    if (point2y > point3y) { Swap(&point3y, &point2y); Swap(&point3x, &point2x); };
+
+    temporary1x = point1x;
+    temporary2x = point1x;
+    y = point1y;
+
+    difference1x = (int32_t)(point2x - point1x);
+    if (difference1x < 0) { difference1x = -difference1x; sign1x = -1; } else sign1x = 1;
+    difference1y = (int32_t)(point2y - point1y);
+
+    difference2x = (int32_t)(point3x - point1x);
+    if (difference2x < 0) { difference2x = -difference2x; sign2x = -1; } else sign2x = 1;
+    difference2y = (int32_t)(point3y - point1y);
+
+    if (difference1y > difference1x) { Swap(&difference1y, &difference1x); changed1 = true; };
+    if (difference2y > difference2x) { Swap(&difference2y, &difference2x); changed2 = true; };
+
+    e2 = (uint32_t)(difference2x >> 1);
+    if (point1y == point2y) goto next;
+    e1 = (uint32_t)(difference1x >> 1);
+
+    for (uint32_t i = 0; i < difference1x;) {
+        temporary1xp = 0;
+        temporary2xp = 0;
+        if (temporary1x < temporary2x) { minX = temporary1x; maxX = temporary2x; } else { minX = temporary2x; maxX = temporary1x; };
+        while (i < difference1x) {
+            i++;
+            e1 += difference1y;
+            while (e1 >= difference1x) {
+                e1 -= difference1x;
+                if (changed1) temporary1xp = sign1x; else goto next1;
+            };
+            if (changed1) break; else temporary1x += sign1x;
+        };
+
+        next1:
+        while(true){
+            e2 += difference2y;
+            while (e2 >= difference2x) {
+                e2 -= difference2x;
+                if (changed2) temporary2xp = sign2x; else goto next2;
+            };
+            if (changed2) break; else temporary2x += sign2x;
+        };
+
+        next2:
+        if (minX > temporary1x) minX = temporary1x;
+        if (minX > temporary2x) minX = temporary2x;
+        if (maxX < temporary1x) maxX = temporary1x;
+        if (maxX < temporary2x) maxX = temporary2x;
+        uint32_t a = minX, b = maxX;
+        for (;a < b; a++) PixelWrite(a, y, pixel, tCurrentDrawTarget);
+        if (!changed1) temporary1x += sign1x;
+        temporary1x += temporary1xp;
+        if (!changed2) temporary2x += sign2x;
+        temporary2x += temporary2xp;
+        y += 1;
+        if (y == point2y) break;
+    };
+
+    next:
+    difference1x = (int32_t)(point3x - point2x);
+    if (difference1x < 0) { difference1x = -difference1x; sign1x = -1; } else sign1x = 1;
+    difference1y = (int32_t)(point3y - point2y);
+    temporary1x = point2x;
+
+    if (difference1y > difference1x) { Swap(&difference1y, &difference1x); changed1 = true; } else changed1 = false;
+    e1 = (uint32_t)(difference1x >> 1);
+
+    for (uint32_t i = 0; i <= difference1x; i++) {
+        temporary1xp = 0; 
+        temporary2xp = 0;
+        if (temporary1x < temporary2x) { minX = temporary1x; maxX = temporary2x; } else { minX = temporary2x; maxX = temporary1x; };
+        while ( i < difference1x) {
+            e1 += difference1y;
+            while (e1 >= difference1x){
+                e1 -= difference1x;
+                if (changed1) { temporary1xp = sign1x; break; } else goto next3;
+            };
+            if (changed1) break; else temporary1x += sign1x;
+            if (i < difference1x) i++;
+        };
+
+        next3:
+        while (temporary2x != point3x) {
+            e2 += difference2y;
+            while (e2 >= difference2x) {
+                e2 -= difference2x;
+                if (changed2) temporary2xp = sign2x; else goto next4;
+            };
+            if (changed2) break; else temporary2x += sign2x;
+        };
+
+        next4:
+        if (minX > temporary1x) minX = temporary1x;
+        if (minX > temporary2x) minX = temporary2x;
+        if (maxX < temporary1x) maxX = temporary1x;
+        if (maxX < temporary2x) maxX = temporary2x;
+        uint32_t a = minX, b = maxX;
+        for (;a < b; a++) PixelWrite(a, y, pixel, tCurrentDrawTarget);
+        if (!changed1) temporary1x += sign1x;
+        temporary1x += temporary1xp;
+        if (!changed2) temporary2x += sign2x;
+        temporary2x += temporary2xp;
+        y += 1;
+        if (y > point3y) return true;
+    };
 };
 
 bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){ 
@@ -759,6 +870,12 @@ void IntToStr(uint32_t value, char destination[]){
         *--p = digit[value%10];
         value = value/10;
     } while(value);
+};
+
+void Swap(uint32_t *number1, uint32_t *number2){
+    uint32_t t = *number2;
+    *number2 = *number1;
+    *number1 = t;
 };
 
 bool LoadImageFromPath(char imagePath[]){
