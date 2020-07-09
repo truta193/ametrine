@@ -798,13 +798,13 @@ bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, 
     glViewport(viewPosition.X,viewPosition.Y,viewSize.X,viewSize.Y);
     return true;
 };
-/*
+
 void Clear(PixelType pixel){
-    uint32_t pixelCount = tCurrentTarget->width*tCurrentTarget->height;
+    uint32_t pixelCount = tCurrentDrawTarget->width * tCurrentDrawTarget->height;
     for (uint32_t i = 0; i < pixelCount; i++){
-        tCurrentTarget->textureData[i] = pixel;
+        tCurrentDrawTarget->textureData[i] = pixel;
     };
-};*/
+};
 
 LRESULT CALLBACK WindowEventHandler(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter){
     switch(uMessage){
