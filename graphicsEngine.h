@@ -9,6 +9,7 @@
 #define WINDOW_CLASS_NAME "GLClass"
 
 typedef enum {false, true} bool;
+typedef BOOL(WINAPI wglSwapInterval_t) (int interval);
 
 typedef struct vector2d {
     uint32_t X;
@@ -52,6 +53,7 @@ typedef enum KeyMapping {
 	key_Arrow_Down = 0x28, key_Esc = 0x1B, key_Ctrl = 0x11, key_Shift = 0x10, key_Enter = 0x0D, key_Backspace = 0x08, key_Spacebar = 0x20, key_Delete = 0x2E
 } KeyMapping;
 
+wglSwapInterval_t* wglSwapInterval = NULL;
 HDC glDeviceContext;
 HGLRC glRenderContext;
 HWND windowHandle;
@@ -84,7 +86,7 @@ TextureType *tCurrentDrawTarget = NULL;
 TextureType *texturePack[32];
 LayerType *tLayers[32];
 
-void LayerCreate(PixelType tint); // Creating it with vScreenSize size; it stretches to vWindowSize to fit
+void LayerCreate(PixelType tint);
 void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData);
 void TextureUpdate(TextureType *texture);
 void TextureApply(uint32_t id); 
@@ -785,7 +787,10 @@ bool CreateDevice(HWND windowHandle, bool boolFullscreen, bool boolVsync){
 	};
 	wglMakeCurrent(glDeviceContext, glRenderContext);
 	glEnable(GL_TEXTURE_2D);
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);    
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);  
+
+    wglSwapInterval = (wglSwapInterval_t*)wglGetProcAddress("wglSwapIntervalEXT");
+    if (wglSwapInterval && !boolVsync) wglSwapInterval(0);  
 };
 
 bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, vector2d viewSize){
