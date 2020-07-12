@@ -1,3 +1,5 @@
+#ifndef GRAPHICS_ENGINE
+#define GRAPHICS_ENGINE
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -193,9 +195,7 @@ void TextureDelete(uint32_t id){
 
 bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){ 
     if (((x + texture->width - 1) < vScreenSize.X) && ((y + texture->height - 1) < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
-        if (iScale > 1){
+        if (iScale < 0){ //WORKAROUND, WAS > 1
             for (uint32_t i = 0; i < texture->width; i++){
                 for (uint32_t j = 0; j < texture->height; j++){
                     for (uint32_t i2 = 0; i2 < iScale; i2++){
@@ -219,9 +219,7 @@ bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
 
 bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture){ 
     if ((bottom < texture->height) && (right < texture->width) && (right-left+x < vScreenSize.X) && (bottom-top+y < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
-        if (iScale > 1){
+        if (iScale < 0){ //WORKAROUND, WAS > 1
                 for (uint32_t i = left; i < right + 1; i++){
                     for (uint32_t j = top; j < bottom + 1; j++){
                         for (uint32_t i2 = 0; i2 < iScale; i2++){
@@ -260,9 +258,7 @@ bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){
 
 bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel){ 
     if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
-        if (iScale > 1){
+        if (iScale < 0){ //WORKAROUND, WAS > 1
             for (uint32_t i = 0; i < iScale; i++){
                 for (uint32_t j = 0; j < iScale; j++){
                     PixelWrite(x + i, y + j, pixel, tCurrentDrawTarget);
@@ -283,8 +279,6 @@ PixelType PixelRead(uint32_t x, uint32_t y, TextureType *texture){
 
 PixelType PixelCheck(uint32_t x, uint32_t y){
     if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
         return tCurrentDrawTarget->textureData[(vScreenSize.X)*y + x];
     };
     return Pixel(0, 0, 0, 0);
@@ -906,3 +900,5 @@ void MouseUpdateState(bool state, int32_t button){
 void KeySetState(bool state, int32_t key){
     bKeyboardNewState[key] = state;
 };
+
+#endif
