@@ -14,8 +14,8 @@ typedef enum {false, true} bool;
 typedef BOOL(WINAPI wglSwapInterval_t) (int interval);
 
 typedef struct vector2d {
-    uint32_t X;
-    uint32_t Y;
+    int32_t X;
+    int32_t Y;
 } vector2d;
 
 typedef struct PixelStruct {
@@ -28,8 +28,9 @@ typedef struct PixelStruct {
 } PixelType;
 
 typedef struct TextureStruct {
-	uint32_t width;
-	uint32_t height;
+	int32_t width;
+	int32_t height;
+    int32_t scale;
 	GLuint id;
 	PixelType textureData[];  
 } TextureType;
@@ -75,41 +76,41 @@ bool bFullscreenIsEnabled = false;
 bool bVsyncIsEnabled = false;
 ButtonInputType biMouse[3];
 ButtonInputType biKeyboard[100];
-uint32_t iScale = 1;
+int32_t iScale = 1;
 GLuint iId = 0;
-uint32_t iTextureNumber = 0;
-uint32_t iLayerNumber = 0;
-uint32_t iFramesPerSecond = 0;
+int32_t iTextureNumber = 0;
+int32_t iLayerNumber = 0;
+int32_t iFramesPerSecond = 0;
 clock_t clTimeCounter1;
 clock_t clTimeCounter2;
 float fElapsedTime = 0.0f;
 char cWindowTitle[40];
 TextureType *tCurrentDrawTarget = NULL;
-TextureType *texturePack[32];
-LayerType *tLayers[32];
+TextureType *tTexturePack[32];
+LayerType *lLayers[32];
 
 void LayerCreate(PixelType tint);
-void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData);
+void TextureCreate(int32_t width, int32_t height, PixelType *imageData);
 void TextureUpdate(TextureType *texture);
-void TextureApply(uint32_t id); 
-void TextureDelete(uint32_t id); // Should also delete from texturePack and push back others
-bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture);
-bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture);
+void TextureApply(int32_t id); 
+void TextureDelete(int32_t id); // Should also delete from tTexturePack and push back others
+bool TextureDraw(int32_t x, int32_t y, TextureType *texture);
+bool TextureDrawPartial(int32_t x, int32_t y, int32_t top, int32_t left, int32_t right, int32_t bottom, TextureType *texture);
 PixelType Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
-bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture);
-bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel);
-PixelType PixelRead(uint32_t x, uint32_t y, TextureType *texture);
-PixelType PixelCheck(uint32_t x, uint32_t y);
+bool PixelWrite(int32_t x, int32_t y, PixelType pixel, TextureType *texture);
+bool PixelDraw(int32_t x, int32_t y, PixelType pixel);
+PixelType PixelRead(int32_t x, int32_t y, TextureType *texture);
+PixelType PixelCheck(int32_t x, int32_t y);
 
-bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, PixelType pixel);
-bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel); 
-bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel);
-bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
-bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel);
-bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
-bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel);
+bool LineDraw(int32_t point1x, int32_t point1y, int32_t point2x, int32_t point2y, PixelType pixel);
+bool RectangleDraw(int32_t x, int32_t y, int32_t width, int32_t height, PixelType pixel); 
+bool RectangleFill(int32_t x, int32_t y, int32_t width, int32_t height, PixelType pixel);
+bool TriangleDraw(int32_t point1x, int32_t point1y, int32_t point2x, int32_t point2y, int32_t point3x, int32_t point3y, PixelType pixel);
+bool TriangleFill(int32_t point1x, int32_t point1y, int32_t point2x, int32_t point2y, int32_t point3x, int32_t point3y, PixelType pixel);
+bool CircleDraw(int32_t centerX, int32_t centerY, int32_t radius, PixelType pixel);
+bool CircleFill(int32_t centerX, int32_t centerY, int32_t radius, PixelType pixel);
 
-bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync);
+bool Construct(int32_t screenWidth, int32_t screenHeight, int32_t scale, bool boolFullscreen, bool boolVsync);
 bool Start();
 DWORD WINAPI EngineThread();
 void CoreUpdate();
@@ -121,12 +122,12 @@ bool CreateDevice(HWND windowHandle, bool boolFullscreen, bool boolVsync);
 bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, vector2d viewSize);
 void Clear(PixelType pixel);
 LRESULT CALLBACK WindowEventHandler(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter);
-void WindowUpdateSize(uint32_t x, uint32_t y);
+void WindowUpdateSize(int32_t x, int32_t y);
 void ViewportUpdate();
 void Terminate();
 void CurrentTargetSetP(TextureType *texture);
-void IntToStr(uint32_t value, char destination[]);
-void Swap(uint32_t *number1, uint32_t *number2);
+void IntToStr(int32_t value, char destination[]);
+void Swap(int32_t *number1, int32_t *number2);
 bool LoadImageFromPath(char imagePath[]);
 void MouseUpdatePosition(int32_t x, int32_t y);
 void MouseUpdateState(bool state, int32_t button);
@@ -143,8 +144,9 @@ void LayerCreate(PixelType tint){
     texture->id = iId;
     texture->height = vScreenSize.Y;
     texture->width = vScreenSize.X;
+    texture->scale = 1;
     PixelType pixel = Pixel(0,0,0,0);
-    for (uint32_t i = 0; i < vScreenSize.X*vScreenSize.Y; i++){
+    for (int32_t i = 0; i < vScreenSize.X*vScreenSize.Y; i++){
         texture->textureData[i] = pixel;
     };
 
@@ -156,12 +158,12 @@ void LayerCreate(PixelType tint){
 
     TextureUpdate(texture);
 
-    tLayers[iLayerNumber] = layer;
+    lLayers[iLayerNumber] = layer;
     iLayerNumber++;
 };
 
 
-void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData){
+void TextureCreate(int32_t width, int32_t height, PixelType *imageData){
     TextureType *texture = malloc(sizeof(TextureType) + sizeof(PixelType)*width*height);
 
     glGenTextures(1, &iId);
@@ -173,11 +175,12 @@ void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData){
     texture->id = iId;
     texture->height = height;
     texture->width = width;
+    texture->scale = 1;
 
     for (int i = 0; i < width*height; i++){
         texture->textureData[i] = imageData[i];
     };
-    texturePack[iTextureNumber] = texture;
+    tTexturePack[iTextureNumber] = texture;
     iTextureNumber++;
 };
 
@@ -185,29 +188,29 @@ void TextureUpdate(TextureType *texture){
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture->width, texture->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &texture->textureData);
 };
 
-void TextureApply(uint32_t id){
+void TextureApply(int32_t id){
     glBindTexture(GL_TEXTURE_2D, id);
 };
 
-void TextureDelete(uint32_t id){
+void TextureDelete(int32_t id){
     glDeleteTextures(1, &id);
 };
 
-bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){ 
+bool TextureDraw(int32_t x, int32_t y, TextureType *texture){ 
     if (((x + texture->width - 1) < vScreenSize.X) && ((y + texture->height - 1) < vScreenSize.Y)){
-        if (iScale < 0){ //WORKAROUND, WAS > 1
-            for (uint32_t i = 0; i < texture->width; i++){
-                for (uint32_t j = 0; j < texture->height; j++){
-                    for (uint32_t i2 = 0; i2 < iScale; i2++){
-                        for (uint32_t j2 = 0; j2 < iScale; j2++){
-                            PixelWrite(x + (i*iScale) + i2, y + (j*iScale) + j2, PixelRead(i, j, texture), tCurrentDrawTarget);
+        if (texture->scale > 1){ 
+            for (int32_t i = 0; i < texture->width; i++){
+                for (int32_t j = 0; j < texture->height; j++){
+                    for (int32_t i2 = 0; i2 < texture->scale; i2++){
+                        for (int32_t j2 = 0; j2 < texture->scale; j2++){
+                            PixelWrite(x + (i*(texture->scale)) + i2, y + (j*(texture->scale)) + j2, PixelRead(i, j, texture), tCurrentDrawTarget);
                         };
                     };
                 };
             };
         } else {
-            for (uint32_t i = 0; i < texture->width; i++){
-                for (uint32_t j = 0; j < texture->height; j++){
+            for (int32_t i = 0; i < texture->width; i++){
+                for (int32_t j = 0; j < texture->height; j++){
                     PixelWrite(x + i, y + j, PixelRead(i, j, texture), tCurrentDrawTarget);
                 }
             };
@@ -217,21 +220,21 @@ bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
     return false;
 };
 
-bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture){ 
+bool TextureDrawPartial(int32_t x, int32_t y, int32_t top, int32_t left, int32_t right, int32_t bottom, TextureType *texture){ 
     if ((bottom < texture->height) && (right < texture->width) && (right-left+x < vScreenSize.X) && (bottom-top+y < vScreenSize.Y)){
-        if (iScale < 0){ //WORKAROUND, WAS > 1
-                for (uint32_t i = left; i < right + 1; i++){
-                    for (uint32_t j = top; j < bottom + 1; j++){
-                        for (uint32_t i2 = 0; i2 < iScale; i2++){
-                            for (uint32_t j2 = 0; j2 < iScale; j2++){
-                                PixelWrite(x + ((i - left)*iScale) + i2, y + ((j - top)*iScale) + j2, PixelRead(i, j, texture), tCurrentDrawTarget);
+        if (texture->scale > 1){ 
+                for (int32_t i = left; i < right + 1; i++){
+                    for (int32_t j = top; j < bottom + 1; j++){
+                        for (int32_t i2 = 0; i2 < texture->scale; i2++){
+                            for (int32_t j2 = 0; j2 < texture->scale; j2++){
+                                PixelWrite(x + ((i - left)*(texture->scale)) + i2, y + ((j - top)*(texture->scale)) + j2, PixelRead(i, j, texture), tCurrentDrawTarget);
                             };
                         };
                     };	
                 };      
         } else {
-            for (uint32_t i = left; i < right + 1; i++){
-                for (uint32_t j = top; j < bottom + 1; j++){
+            for (int32_t i = left; i < right + 1; i++){
+                for (int32_t j = top; j < bottom + 1; j++){
                     PixelWrite(x + i - left, y + j - top, PixelRead(i, j, texture), tCurrentDrawTarget);
                 };
             };
@@ -248,7 +251,7 @@ PixelType Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha){
     return pixel;   
 };
 
-bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){ 
+bool PixelWrite(int32_t x, int32_t y, PixelType pixel, TextureType *texture){ 
     if ((x < texture->width) && (y < texture->height)){
         texture->textureData[(texture->width)*y + x] = pixel;
         return true;
@@ -256,41 +259,31 @@ bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){
     return false;
 };
 
-bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel){ 
-    if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
-        if (iScale < 0){ //WORKAROUND, WAS > 1
-            for (uint32_t i = 0; i < iScale; i++){
-                for (uint32_t j = 0; j < iScale; j++){
-                    PixelWrite(x + i, y + j, pixel, tCurrentDrawTarget);
-                };
-            };
-        } else {
-            PixelWrite(x, y, pixel, tCurrentDrawTarget);
-        };
-    };
+bool PixelDraw(int32_t x, int32_t y, PixelType pixel){ 
+    if ((x < vScreenSize.X) && (y < vScreenSize.Y)) PixelWrite(x, y, pixel, tCurrentDrawTarget);
 };
 
-PixelType PixelRead(uint32_t x, uint32_t y, TextureType *texture){
+PixelType PixelRead(int32_t x, int32_t y, TextureType *texture){
     if ((x < texture->width) && (y < texture->height)){
         return texture->textureData[(texture->width)*y + x];
     };
     return Pixel(0, 0, 0, 0);   
 };
 
-PixelType PixelCheck(uint32_t x, uint32_t y){
+PixelType PixelCheck(int32_t x, int32_t y){
     if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
         return tCurrentDrawTarget->textureData[(vScreenSize.X)*y + x];
     };
     return Pixel(0, 0, 0, 0);
 };
 
-bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, PixelType pixel){
+bool LineDraw(int32_t point1x, int32_t point1y, int32_t point2x, int32_t point2y, PixelType pixel){
     int32_t differenceX = point2x - point1x; //If one's negaitve, the slope is negative
     int32_t differenceY = point2y - point1y;
 
     if (differenceX == 0){
         if (point1y > point2y){
-            uint32_t temp = point2y;
+            int32_t temp = point2y;
             point2y = point1y;
             point1y = temp;
         };
@@ -302,7 +295,7 @@ bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t poi
 
     if (differenceY == 0){
         if (point1x > point2x){
-            uint32_t temp = point2x;
+            int32_t temp = point2x;
             point2x = point1x;
             point1x = temp;
         };
@@ -373,37 +366,37 @@ bool LineDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t poi
     };
 };
 
-bool RectangleDraw(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel){ 
+bool RectangleDraw(int32_t x, int32_t y, int32_t width, int32_t height, PixelType pixel){ 
     if (((width + x - 1) < vScreenSize.X) && ((height + y - 1) < vScreenSize.Y)){
-        for (uint32_t i = 0; i < width; i++){
+        for (int32_t i = 0; i < width; i++){
             PixelWrite(x + i, y, pixel, tCurrentDrawTarget);
             PixelWrite(x + i, y + height - 1, pixel, tCurrentDrawTarget);
         };
-        for (uint32_t i = 0; i < height - 2; i++){
+        for (int32_t i = 0; i < height - 2; i++){
             PixelWrite(x, y + i + 1, pixel, tCurrentDrawTarget);
             PixelWrite(x + width - 1, y + i + 1, pixel, tCurrentDrawTarget);
         };
     };
 };
 
-bool RectangleFill(uint32_t x, uint32_t y, uint32_t width, uint32_t height, PixelType pixel){
+bool RectangleFill(int32_t x, int32_t y, int32_t width, int32_t height, PixelType pixel){
     if (((width + x - 1) < vScreenSize.X) && ((height + y - 1) < vScreenSize.Y)){
-        for (uint32_t i = 0; i < height; i++){
-            for (uint32_t j = 0; j < width; j++){
+        for (int32_t i = 0; i < height; i++){
+            for (int32_t j = 0; j < width; j++){
                 PixelWrite(x + j, y + i, pixel, tCurrentDrawTarget);
             };
         };
     };
 };
 
-bool TriangleDraw(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
+bool TriangleDraw(int32_t point1x, int32_t point1y, int32_t point2x, int32_t point2y, int32_t point3x, int32_t point3y, PixelType pixel){
     LineDraw(point1x, point1y, point2x, point2y, pixel);
     LineDraw(point2x, point2y, point3x, point3y, pixel);
     LineDraw(point3x, point3y, point1x, point1y, pixel);
 };
 
-bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t point2y, uint32_t point3x, uint32_t point3y, PixelType pixel){
-    uint32_t temporary1x, temporary2x, y, minX, maxX, temporary1xp, temporary2xp, e1, e2;
+bool TriangleFill(int32_t point1x, int32_t point1y, int32_t point2x, int32_t point2y, int32_t point3x, int32_t point3y, PixelType pixel){
+    int32_t temporary1x, temporary2x, y, minX, maxX, temporary1xp, temporary2xp, e1, e2;
     bool changed1 = false;
     bool changed2 = false;
     int32_t sign1x, sign2x, difference1x, difference1y, difference2x, difference2y;
@@ -427,11 +420,11 @@ bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t
     if (difference1y > difference1x) { Swap(&difference1y, &difference1x); changed1 = true; };
     if (difference2y > difference2x) { Swap(&difference2y, &difference2x); changed2 = true; };
 
-    e2 = (uint32_t)(difference2x >> 1);
+    e2 = (int32_t)(difference2x >> 1);
     if (point1y == point2y) goto next;
-    e1 = (uint32_t)(difference1x >> 1);
+    e1 = (int32_t)(difference1x >> 1);
 
-    for (uint32_t i = 0; i < difference1x;) {
+    for (int32_t i = 0; i < difference1x;) {
         temporary1xp = 0;
         temporary2xp = 0;
         if (temporary1x < temporary2x) { minX = temporary1x; maxX = temporary2x; } else { minX = temporary2x; maxX = temporary1x; };
@@ -460,7 +453,7 @@ bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t
         if (minX > temporary2x) minX = temporary2x;
         if (maxX < temporary1x) maxX = temporary1x;
         if (maxX < temporary2x) maxX = temporary2x;
-        uint32_t a = minX, b = maxX;
+        int32_t a = minX, b = maxX;
         for (;a < b; a++) PixelWrite(a, y, pixel, tCurrentDrawTarget);
         if (!changed1) temporary1x += sign1x;
         temporary1x += temporary1xp;
@@ -477,9 +470,9 @@ bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t
     temporary1x = point2x;
 
     if (difference1y > difference1x) { Swap(&difference1y, &difference1x); changed1 = true; } else changed1 = false;
-    e1 = (uint32_t)(difference1x >> 1);
+    e1 = (int32_t)(difference1x >> 1);
 
-    for (uint32_t i = 0; i <= difference1x; i++) {
+    for (int32_t i = 0; i <= difference1x; i++) {
         temporary1xp = 0; 
         temporary2xp = 0;
         if (temporary1x < temporary2x) { minX = temporary1x; maxX = temporary2x; } else { minX = temporary2x; maxX = temporary1x; };
@@ -508,7 +501,7 @@ bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t
         if (minX > temporary2x) minX = temporary2x;
         if (maxX < temporary1x) maxX = temporary1x;
         if (maxX < temporary2x) maxX = temporary2x;
-        uint32_t a = minX, b = maxX;
+        int32_t a = minX, b = maxX;
         for (;a < b; a++) PixelWrite(a, y, pixel, tCurrentDrawTarget);
         if (!changed1) temporary1x += sign1x;
         temporary1x += temporary1xp;
@@ -519,7 +512,7 @@ bool TriangleFill(uint32_t point1x, uint32_t point1y, uint32_t point2x, uint32_t
     };
 };
 
-bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){ 
+bool CircleDraw(int32_t centerX, int32_t centerY, int32_t radius, PixelType pixel){ 
     int pointX = 0, pointY = radius;
     int decisionValue = 3 - 2*radius;
     PixelWrite(centerX+pointX, centerY+pointY, pixel, tCurrentDrawTarget);
@@ -549,7 +542,7 @@ bool CircleDraw(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType p
     };
 };
 
-bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType pixel){
+bool CircleFill(int32_t centerX, int32_t centerY, int32_t radius, PixelType pixel){
     int pointX = 0, pointY = radius;
     int decisionValue = 3 - 2*radius;
     LineDraw(centerX+pointX, centerY+pointY, centerX-pointX, centerY+pointY, pixel);
@@ -571,7 +564,7 @@ bool CircleFill(uint32_t centerX, uint32_t centerY, uint32_t radius, PixelType p
     };
 };
 
-bool Construct(uint32_t screenWidth, uint32_t screenHeight, uint32_t scale, bool boolFullscreen, bool boolVsync){
+bool Construct(int32_t screenWidth, int32_t screenHeight, int32_t scale, bool boolFullscreen, bool boolVsync){
     vScreenSize.X = screenWidth;
     vScreenSize.Y = screenHeight;
     iScale = scale;
@@ -616,7 +609,7 @@ bool Start(){
 DWORD WINAPI EngineThread(){
     CreateGraphics(bFullscreenIsEnabled, bVsyncIsEnabled, vViewPosition, vViewSize);
     LayerCreate(Pixel(0,0,0,255));
-    tCurrentDrawTarget = tLayers[0]->texture;
+    tCurrentDrawTarget = lLayers[0]->texture;
 
     clTimeCounter1 = clock();
     clTimeCounter2 = clock();
@@ -676,14 +669,14 @@ void CoreUpdate(){
     glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_TEXTURE_2D);
-    tLayers[0]->bUpdate = true;
-    tLayers[0]->bVisible = true;
+    lLayers[0]->bUpdate = true;
+    lLayers[0]->bVisible = true;
     
-    for (uint32_t i = 0; i < iLayerNumber; ++i){ //FIGURE OUT PROBLEM HERE
-        if (tLayers[i]->bVisible){
-            TextureApply(tLayers[i]->texture->id);
-            if (tLayers[i]->bUpdate){
-                TextureUpdate(tLayers[i]->texture);
+    for (int32_t i = 0; i < iLayerNumber; ++i){ //FIGURE OUT PROBLEM HERE
+        if (lLayers[i]->bVisible){
+            TextureApply(lLayers[i]->texture->id);
+            if (lLayers[i]->bUpdate){
+                TextureUpdate(lLayers[i]->texture);
             };
             glBegin(GL_QUADS);
             glTexCoord2f(0.0f, 0.0f);
@@ -794,8 +787,8 @@ bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, 
 };
 
 void Clear(PixelType pixel){
-    uint32_t pixelCount = tCurrentDrawTarget->width * tCurrentDrawTarget->height;
-    for (uint32_t i = 0; i < pixelCount; i++){
+    int32_t pixelCount = tCurrentDrawTarget->width * tCurrentDrawTarget->height;
+    for (int32_t i = 0; i < pixelCount; i++){
         tCurrentDrawTarget->textureData[i] = pixel;
     };
 };
@@ -823,43 +816,43 @@ LRESULT CALLBACK WindowEventHandler(HWND windowHandle, UINT uMessage, WPARAM wPa
     return DefWindowProc(windowHandle, uMessage, wParameter, lParameter);
 };
 
-void WindowUpdateSize(uint32_t x, uint32_t y){
+void WindowUpdateSize(int32_t x, int32_t y){
     vWindowSize.X = x;
     vWindowSize.Y = y;
     ViewportUpdate();
 };
 
 void ViewportUpdate(){
-	uint32_t windowWidth = vScreenSize.X * iScale;
-	uint32_t windowHeight = vScreenSize.Y * iScale;
+	int32_t windowWidth = vScreenSize.X * iScale;
+	int32_t windowHeight = vScreenSize.Y * iScale;
 	float ratio = (float)windowWidth / (float)windowHeight;
 
-	vViewSize.X = (uint32_t)vWindowSize.X;
-	vViewSize.Y = (uint32_t)((float)vViewSize.X/ratio);
+	vViewSize.X = (int32_t)vWindowSize.X;
+	vViewSize.Y = (int32_t)((float)vViewSize.X/ratio);
 
 	if (vViewSize.Y > vWindowSize.Y){
 		vViewSize.Y = vWindowSize.Y;
-		vViewSize.X = (uint32_t)((float)vViewSize.Y * ratio);
+		vViewSize.X = (int32_t)((float)vViewSize.Y * ratio);
 	};
 	vViewPosition.X = (vWindowSize.X-vViewSize.X)/2;
 	vViewPosition.Y = (vWindowSize.Y-vViewSize.Y)/2;
 };
 
 void Terminate(){
-	for (uint32_t i = 0; i < iTextureNumber; i++){
-		free(texturePack[i]);
+	for (int32_t i = 0; i < iTextureNumber; i++){
+		free(tTexturePack[i]);
 	};
-    for (uint32_t i = 0; i < iLayerNumber; i++){
-        free(tLayers[i]->texture);
-        free(tLayers[i]);
-    }
+    for (int32_t i = 0; i < iLayerNumber; i++){
+        free(lLayers[i]->texture);
+        free(lLayers[i]);
+    };
 	bApplicationIsRunning = false;
 };
 
-void IntToStr(uint32_t value, char destination[]){
+void IntToStr(int32_t value, char destination[]){
     char const digit[] = "0123456789";
     char* p = destination;
-    uint32_t shifter = value;
+    int32_t shifter = value;
     do {
         ++p;
         shifter = shifter/10;
@@ -871,8 +864,8 @@ void IntToStr(uint32_t value, char destination[]){
     } while(value);
 };
 
-void Swap(uint32_t *number1, uint32_t *number2){
-    uint32_t t = *number2;
+void Swap(int32_t *number1, int32_t *number2){
+    int32_t t = *number2;
     *number2 = *number1;
     *number1 = t;
 };
@@ -890,8 +883,14 @@ bool LoadImageFromPath(char imagePath[]){
 };
 
 void MouseUpdatePosition(int32_t x, int32_t y){
-    vMousePosition.X = x / iScale;
-    vMousePosition.Y = y / iScale;
+    x -= vViewPosition.X;
+    y -= vViewPosition.Y;
+    vMousePosition.X = (int32_t)(((float)x/(float)(vWindowSize.X - (vViewPosition.X*2)) * (float)vScreenSize.X));
+    vMousePosition.Y = (int32_t)(((float)y/(float)(vWindowSize.Y - (vViewPosition.Y*2)) * (float)vScreenSize.Y));
+    if (vMousePosition.X >= vScreenSize.X) vMousePosition.X = vScreenSize.X - 1; 
+    if (vMousePosition.Y >= vScreenSize.Y) vMousePosition.Y = vScreenSize.Y - 1; 
+    if (vMousePosition.X < 0) vMousePosition.X = 0;
+    if (vMousePosition.Y < 0) vMousePosition.Y = 0;
 };
 
 void MouseUpdateState(bool state, int32_t button){
