@@ -1,3 +1,4 @@
+//SCALING BROKEN, GET RID OF ISCALE, OR CONVERT IT TO INTERNAL TEXTURE SCALE
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #define WINDOW_CLASS_NAME "GLClass"
 
 typedef enum {false, true} bool;
+typedef BOOL(WINAPI wglSwapInterval_t) (int interval);
 
 typedef struct vector2d {
     uint32_t X;
@@ -52,6 +54,7 @@ typedef enum KeyMapping {
 	key_Arrow_Down = 0x28, key_Esc = 0x1B, key_Ctrl = 0x11, key_Shift = 0x10, key_Enter = 0x0D, key_Backspace = 0x08, key_Spacebar = 0x20, key_Delete = 0x2E
 } KeyMapping;
 
+wglSwapInterval_t* wglSwapInterval = NULL;
 HDC glDeviceContext;
 HGLRC glRenderContext;
 HWND windowHandle;
@@ -84,7 +87,7 @@ TextureType *tCurrentDrawTarget = NULL;
 TextureType *texturePack[32];
 LayerType *tLayers[32];
 
-void LayerCreate(PixelType tint); // Creating it with vScreenSize size; it stretches to vWindowSize to fit
+void LayerCreate(PixelType tint);
 void TextureCreate(uint32_t width, uint32_t height, PixelType *imageData);
 void TextureUpdate(TextureType *texture);
 void TextureApply(uint32_t id); 
@@ -191,9 +194,7 @@ void TextureDelete(uint32_t id){
 
 bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){ 
     if (((x + texture->width - 1) < vScreenSize.X) && ((y + texture->height - 1) < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
-        if (iScale > 1){
+        if (iScale < 0){ //WORKAROUND, WAS > 1
             for (uint32_t i = 0; i < texture->width; i++){
                 for (uint32_t j = 0; j < texture->height; j++){
                     for (uint32_t i2 = 0; i2 < iScale; i2++){
@@ -217,9 +218,7 @@ bool TextureDraw(uint32_t x, uint32_t y, TextureType *texture){
 
 bool TextureDrawPartial(uint32_t x, uint32_t y, uint32_t top, uint32_t left, uint32_t right, uint32_t bottom, TextureType *texture){ 
     if ((bottom < texture->height) && (right < texture->width) && (right-left+x < vScreenSize.X) && (bottom-top+y < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
-        if (iScale > 1){
+        if (iScale < 0){ //WORKAROUND, WAS > 1
                 for (uint32_t i = left; i < right + 1; i++){
                     for (uint32_t j = top; j < bottom + 1; j++){
                         for (uint32_t i2 = 0; i2 < iScale; i2++){
@@ -258,9 +257,7 @@ bool PixelWrite(uint32_t x, uint32_t y, PixelType pixel, TextureType *texture){
 
 bool PixelDraw(uint32_t x, uint32_t y, PixelType pixel){ 
     if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
-        if (iScale > 1){
+        if (iScale < 0){ //WORKAROUND, WAS > 1
             for (uint32_t i = 0; i < iScale; i++){
                 for (uint32_t j = 0; j < iScale; j++){
                     PixelWrite(x + i, y + j, pixel, tCurrentDrawTarget);
@@ -281,8 +278,6 @@ PixelType PixelRead(uint32_t x, uint32_t y, TextureType *texture){
 
 PixelType PixelCheck(uint32_t x, uint32_t y){
     if ((x < vScreenSize.X) && (y < vScreenSize.Y)){
-        x = x*iScale;
-        y = y*iScale;
         return tCurrentDrawTarget->textureData[(vScreenSize.X)*y + x];
     };
     return Pixel(0, 0, 0, 0);
@@ -785,7 +780,10 @@ bool CreateDevice(HWND windowHandle, bool boolFullscreen, bool boolVsync){
 	};
 	wglMakeCurrent(glDeviceContext, glRenderContext);
 	glEnable(GL_TEXTURE_2D);
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);    
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);  
+
+    wglSwapInterval = (wglSwapInterval_t*)wglGetProcAddress("wglSwapIntervalEXT");
+    if (wglSwapInterval && !boolVsync) wglSwapInterval(0);  
 };
 
 bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, vector2d viewSize){
@@ -793,13 +791,13 @@ bool CreateGraphics(bool boolFullscreen, bool boolVsync, vector2d viewPosition, 
     glViewport(viewPosition.X,viewPosition.Y,viewSize.X,viewSize.Y);
     return true;
 };
-/*
+
 void Clear(PixelType pixel){
-    uint32_t pixelCount = tCurrentTarget->width*tCurrentTarget->height;
+    uint32_t pixelCount = tCurrentDrawTarget->width * tCurrentDrawTarget->height;
     for (uint32_t i = 0; i < pixelCount; i++){
-        tCurrentTarget->textureData[i] = pixel;
+        tCurrentDrawTarget->textureData[i] = pixel;
     };
-};*/
+};
 
 LRESULT CALLBACK WindowEventHandler(HWND windowHandle, UINT uMessage, WPARAM wParameter, LPARAM lParameter){
     switch(uMessage){
