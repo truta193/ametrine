@@ -95,8 +95,15 @@ typedef struct PixelT {
 typedef struct ImageT {
     int32 width;
     int32 height;
-    PixelT *buffer;
+    PixelT *data;
 } ImageT;
+
+typedef struct ArrayT {
+    uint8 *data;
+    uint32 length;
+    uint32 allocLength;
+    uint32 elementSize;
+} ArrayT;
 
 /*
 typedef struct LayerT { 
@@ -128,6 +135,7 @@ typedef struct VAO {
     uint32 handle;
 } VAO;
 
+/*
 typedef struct VAOvector {
     VAO *buffer;
     size_t size;
@@ -154,6 +162,7 @@ typedef struct uivector {
                          (v)->allocsize = 0; \
                          free((void*)(v)->buffer); \
                          (v)->buffer = NULL;
+*/
 
 typedef struct input {
     ButtonState keyboard[256];
@@ -181,11 +190,10 @@ longint window;
 GLDeviceContext glDeviceContext;
 GLRenderContext glRenderContext;
 uint32 mainProgram = 0;
-vectorui programs;
-vectorVAO VAOs;
-vectorVBO VBOs;
 
-
+ArrayT programs;
+ArrayT VAOs;
+ArrayT VBOs;
 
 GLfloat vertices[] = {
    0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
@@ -212,6 +220,7 @@ void EventHandler(); //Linux event handler
 void StartEventLoop(); //Windows event handler
 return_code SetWindowTitle(char *title);
 
+/*
 bool vectoruiResize(vectorui *v, size_t size);
 bool vectoruiPush(vectorui *v, uint32 i);
 bool vectoruiPop(vectorui *v);
@@ -223,7 +232,19 @@ bool vectorVAOPopIdx(vectorVAO *v, int32 index);
 bool vectorVBOResize(vectorVBO *v, size_t size);
 bool vectorVBOPush(vectorVBO *v, VBO i);
 bool vectorVBOPop(vectorVBO *v);
-bool vectorVBOPopIdx(vectorVBO *v, int32 index);
+bool vectorVBOPopIdx(vectorVBO *v, int32 index);*/
+
+void ArrayInit(ArrayT *array, uint32 elementSize);
+bool ArrayResize(ArrayT *array, uint32 newsize);
+bool ArrayPush(ArrayT *array, void *data, uint32 length);
+bool ArrayInsert(ArrayT *array, void *data, uint32 length, uint32 index);
+bool ArrayPop(ArrayT *array, uint32 length);
+bool ArrayRemove(ArrayT *array, uint32 index, uint32 length);
+void ArrayCleanup(ArrayT *array);
+
+#define arrayDataLength(array, length) ((array)->elementSize * (length))
+#define arrayDataPos(array, index) ((array)->data + arrayDataLength((array), (index)))
+#define arrayRetrieve(array, type, index) (((type*) (void*) (array)->data)[(index)])
 
 void glInitialize();
 char* CopyShaderToBuffer(char* path);
@@ -250,10 +271,10 @@ return_code EventUserUpdate();
 void EventUserTerminate();
 
 PixelT Pixel(uint8 red, uint8 green, uint8 blue, uint8 alpha);
-bool ImageCreate(ImageT *sprite, uint32 width, uint32 height, PixelT *buffer);
-bool ImageLoad(ImageT *sprite, char *path);
-void ImageClear(ImageT *sprite);
-void ImageDelete(ImageT *sprite);
+bool ImageCreate(ImageT *image, uint32 width, uint32 height, PixelT *data);
+bool ImageLoad(ImageT *image, char *path);
+void ImageClear(ImageT *image);
+void ImageDelete(ImageT *image);
 
 void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool fullscreen); 
 void *RenderThread();
@@ -511,7 +532,7 @@ return_code SetWindowTitle(char* title) {
 //-------------------------------------------------------------//
 //                          START VECTOR                       //
 //-------------------------------------------------------------//
-
+/*
 bool vectoruiResize(vectorui *v, size_t size) {
     size_t allocsize = size * sizeof(uint32);
     if (allocsize > v->allocsize) {
@@ -611,7 +632,69 @@ bool vectorVBOPopIdx(vectorVBO *v, int32 index) {
     return true;
 };
 
+*/
+void ArrayInit(ArrayT *array, uint32 elementSize) {
+    array->data = NULL;
+    array->length = 0;
+    array->allocLength = 0;
+    array->elementSize = elementSize;
+};
 
+bool ArrayResize(ArrayT *array, uint32 newLength) {
+    if (newLength > array->allocLength) {
+        void *buffer = NULL;
+        buffer = realloc(array->data, (newLength + (array->allocLength >> 1u))*arrayDataLength(array, 1));
+        if (buffer) {
+            array->allocLength = newLength + (array->allocLength >> 1u);
+            array->data = (uint8*) buffer;
+        } else return false;
+    };
+    return true;
+};
+
+bool ArrayPush(ArrayT *array, void *data, uint32 length) {
+    if (length >=0) { //Useless check, just keeping the same function type for prettiness
+        ArrayResize(array, array->length + length);
+        memcpy(arrayDataPos(array, array->length), data, arrayDataLength(array, length));
+        array->length += length;
+        return true;
+    };
+    return false;
+};
+
+bool ArrayInsert(ArrayT *array, void *data, uint32 length, uint32 index) {
+    if (index <= array->length) {
+        ArrayResize(array, array->length + length);
+        memcpy(arrayDataPos(array, index+length), arrayDataPos(array, index), arrayDataLength(array, length));
+        memcpy(arrayDataPos(array, index), data, arrayDataLength(array, length));
+        array->length += length;
+        return true;
+    };
+    return false;
+};
+
+bool ArrayPop(ArrayT *array, uint32 length) {
+    if (length <= array->length) {
+        array->length -= length;
+        return true;
+    };
+    return false;
+};
+
+bool ArrayRemove(ArrayT *array, uint32 index, uint32 length) {
+    if (index + length > array->length) return false;
+    memcpy(arrayDataPos(array, index), arrayDataPos(array, index+length), arrayDataLength(array, array->length - length));
+    array->length -= length;
+    return true;
+};
+
+void ArrayCleanup(ArrayT *array) {
+    array->length = 0;
+    array->elementSize = 0;
+    array->allocLength = 0;
+    free((void*)array->data);
+    array->data = NULL;
+};
 //-------------------------------------------------------------//
 //                           END VECTOR                        //
 //-------------------------------------------------------------//
@@ -926,40 +1009,40 @@ PixelT Pixel(uint8 red, uint8 green, uint8 blue, uint8 alpha) {
     return pixel;
 };
 
-bool ImageCreate(ImageT *sprite, uint32 width, uint32 height, PixelT *buffer) {
-    sprite->width = width;
-    sprite->height = height;
-    if (buffer == NULL) {
+bool ImageCreate(ImageT *image, uint32 width, uint32 height, PixelT *data) {
+    image->width = width;
+    image->height = height;
+    if (data == NULL) {
         void *bfr = NULL;
         bfr = malloc(sizeof(PixelT)*width*height);
         if (!bfr) return false;
-        sprite->buffer = (PixelT*) bfr;
-        for (uint32 i = 0; i < width*height; i++) sprite->buffer[i] = Pixel(0,100,0,255); //TODO: FOR DEBUG, REPLACE WITH 0,0,0,0
-    } else sprite->buffer = buffer;
+        image->data = (PixelT*) bfr;
+        for (uint32 i = 0; i < width*height; i++) image->data[i] = Pixel(0,100,0,255); //TODO: FOR DEBUG; REPLACE WITH 0,0,0,0
+    } else image->data = data;
     return true;
 };
 
-bool ImageLoad(ImageT *sprite, char *path) {
+bool ImageLoad(ImageT *image, char *path) {
     uint32 width, height, noc;
     unsigned char *buffer = NULL;
     buffer = stbi_load(path, &width, &height, &noc, 4);
-    if (ImageCreate(sprite, width, height, (PixelT*)buffer)) {
+    if (ImageCreate(image, width, height, (PixelT*)buffer)) {
         return true;
     };
     stbi_image_free(buffer);
     return false;
 };
 
-void ImageClear(ImageT *sprite) {
-    for (uint i = 0; i < sprite->height*sprite->height; i++) sprite->buffer[i] = Pixel(0,0,0,0);
-    sprite->width = 0;
-    sprite->height = 0;
+void ImageClear(ImageT *image) {
+    for (uint i = 0; i < image->height*image->height; i++) image->data[i] = Pixel(0,0,0,0);
+    image->width = 0;
+    image->height = 0;
 };
 
-void ImageDelete(ImageT *sprite) {
-    free((void*)sprite->buffer);
-    sprite->width = 0;
-    sprite->height = 0;
+void ImageDelete(ImageT *image) {
+    free((void*)image->data);
+    image->width = 0;
+    image->height = 0;
 };
 
 //-------------------------------------------------------------//
@@ -980,9 +1063,13 @@ void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool ful
     fullscreenEnabled = fullscreen;
     vsyncEnaled = vsync;
     appRunning = true;
+    /*
     vectorInit(&programs);
     vectorInit(&VAOs);
-    vectorInit(&VBOs);
+    vectorInit(&VBOs);*/
+    ArrayInit(&programs, sizeof(uint32));
+    ArrayInit(&VAOs, sizeof(VAO));
+    ArrayInit(&VBOs, sizeof(VBO));
     CreateWindowP(windowPosition.X, windowPosition.Y, windowSize.X, windowSize.Y, fullscreenEnabled);
     WindowSizeUpdate(windowSize.X, windowSize.Y);
     #ifdef STBI_INCLUDE_STB_IMAGE_H 
@@ -1032,11 +1119,11 @@ void FrameRender() {
 
 void TerminateCleanup() {
     //TODO:Make an optimized cleaning step for windows as well
-
+    /*
     vectorCleanup(&programs);
     vectorCleanup(&VAOs);
     vectorCleanup(&VBOs);
-    
+    */
     #ifdef LINUX
         XUnmapWindow(display, window);
         glXMakeCurrent(display, 0, NULL);
