@@ -9,6 +9,7 @@
 #include <time.h>
 #include <GL/gl.h>
 
+
 #ifdef LINUX
     #include <X11/Xatom.h>
     #include <X11/Xlib.h>
@@ -16,7 +17,9 @@
     #include <pthread.h>
 #else
     #include <windows.h>
+    #include <GL/glext.h>
 #endif
+
 
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -47,6 +50,55 @@ typedef enum {false, true} bool;
     typedef bool(WINAPI GLSwapInterval) (int interval);
 #endif
 
+
+#ifdef LINUX
+    #define _CALL *
+    
+#else
+    #define _CALL __stdcall*
+#endif
+
+#ifdef LINUX
+    #define getProcAddr(str) glXGetProcAddress((str))
+    #define _THR void *
+#else
+    #define getProcAddr(str) wglGetProcAddress((str))
+    #define _THR DWORD WINAPI
+#endif
+
+
+
+
+typedef GLuint (_CALL PFNGLCREATESHADERPROC) (GLenum type);
+typedef void (_CALL PFNGLSHADERSOURCEPROC) (GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length);
+typedef void (_CALL PFNGLCOMPILESHADERPROC) (GLuint shader);
+typedef void (_CALL PFNGLGETSHADERIVPROC) (GLuint shader, GLenum pname, GLint *params);
+typedef void (_CALL PFNGLGETSHADERINFOLOGPROC) (GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+typedef void (_CALL PFNGLDETACHSHADERPROC) (GLuint program, GLuint shader);
+typedef void (_CALL PFNGLDELETESHADERPROC) (GLuint shader);
+typedef GLuint (_CALL PFNGLCREATEPROGRAMPROC) (void);
+typedef void (_CALL PFNGLATTACHSHADERPROC) (GLuint program, GLuint shader);
+typedef void (_CALL PFNGLLINKPROGRAMPROC) (GLuint program);
+typedef void (_CALL PFNGLGETPROGRAMIVPROC) (GLuint program, GLenum pname, GLint *params);
+typedef void (_CALL PFNGLGETPROGRAMINFOLOGPROC) (GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+typedef void (_CALL PFNGLDELETEPROGRAMPROC) (GLuint program);
+typedef void (_CALL PFNGLUSEPROGRAMPROC) (GLuint program);
+typedef void (_CALL PFNGLGENBUFFERSPROC) (GLsizei n, GLuint *buffers);
+typedef void (_CALL PFNGLDELETEBUFFERSPROC) (GLsizei n, const GLuint *buffers);
+typedef void (_CALL PFNGLBINDBUFFERPROC) (GLenum target, GLuint buffer);
+typedef void (_CALL PFNGLBUFFERDATAPROC) (GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+typedef void (_CALL PFNGLGENVERTEXARRAYSPROC) (GLsizei n, GLuint *arrays);
+typedef void (_CALL PFNGLDELETEVERTEXARRAYSPROC) (GLsizei n, const GLuint *arrays);
+typedef void (_CALL PFNGLBINDVERTEXARRAYPROC) (GLuint array);
+typedef void (_CALL PFNGLVERTEXATTRIBPOINTERPROC) (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+typedef void (_CALL PFNGLENABLEVERTEXATTRIBARRAYPROC) (GLuint index);
+typedef GLint (_CALL PFNGLGETATTRIBLOCATIONPROC) (GLuint program, const GLchar *name);
+typedef void (_CALL PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
+typedef GLint (_CALL PFNGLGETUNIFORMLOCATIONPROC) (GLuint program, const GLchar *name);
+typedef void (_CALL PFNGLGENERATEMIPMAPPROC) (GLenum target);
+typedef void (_CALL PFNGLACTIVETEXTUREPROC) (GLenum texture); 
+
+
 static GLSwapInterval *glSwapIntervalEXT;
 PFNGLCREATESHADERPROC glCreateShader = NULL;
 PFNGLSHADERSOURCEPROC glShaderSource = NULL;;
@@ -76,6 +128,9 @@ PFNGLGETATTRIBLOCATIONPROC glGetAttribLocation = NULL;
 PFNGLUNIFORM1IPROC glUniform1i = NULL;
 PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = NULL;
 PFNGLGENERATEMIPMAPPROC glGenerateMipmap = NULL;
+#ifdef WINDOWS 
+    PFNGLACTIVETEXTUREPROC glActiveTexture = NULL;
+#endif
 
 typedef struct v2i {
     int32 X;
@@ -104,6 +159,19 @@ typedef struct ArrayT {
     uint32 allocLength;
     uint32 elementSize;
 } ArrayT;
+
+typedef struct TextureT {
+    uint32 handle;
+    ImageT *image;
+    uint32 width;
+    uint32 height;
+} TextureT;
+
+typedef struct AtlasT {
+    ImageT *image;
+    uint32 subWidth;
+    uint32 subHeight;
+} AtlasT;
 
 /*
 typedef struct LayerT { 
@@ -134,35 +202,6 @@ typedef struct VBO {
 typedef struct VAO {
     uint32 handle;
 } VAO;
-
-/*
-typedef struct VAOvector {
-    VAO *buffer;
-    size_t size;
-    size_t allocsize;
-} vectorVAO;
-
-typedef struct VBOvector {
-    VBO *buffer;
-    size_t size;
-    size_t allocsize;
-} vectorVBO;
-
-typedef struct uivector {
-    uint32 *buffer;
-    size_t size;
-    size_t allocsize;
-} vectorui;
-
-#define vectorInit(v) (v)->size = 0; \
-                      (v)->allocsize = 0; \
-                      (v)->buffer = NULL;
-
-#define vectorCleanup(v) (v)->size = 0; \
-                         (v)->allocsize = 0; \
-                         free((void*)(v)->buffer); \
-                         (v)->buffer = NULL;
-*/
 
 typedef struct input {
     ButtonState keyboard[256];
@@ -220,20 +259,6 @@ void EventHandler(); //Linux event handler
 void StartEventLoop(); //Windows event handler
 return_code SetWindowTitle(char *title);
 
-/*
-bool vectoruiResize(vectorui *v, size_t size);
-bool vectoruiPush(vectorui *v, uint32 i);
-bool vectoruiPop(vectorui *v);
-bool vectoruiPopIdx(vectorui *v, int32 index);
-bool vectorVAOResize(vectorVAO *v, size_t size);
-bool vectorVAOPush(vectorVAO *v, VAO i);
-bool vectorVAOPop(vectorVAO *v);
-bool vectorVAOPopIdx(vectorVAO *v, int32 index);
-bool vectorVBOResize(vectorVBO *v, size_t size);
-bool vectorVBOPush(vectorVBO *v, VBO i);
-bool vectorVBOPop(vectorVBO *v);
-bool vectorVBOPopIdx(vectorVBO *v, int32 index);*/
-
 void ArrayInit(ArrayT *array, uint32 elementSize);
 bool ArrayResize(ArrayT *array, uint32 newsize);
 bool ArrayPush(ArrayT *array, void *data, uint32 length);
@@ -273,11 +298,23 @@ void EventUserTerminate();
 PixelT Pixel(uint8 red, uint8 green, uint8 blue, uint8 alpha);
 bool ImageCreate(ImageT *image, uint32 width, uint32 height, PixelT *data);
 bool ImageLoad(ImageT *image, char *path);
-void ImageClear(ImageT *image);
+void ImageReset(ImageT *image);
 void ImageDelete(ImageT *image);
 
+//TODO:Implement
+bool TextureCreate(TextureT *texture, uint32 width, uint32 height, ImageT *source);
+bool TextureLoad(TextureT *texture, char *path);
+void TextureBind(TextureT *texture);
+void TextureDelete(TextureT *texture);
+bool AtlasCreate(AtlasT *atlas, uint32 subWidth, uint32 subHeight, ImageT *image);
+bool AtlasLoad(AtlasT *atlas, char *path);
+//AtlasRetrieve(AtlasT *atlas, uint32 row, uint32 column); Think of a good solution
+void AtlasDestroy(AtlasT *atlas);
+//TODO:END
+
 void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool fullscreen); 
-void *RenderThread();
+
+_THR RenderThread();
 void FrameRender();
 void TerminateCleanup();
 
@@ -438,7 +475,7 @@ typedef enum KeyboardMap {
     key_Comma = 0xbc, key_Dot = 0xbe, key_Space = VK_SPACE, key_Slash = 0xbf
 } KeyboardMap;
 
-void CreateWindowP(uint32 windowPositionX, uint32 windowPositionY, uint32 windowWidth, uint32 windowHeight, bool fullscreenEnabled); {
+void CreateWindowP(uint32 windowPositionX, uint32 windowPositionY, uint32 windowWidth, uint32 windowHeight, bool fullscreenEnabled) {
     WNDCLASS windowClass;
 	windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -458,7 +495,7 @@ void CreateWindowP(uint32 windowPositionX, uint32 windowPositionY, uint32 window
 	vTopLeft.X = windowPositionX;
 	vTopLeft.Y = windowPositionY;
 	
-	if (fullscreen){
+	if (fullscreenEnabled){
 		dwExStyle = 0;
 		dwStyle = WS_VISIBLE | WS_POPUP;
 		HMONITOR hmon = MonitorFromWindow((HWND)window, MONITOR_DEFAULTTONEAREST);
@@ -499,19 +536,19 @@ LRESULT CALLBACK EventLoop(HWND windowHandle, uint32 uMessage, WPARAM wParameter
         case WM_MOUSEMOVE: {
             uint16 x = lParameter & 0xFFFF;
             uint16 y = (lParameter >> 16) & 0xFFFF;
-            mousePosition.X = *(int16*)&x;
-            mousePosition.Y = *(int16*)&y;
+            input.mousePosition.X = *(int16*)&x;
+            input.mousePosition.Y = *(int16*)&y;
             break;
         };
-        case WM_KEYDOWN: { currentKeyboardState[wParameter] = true; break; };
-        case WM_KEYUP: { currentKeyboardState[wParameter] = false; break; };
-        case WM_LBUTTONDOWN: { currentMouseState[LClick] = true; break; };
-        case WM_LBUTTONUP: { currentMouseState[LClick] = false; break; };
-        case WM_RBUTTONDOWN: { currentMouseState[RClick] = true; break; };
-        case WM_RBUTTONUP: { currentMouseState[RClick] = false; break; };
-        case WM_MBUTTONDOWN: { currentMouseState[MClick] = true; break; };
-        case WM_MBUTTONUP: { currentMouseState[MClick] = false; break; };
-        case WM_MOUSEWHEEL: { wheelDelta += GET_WHEEL_DELTA_WPARAM(wParameter); break; };
+        case WM_KEYDOWN: { input.currentKeyboardState[wParameter] = true; break; };
+        case WM_KEYUP: { input.currentKeyboardState[wParameter] = false; break; };
+        case WM_LBUTTONDOWN: { input.currentMouseState[LClick] = true; break; };
+        case WM_LBUTTONUP: { input.currentMouseState[LClick] = false; break; };
+        case WM_RBUTTONDOWN: { input.currentMouseState[RClick] = true; break; };
+        case WM_RBUTTONUP: { input.currentMouseState[RClick] = false; break; };
+        case WM_MBUTTONDOWN: { input.currentMouseState[MClick] = true; break; };
+        case WM_MBUTTONUP: { input.currentMouseState[MClick] = false; break; };
+        case WM_MOUSEWHEEL: { input.wheelDelta += GET_WHEEL_DELTA_WPARAM(wParameter); break; };
         case WM_DESTROY: { PostQuitMessage(0); break; };
         case WM_CLOSE: { appRunning = false; TerminateCleanup(); break; };
     };
@@ -532,107 +569,7 @@ return_code SetWindowTitle(char* title) {
 //-------------------------------------------------------------//
 //                          START VECTOR                       //
 //-------------------------------------------------------------//
-/*
-bool vectoruiResize(vectorui *v, size_t size) {
-    size_t allocsize = size * sizeof(uint32);
-    if (allocsize > v->allocsize) {
-        size_t newsize = allocsize + (v->allocsize >> 1u);
-        void *buffer = realloc(v->buffer, newsize);
-        if (buffer) {
-            v->allocsize = newsize;
-            v->buffer = (uint32*) buffer;
-        } else return false;
-    };
-    v->size = size;
-    return true;
-};
 
-bool vectoruiPush(vectorui *v, uint32 i) {
-    if (!vectoruiResize(v, v->size + 1)) return false;
-    v->buffer[v->size - 1] = i;
-    return true;
-};
-
-bool vectoruiPop(vectorui *v) {
-    if (!vectoruiResize(v, v->size - 1)) return false;
-    return true;
-};
-
-bool vectoruiPopIdx(vectorui *v, int32 index) {
-    if (index > v->size-1) return false;
-    if (index == v->size-1) if(!vectoruiPop(v)) return false; else return true;
-    for (int i = index; i < v->size-1; i++) v->buffer[i] = v->buffer[i+1];  
-    if(!vectoruiPop(v)) return false; 
-    return true;
-};
-
-bool vectorVAOResize(vectorVAO *v, size_t size) {
-    size_t allocsize = size * sizeof(VAO);
-    if (allocsize > v->allocsize) {
-        size_t newsize = allocsize + (v->allocsize >> 1u);
-        void *buffer = realloc(v->buffer, newsize);
-        if (buffer) {
-            v->allocsize = newsize;
-            v->buffer = (VAO*) buffer;
-        } else return false;
-    };
-    v->size = size;
-    return true;
-};
-
-bool vectorVAOPush(vectorVAO *v, VAO i) {
-    if (!vectorVAOResize(v, v->size + 1)) return false;
-    v->buffer[v->size - 1] = i;
-    return true;
-};
-
-bool vectorVAOPop(vectorVAO *v) {
-    if (!vectorVAOResize(v, v->size - 1)) return false;
-    return true;
-};
-
-bool vectorVAOPopIdx(vectorVAO *v, int32 index) {
-    if (index > v->size-1) return false;
-    if (index == v->size-1) if(!vectorVAOPop(v)) return false; else return true;
-    for (int i = index; i < v->size-1; i++) v->buffer[i] = v->buffer[i+1];  
-    if(!vectorVAOPop(v)) return false; 
-    return true;
-};
-
-bool vectorVBOResize(vectorVBO *v, size_t size) {
-    size_t allocsize = size * sizeof(VBO);
-    if (allocsize > v->allocsize) {
-        size_t newsize = allocsize + (v->allocsize >> 1u);
-        void *buffer = realloc(v->buffer, newsize);
-        if (buffer) {
-            v->allocsize = newsize;
-            v->buffer = (VBO*) buffer;
-        } else return false;
-    };
-    v->size = size;
-    return true;
-};
-
-bool vectorVBOPush(vectorVBO *v, VBO i) {
-    if (!vectorVBOResize(v, v->size + 1)) return false;
-    v->buffer[v->size - 1] = i;
-    return true;
-};
-
-bool vectorVBOPop(vectorVBO *v) {
-    if (!vectorVBOResize(v, v->size - 1)) return false;
-    return true;
-};
-
-bool vectorVBOPopIdx(vectorVBO *v, int32 index) {
-    if (index > v->size-1) return false;
-    if (index == v->size-1) if(!vectorVBOPop(v)) return false; else return true;
-    for (int i = index; i < v->size-1; i++) v->buffer[i] = v->buffer[i+1];  
-    if(!vectorVBOPop(v)) return false; 
-    return true;
-};
-
-*/
 void ArrayInit(ArrayT *array, uint32 elementSize) {
     array->data = NULL;
     array->length = 0;
@@ -692,7 +629,7 @@ void ArrayCleanup(ArrayT *array) {
     array->length = 0;
     array->elementSize = 0;
     array->allocLength = 0;
-    free((void*)array->data);
+    FreeAllocatedMemory((void*)array->data);
     array->data = NULL;
 };
 //-------------------------------------------------------------//
@@ -709,7 +646,7 @@ void glInitialize() {
         glDeviceContext = glXCreateContext(display, visualInfo, NULL, GL_TRUE);
         glXMakeCurrent(display, window, glDeviceContext);
         glSwapIntervalEXT = NULL;
-        glSwapIntervalEXT = (GLSwapInterval*)glXGetProcAddress((unsigned char*)"glXSwapIntervalEXT");
+        glSwapIntervalEXT = (GLSwapInterval*)getProcAddr((unsigned char*)"glXSwapIntervalEXT");
         if (glSwapIntervalEXT == NULL && !vsyncEnaled) printf("Unable to disable vsync, will run at monitor's default refresh rate\n");
         if (glSwapIntervalEXT != NULL && !vsyncEnaled) glSwapIntervalEXT(display, window, 0);
     #else
@@ -738,34 +675,42 @@ void glInitialize() {
     glViewport(viewportPosition.X, viewportPosition.Y, viewportSize.X, viewportSize.Y);
     
     //TODO: GLX, needs WGL version
-    glCreateShader = (PFNGLCREATESHADERPROC)glXGetProcAddress("glCreateShader");
-    glShaderSource = (PFNGLSHADERSOURCEPROC)glXGetProcAddress("glShaderSource");
-    glCompileShader = (PFNGLCOMPILESHADERPROC)glXGetProcAddress("glCompileShader");
-    glGetShaderiv = (PFNGLGETSHADERIVPROC)glXGetProcAddress("glGetShaderiv");
-    glGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)glXGetProcAddress("glGetShaderInfoLog");
-    glDetachShader = (PFNGLDETACHSHADERPROC)glXGetProcAddress("glDetachShader");
-    glDeleteShader = (PFNGLDELETESHADERPROC)glXGetProcAddress("glDeleteShader");
-    glCreateProgram = (PFNGLCREATEPROGRAMPROC)glXGetProcAddress("glCreateProgram");
-    glAttachShader = (PFNGLATTACHSHADERPROC)glXGetProcAddress("glAttachShader");
-    glLinkProgram = (PFNGLLINKPROGRAMPROC)glXGetProcAddress("glLinkProgram");
-    glGetProgramiv = (PFNGLGETPROGRAMIVPROC)glXGetProcAddress("glGetProgramiv");
-    glGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC)glXGetProcAddress("glGetProgramInfoLog");
-    glDeleteProgram = (PFNGLDELETEPROGRAMPROC)glXGetProcAddress("glDeleteProgram");
-    glUseProgram = (PFNGLUSEPROGRAMPROC)glXGetProcAddress("glUseProgram");
-    glGenBuffers = (PFNGLGENBUFFERSPROC)glXGetProcAddress("glGenBuffers");
-    glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)glXGetProcAddress("glDeleteBuffers");
-    glBindBuffer = (PFNGLBINDBUFFERPROC)glXGetProcAddress("glBindBuffer");
-    glBufferData = (PFNGLBUFFERDATAPROC)glXGetProcAddress("glBufferData");
-    glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)glXGetProcAddress("glGenVertexArrays");
-    glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)glXGetProcAddress("glDeleteVertexArrays");
-    glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)glXGetProcAddress("glBindVertexArray");
-    glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)glXGetProcAddress("glVertexAttribPointer");
-    glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)glXGetProcAddress("glEnableVertexAttribArray");
-    glGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC)glXGetProcAddress("glGetAttribLocation");
+    glCreateShader = (PFNGLCREATESHADERPROC)getProcAddr("glCreateShader");
+    glShaderSource = (PFNGLSHADERSOURCEPROC)getProcAddr("glShaderSource");
+    glCompileShader = (PFNGLCOMPILESHADERPROC)getProcAddr("glCompileShader");
+    glGetShaderiv = (PFNGLGETSHADERIVPROC)getProcAddr("glGetShaderiv");
+    glGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)getProcAddr("glGetShaderInfoLog");
+    glDetachShader = (PFNGLDETACHSHADERPROC)getProcAddr("glDetachShader");
+    glDeleteShader = (PFNGLDELETESHADERPROC)getProcAddr("glDeleteShader");
+    glCreateProgram = (PFNGLCREATEPROGRAMPROC)getProcAddr("glCreateProgram");
+    glAttachShader = (PFNGLATTACHSHADERPROC)getProcAddr("glAttachShader");
+    glLinkProgram = (PFNGLLINKPROGRAMPROC)getProcAddr("glLinkProgram");
+    glGetProgramiv = (PFNGLGETPROGRAMIVPROC)getProcAddr("glGetProgramiv");
+    glGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC)getProcAddr("glGetProgramInfoLog");
+    glDeleteProgram = (PFNGLDELETEPROGRAMPROC)getProcAddr("glDeleteProgram");
+    glUseProgram = (PFNGLUSEPROGRAMPROC)getProcAddr("glUseProgram");
+    glGenBuffers = (PFNGLGENBUFFERSPROC)getProcAddr("glGenBuffers");
+    glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)getProcAddr("glDeleteBuffers");
+    glBindBuffer = (PFNGLBINDBUFFERPROC)getProcAddr("glBindBuffer");
+    glBufferData = (PFNGLBUFFERDATAPROC)getProcAddr("glBufferData");
+    glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)getProcAddr("glGenVertexArrays");
+    glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)getProcAddr("glDeleteVertexArrays");
+    glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)getProcAddr("glBindVertexArray");
+    glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)getProcAddr("glVertexAttribPointer");
+    glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)getProcAddr("glEnableVertexAttribArray");
+    glGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC)getProcAddr("glGetAttribLocation");
 
-    glUniform1i = (PFNGLUNIFORM1IPROC)glXGetProcAddress("glUniform1i");
-    glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)glXGetProcAddress("glGetUniformLocation");
-    glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)glXGetProcAddress("glGenerateMipmap");
+    glUniform1i = (PFNGLUNIFORM1IPROC)getProcAddr("glUniform1i");
+    glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)getProcAddr("glGetUniformLocation");
+    glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)getProcAddr("glGenerateMipmap");
+    #ifdef WINDOWS 
+        glActiveTexture = (PFNGLACTIVETEXTUREPROC)getProcAddr("glActiveTexture");
+    #endif
+
+};
+
+void FreeAllocatedMemory(void* ptr) {
+    free(ptr);
 };
 
 char* CopyShaderToBuffer(char* path) {
@@ -788,7 +733,7 @@ char* CopyShaderToBuffer(char* path) {
     rewind(f);
     fread(source, 1, sizeof(char)*cCount, f);
     if (ferror(f)) {
-        free(source);
+        FreeAllocatedMemory(source);
         fclose(f);
         printf("Error reading file!\n");
         return NULL;
@@ -796,10 +741,6 @@ char* CopyShaderToBuffer(char* path) {
     fclose(f);
     source[cCount] = '\0';
     return source;
-};
-
-void FreeAllocatedMemory(void* ptr) {
-    free(ptr);
 };
 
     //---------//
@@ -924,6 +865,7 @@ void BufferClear(bool colorBuffer, bool depthBuffer) {
 //                           END OPENGL                        //
 //-------------------------------------------------------------//
 
+
 //-------------------------------------------------------------//
 //                         START UPDATES                       //
 //-------------------------------------------------------------//
@@ -1012,13 +954,15 @@ PixelT Pixel(uint8 red, uint8 green, uint8 blue, uint8 alpha) {
 bool ImageCreate(ImageT *image, uint32 width, uint32 height, PixelT *data) {
     image->width = width;
     image->height = height;
-    if (data == NULL) {
-        void *bfr = NULL;
-        bfr = malloc(sizeof(PixelT)*width*height);
-        if (!bfr) return false;
-        image->data = (PixelT*) bfr;
+    void *bfr = NULL;
+    bfr = malloc(sizeof(PixelT)*width*height);
+    if (!bfr) return false;
+    image->data = (PixelT*) bfr;
+    if (data == NULL) { 
         for (uint32 i = 0; i < width*height; i++) image->data[i] = Pixel(0,100,0,255); //TODO: FOR DEBUG; REPLACE WITH 0,0,0,0
-    } else image->data = data;
+    } else {
+        memcpy(image->data, data, sizeof(PixelT)*width*height);
+    };
     return true;
 };
 
@@ -1027,20 +971,21 @@ bool ImageLoad(ImageT *image, char *path) {
     unsigned char *buffer = NULL;
     buffer = stbi_load(path, &width, &height, &noc, 4);
     if (ImageCreate(image, width, height, (PixelT*)buffer)) {
+        stbi_image_free(buffer);
         return true;
     };
     stbi_image_free(buffer);
     return false;
 };
 
-void ImageClear(ImageT *image) {
-    for (uint i = 0; i < image->height*image->height; i++) image->data[i] = Pixel(0,0,0,0);
+void ImageReset(ImageT *image) {
+    for (uint32 i = 0; i < image->height*image->height; i++) image->data[i] = Pixel(0,0,0,0);
     image->width = 0;
     image->height = 0;
 };
 
 void ImageDelete(ImageT *image) {
-    free((void*)image->data);
+    FreeAllocatedMemory((void*)image->data);
     image->width = 0;
     image->height = 0;
 };
@@ -1063,10 +1008,6 @@ void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool ful
     fullscreenEnabled = fullscreen;
     vsyncEnaled = vsync;
     appRunning = true;
-    /*
-    vectorInit(&programs);
-    vectorInit(&VAOs);
-    vectorInit(&VBOs);*/
     ArrayInit(&programs, sizeof(uint32));
     ArrayInit(&VAOs, sizeof(VAO));
     ArrayInit(&VBOs, sizeof(VBO));
@@ -1083,11 +1024,16 @@ void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool ful
         StartEventLoop();
         pthread_join(tid, NULL);
     #else
+        HANDLE tid = CreateThread(NULL, 0, RenderThread, NULL, 0, NULL);
+        StartEventLoop();
+
+        if (tid != NULL) WaitForSingleObject(tid, 0xFFFFFFFF);
+
         //TODO:IMPLEMENT WINDOWS THREADING
     #endif 
 };
 
-void *RenderThread() {
+_THR RenderThread() {
     glInitialize();
     if (!EventUserInit()) appRunning = false;
     while (appRunning) FrameRender();
@@ -1124,6 +1070,10 @@ void TerminateCleanup() {
     vectorCleanup(&VAOs);
     vectorCleanup(&VBOs);
     */
+   ArrayCleanup(&programs);
+   ArrayCleanup(&VAOs);
+   ArrayCleanup(&VBOs);
+   //EventUserTerminate();
     #ifdef LINUX
         XUnmapWindow(display, window);
         glXMakeCurrent(display, 0, NULL);
