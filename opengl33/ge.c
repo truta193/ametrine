@@ -1057,7 +1057,7 @@ _THR RenderThread() {
         pthread_exit(0);
     #else
         PostMessage((HWND)window,WM_DESTROY,0,0);
-        return; //TODO:Should be ok, need to check on windows
+        return 0; //TODO:Should be ok, need to check on windows
     #endif
     
 };
@@ -1091,7 +1091,7 @@ void TerminateCleanup() {
         XCloseDisplay(display);
     #else
         //TODO:Check if this is ok
-        wglMakeCurrent(GLDeviceContext, 0);
+        wglMakeCurrent(glDeviceContext, 0);
         DestroyWindow((HWND)window);
         wglDeleteContext(glRenderContext);
     #endif
