@@ -10,6 +10,7 @@
 #include <GL/gl.h>
 
 
+
 #ifdef LINUX
     #include <X11/Xatom.h>
     #include <X11/Xlib.h>
@@ -19,8 +20,6 @@
     #include <windows.h>
     #include <GL/glext.h>
 #endif
-
-
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb_image.h"
@@ -41,29 +40,19 @@ typedef enum {FAIL = 0, OK = 1, NO_FILE = -1} return_code;
 typedef enum {false, true} bool;
 
 #ifdef LINUX
+    #define _CALL *
+    #define getProcAddr(str) glXGetProcAddress((str))
+    #define _THR void *
     typedef GLXContext GLDeviceContext;
     typedef GLXContext GLRenderContext;
     typedef int(GLSwapInterval)(Display* dpy, GLXDrawable drawable, int interval);
 #else   
+    #define _CALL __stdcall*
+    #define getProcAddr(str) wglGetProcAddress((str))
+    #define _THR DWORD WINAPI
     typedef HDC GLDeviceContext;
     typedef HGLRC GLRenderContext;
     typedef bool(WINAPI GLSwapInterval) (int interval);
-#endif
-
-
-#ifdef LINUX
-    #define _CALL *
-    
-#else
-    #define _CALL __stdcall*
-#endif
-
-#ifdef LINUX
-    #define getProcAddr(str) glXGetProcAddress((str))
-    #define _THR void *
-#else
-    #define getProcAddr(str) wglGetProcAddress((str))
-    #define _THR DWORD WINAPI
 #endif
 
 
@@ -101,8 +90,8 @@ typedef void (_CALL PFNGLACTIVETEXTUREPROC) (GLenum texture);
 
 static GLSwapInterval *glSwapIntervalEXT;
 PFNGLCREATESHADERPROC glCreateShader = NULL;
-PFNGLSHADERSOURCEPROC glShaderSource = NULL;;
-PFNGLCOMPILESHADERPROC glCompileShader = NULL;;
+PFNGLSHADERSOURCEPROC glShaderSource = NULL;
+PFNGLCOMPILESHADERPROC glCompileShader = NULL;
 PFNGLGETSHADERIVPROC glGetShaderiv = NULL;;
 PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog = NULL;
 PFNGLDETACHSHADERPROC glDetachShader = NULL;
@@ -148,8 +137,8 @@ typedef struct PixelT {
 } PixelT;
 
 typedef struct ImageT {
-    int32 width;
-    int32 height;
+    uint32 width;
+    uint32 height;
     PixelT *data;
 } ImageT;
 
@@ -162,7 +151,6 @@ typedef struct ArrayT {
 
 typedef struct TextureT {
     uint32 handle;
-    ImageT *image;
     uint32 width;
     uint32 height;
 } TextureT;
@@ -172,16 +160,6 @@ typedef struct AtlasT {
     uint32 subWidth;
     uint32 subHeight;
 } AtlasT;
-
-/*
-typedef struct LayerT { 
-    uint32 glid;
-    uint32 index;
-    v2i offset;
-    bool visible;
-    bool update;
-    ImageT *sprite;
-} LayerT;*/
 
 typedef struct ButtonState {
     bool pressed;
@@ -234,25 +212,15 @@ ArrayT programs;
 ArrayT VAOs;
 ArrayT VBOs;
 
-GLfloat vertices[] = {
-   0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-  -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-  -0.5f, -0.5f,  0.0f, 0.0f, 0.0f
-};
-
-unsigned int indices[] = { 0, 1, 2 };
-
-float pixels[] = {
-  0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-  1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f
-};
-
+ImageT testImg;
+TextureT testTex;
 VAO vao;
 VBO vbo;
 VBO idx;
-GLuint tex;
 
-
+/* TODO:
+* SetActiveTexture proc/macro
+*/
 
 void CreateWindowP(uint32 windowPositionX, uint32 windowPositionY, uint32 windowWidth, uint32 windowHeight, bool fullscreenEnabled);
 void EventHandler(); //Linux event handler
@@ -301,55 +269,22 @@ bool ImageLoad(ImageT *image, char *path);
 void ImageReset(ImageT *image);
 void ImageDelete(ImageT *image);
 
-//TODO:Implement
-bool TextureCreate(TextureT *texture, uint32 width, uint32 height, ImageT *source);
+
+void TextureCreate(TextureT *texture, ImageT *image);
 bool TextureLoad(TextureT *texture, char *path);
 void TextureBind(TextureT *texture);
 void TextureDelete(TextureT *texture);
-bool AtlasCreate(AtlasT *atlas, uint32 subWidth, uint32 subHeight, ImageT *image);
-bool AtlasLoad(AtlasT *atlas, char *path);
-//AtlasRetrieve(AtlasT *atlas, uint32 row, uint32 column); Think of a good solution
-void AtlasDestroy(AtlasT *atlas);
-//TODO:END
+//TODO: Implement
+void TextureAtlasCreate(AtlasT *atlas, uint32 subWidth, uint32 subHeight, ImageT *image);
+bool TextureAtlasLoad(AtlasT *atlas, char *path);
+//TextureAtlasRetrieve(AtlasT *atlas, uint32 row, uint32 column); Think of a good solution
+void TextureAtlasDelete(AtlasT *atlas);
 
 void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool fullscreen); 
-
 _THR RenderThread();
 void FrameRender();
 void TerminateCleanup();
 
-/*
-void Construct(uint32 width, uint32 height, uint32 scale, bool vsync, bool fullscreen);
-void Start();
-void *Thread();
-void FrameRender();
-void TerminateCleanup();
-void BufferClear(bool colorBuffer, bool depthBuffer);
-
-
-PixelT Pixel(uint8 red, uint8 green, uint8 blue, uint8 alpha);
-PixelT PixelRetrieve(uint32 x, uint32 y,  ImageT *sprite); 
-return_code PixelDraw(PixelT pixel, uint32 x, uint32 y, ImageT *sprite); 
-ImageT *SpriteCreate(uint32 width, uint32 height, PixelT *buffer);
-ImageT *SpriteLoadFromImage(char path[]);
-void SpriteClear(ImageT *sprite, PixelT pixel);
-void SpriteDelete(ImageT *sprite);
-void SpriteDraw(ImageT *sprite, uint32 x, uint32 y, uint32 scale, ImageT *target);
-void SpriteDrawPartial(ImageT *sprite, uint32 left, uint32 top, uint32 right, uint32 bottom, uint32 scale,  ImageT *target, uint32 x, uint32 y);
-LayerT *LayerCreate(bool visible, bool update);          
-void LayerDelete(uint32 id);
-
-
-return_code UserInitEvent();
-return_code UserUpdateEvent();
-void UserTerminateEvent();
-
-
-void ViewportSizeUpdate();
-void WindowSizeUpdate(uint32 x, uint32 y);
-void LayerOffsetUpdate(LayerT *layer, uint32 x, uint32 y);
-
-*/
 
 //-------------------------------------------------------------//
 //                           START UTIL                        //
@@ -450,8 +385,10 @@ void EventHandler() {
                 break;
             };
             case ClientMessage: {
-                appRunning = false; 
-                TerminateCleanup();
+                if (event.xclient.data.l[0] = XInternAtom(display, "WM_DELETE_WINDOW", false)) {
+                    appRunning = false; 
+                    TerminateCleanup();
+                };
                 break;  
             };
         };
@@ -529,7 +466,7 @@ void StartEventLoop() {
         DispatchMessage(&message);
     }
 };
-//TODO:Will need to update this because of the new input struct
+
 LRESULT CALLBACK EventLoop(HWND windowHandle, uint32 uMessage, WPARAM wParameter, LPARAM lParameter){
     switch(uMessage){
         case WM_SIZE: { WindowSizeUpdate(lParameter & 0xFFFF, (lParameter >> 16) & 0xFFFF); break; };
@@ -673,8 +610,10 @@ void glInitialize() {
         if (glSwapIntervalEXT != NULL && !vsyncEnaled) glSwapIntervalEXT(0);
     #endif
     glViewport(viewportPosition.X, viewportPosition.Y, viewportSize.X, viewportSize.Y);
+
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
     
-    //TODO: GLX, needs WGL version
     glCreateShader = (PFNGLCREATESHADERPROC)getProcAddr("glCreateShader");
     glShaderSource = (PFNGLSHADERSOURCEPROC)getProcAddr("glShaderSource");
     glCompileShader = (PFNGLCOMPILESHADERPROC)getProcAddr("glCompileShader");
@@ -898,34 +837,58 @@ void ViewportSizeUpdate() {
 //-------------------------------------------------------------//
 
 return_code EventUserInit() {
+    
+    mainProgram = ProgramCompile("testvs.glsl", "testfs.glsl");
+    TextureLoad(&testTex, "/home/truta/Downloads/photo-1570556319136-3cfc640168a4.jpg");
+    /*TESTING
+    glGenTextures(1, &testTex.handle);
+    glBindTexture(GL_TEXTURE_2D, testTex.handle);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    int width, height, nrChannels;
+    // The FileSystem::getPath(...) is part of the GitHub repository so we can find files on any IDE/platform; replace it with your own image path.
+    unsigned char *data = stbi_load("/home/truta/Downloads/photo-1570556319136-3cfc640168a4.jpg", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        printf("Failed to load image\n");
+    }
+    stbi_image_free(data);
+    */
 
-    mainProgram = ProgramCompile("test.vs", "test.fs");
+    float vertices[] = {
+        // positions          // colors                  // texture coords
+         0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f, 1.0f,   1.0f, 1.0f, // top right
+         0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f, 1.0f,   1.0f, 0.0f, // bottom right
+        -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f, 1.0f,   0.0f, 0.0f, // bottom left
+        -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f, 1.0f,   0.0f, 1.0f  // top left 
+    };
+    
+    unsigned int indices[] = {  // note that we start from 0!
+        0, 1, 3,   // first triangle
+        1, 2, 3
+    }; 
+
+
     VAOCreate(&vao);
-    VAOBind(&vao);
-
     VBOCreate(&vbo, GL_ARRAY_BUFFER, false);
-    VBOBind(&vbo);
-    VBOBuffer(&vbo, vertices, 0, sizeof(vertices));
-
     VBOCreate(&idx, GL_ELEMENT_ARRAY_BUFFER, false);
-    VBOBind(&idx);
+
+    VAOBind(&vao);
+    
+    VBOBuffer(&vbo, vertices, 0, sizeof(vertices));
     VBOBuffer(&idx, indices, 0, sizeof(indices));
     
-    glUseProgram(mainProgram);
+    VAOAttribs(&vao, &vbo, 0, 3, GL_FLOAT, 9 * sizeof(float), 0);
+    VAOAttribs(&vao, &vbo, 1, 4, GL_FLOAT, 9 * sizeof(float), 3*sizeof(float));
+    VAOAttribs(&vao, &vbo, 2, 2, GL_FLOAT, 9 * sizeof(float), 7*(sizeof(float)));
 
-    VAOAttribs(&vao, &vbo, glGetAttribLocation(mainProgram, "point"), 3, GL_FLOAT, 5 * sizeof(float), 0);
-    VAOAttribs(&vao, &vbo, glGetAttribLocation(mainProgram, "texcoord"), 2, GL_FLOAT, 5 * sizeof(float), 3 * sizeof(float));
-
-
-    glGenTextures(1, &tex);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glUniform1i(glGetUniformLocation(mainProgram, "tex"), 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_BGR, GL_FLOAT, pixels);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glGenerateMipmap(GL_TEXTURE_2D);
     return OK;
 };
 
@@ -954,27 +917,29 @@ PixelT Pixel(uint8 red, uint8 green, uint8 blue, uint8 alpha) {
 bool ImageCreate(ImageT *image, uint32 width, uint32 height, PixelT *data) {
     image->width = width;
     image->height = height;
-    void *bfr = NULL;
-    bfr = malloc(sizeof(PixelT)*width*height);
-    if (!bfr) return false;
-    image->data = (PixelT*) bfr;
     if (data == NULL) { 
-        for (uint32 i = 0; i < width*height; i++) image->data[i] = Pixel(0,100,0,255); //TODO: FOR DEBUG; REPLACE WITH 0,0,0,0
+        void *bfr = NULL;
+        bfr = malloc(sizeof(PixelT)*width*height);
+        if (!bfr) return false;
+        image->data = (PixelT*) bfr;
+        for (uint32 i = 0; i < width*height; i++) image->data[i] = Pixel(0,100,0,255); //TODO: FOR DEBUG; REPLACE WITH 0,0,0,0 WHEN DONE
     } else {
-        memcpy(image->data, data, sizeof(PixelT)*width*height);
+        image->data = data;
     };
     return true;
 };
 
 bool ImageLoad(ImageT *image, char *path) {
-    uint32 width, height, noc;
-    unsigned char *buffer = NULL;
-    buffer = stbi_load(path, &width, &height, &noc, 4);
-    if (ImageCreate(image, width, height, (PixelT*)buffer)) {
-        stbi_image_free(buffer);
+    int32 width, height, noc;
+    unsigned char *data = NULL;
+    data = stbi_load(path, &width, &height, &noc, 4);
+    if (data) {
+        image->width = width;
+        image->height = height;
+        image->data = (PixelT*) data;
         return true;
     };
-    stbi_image_free(buffer);
+    stbi_image_free(data);
     return false;
 };
 
@@ -989,6 +954,51 @@ void ImageDelete(ImageT *image) {
     image->width = 0;
     image->height = 0;
 };
+
+void TextureCreate(TextureT *texture, ImageT *image) {
+    texture->handle = 0;
+    texture->height = image->height;
+    texture->width = image->width;
+    glGenTextures(1, &texture->handle);
+    glBindTexture(GL_TEXTURE_2D, texture->handle);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture->width, texture->handle, 0, GL_RGBA, GL_UNSIGNED_BYTE, image->data);
+};
+    
+bool TextureLoad(TextureT *texture, char *path) {
+    int32 width, height, noc;
+    unsigned char *data = NULL;
+    data = stbi_load(path, &width, &height, &noc, 4);
+    if (data) {
+        glGenTextures(1, &texture->handle);
+        glBindTexture(GL_TEXTURE_2D, texture->handle);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        return true;
+    };
+    printf("Failed to load image from: %s\n", path);
+    stbi_image_free(data);
+    return false;
+};
+
+void TextureBind(TextureT *texture) {
+    glBindTexture(GL_TEXTURE_2D, texture->handle);
+};
+
+void TextureDelete(TextureT *texture) {
+    glDeleteTextures(1, &texture->handle);
+};
+
+void TextureAtlasCreate(AtlasT *atlas, uint32 subWidth, uint32 subHeight, ImageT *image);
+bool TextureAtlasLoad(AtlasT *atlas, char *path);
+//TextureAtlasRetrieve(AtlasT *atlas, uint32 row, uint32 column); Think of a good solution
+void TextureAtlasDelete(AtlasT *atlas);
 
 //-------------------------------------------------------------//
 //                         END DATA MANIP                      //
@@ -1019,17 +1029,14 @@ void StartEngine(uint32 width, uint32 height, uint32 scale, bool vsync, bool ful
     
     #ifdef LINUX
         pthread_t tid;  
-        //TODO:Possible (very likely) memory leak, read up on this
+        //TODO:Possible memory leak, read up on this
         pthread_create(&tid, NULL, &RenderThread, NULL);
         StartEventLoop();
         pthread_join(tid, NULL);
     #else
         HANDLE tid = CreateThread(NULL, 0, RenderThread, NULL, 0, NULL);
         StartEventLoop();
-
         if (tid != NULL) WaitForSingleObject(tid, 0xFFFFFFFF);
-
-        //TODO:IMPLEMENT WINDOWS THREADING
     #endif 
 };
 
@@ -1039,14 +1046,18 @@ _THR RenderThread() {
     while (appRunning) FrameRender();
     
     #ifdef LINUX
-        //TODO:Send proper close message
         XEvent event;
-        XSendEvent(display, window, false, 0, &event);
+        event.xclient.type = ClientMessage;
+        event.xclient.window = window;
+        event.xclient.message_type = XInternAtom(display, "WM_PROTOCOLS", true);
+        event.xclient.format = 32;
+        event.xclient.data.l[0] = XInternAtom(display, "WM_DELETE_WINDOW", false);
+        event.xclient.data.l[1] = CurrentTime;
+        XSendEvent(display, window, false, NoEventMask, &event);
         pthread_exit(0);
     #else
-        wglDeleteContext(glRenderContext);
         PostMessage((HWND)window,WM_DESTROY,0,0);
-        //TODO:EXIT THREAD HERE WINDOWS
+        return; //TODO:Should be ok, need to check on windows
     #endif
     
 };
@@ -1054,8 +1065,10 @@ _THR RenderThread() {
 void FrameRender() {
     EventHandler();
     BufferClear(true, false);
+    TextureBind(&testTex);
     glUseProgram(mainProgram);
-    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+    VAOBind(&vao);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     #ifdef LINUX
         glXSwapBuffers(display, window);
     #else
@@ -1064,12 +1077,6 @@ void FrameRender() {
 };
 
 void TerminateCleanup() {
-    //TODO:Make an optimized cleaning step for windows as well
-    /*
-    vectorCleanup(&programs);
-    vectorCleanup(&VAOs);
-    vectorCleanup(&VBOs);
-    */
    ArrayCleanup(&programs);
    ArrayCleanup(&VAOs);
    ArrayCleanup(&VBOs);
@@ -1083,6 +1090,9 @@ void TerminateCleanup() {
         XFree(visualInfo);
         XCloseDisplay(display);
     #else
+        //TODO:Check if this is ok
+        wglMakeCurrent(GLDeviceContext, 0);
+        DestroyWindow((HWND)window);
         wglDeleteContext(glRenderContext);
     #endif
 };
@@ -1093,6 +1103,6 @@ void TerminateCleanup() {
 
 
 int main() {
-    StartEngine(200, 200, 1, true, false);
+    StartEngine(1000, 1000, 1, true, false);
     return 0;
 }
