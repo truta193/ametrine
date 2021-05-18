@@ -1,4 +1,4 @@
-//12-may-2021 9:16:00
+//18-may-2021 9:10:00
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
@@ -243,6 +243,8 @@ typedef enum am_events {
     AM_EVENT_MOUSE_LEAVE,
     AM_EVENT_MOUSE_SCROLL_UP,
     AM_EVENT_MOUSE_SCROLL_DOWN,
+    AM_EVENT_WINDOW_MOTION,
+    AM_EVENT_WINDOW_RESIZE,
     AM_EVENT_COUNT
 } am_events;
 
@@ -253,6 +255,7 @@ typedef struct am_window_info {
     uint32 window_height; 
     am_vec2i window_position; 
     bool is_fullscreen; //Useless for child windows
+    bool is_resizable;
 } am_window_info;
 
 //TODO: Linux only, implement windows functinality
@@ -267,6 +270,8 @@ typedef struct am_platform_callbacks {
     void (*am_platform_mouse_button_callback)(uint64, am_mouse_map, am_events);
     void (*am_platform_mouse_motion_callback)(uint64, int32, int32, am_events);
     void (*am_platform_mouse_scroll_callback)(uint64, am_events);
+    void (*am_platform_window_motion_callback)(uint64, int32, int32, am_events);
+    void (*am_platform_window_resize_callback)(uint64, int32, int32, am_events);
 } am_platform_callbacks;
 
 typedef struct am_platform_input {
@@ -294,8 +299,6 @@ typedef struct am_platform {
     am_platform_time time;
     am_platform_callbacks callbacks;
 } am_platform;
-
-
 
 
 //Platform fns
@@ -330,16 +333,21 @@ void am_platform_key_callback_default(uint64 window_handle, am_key_map key, am_e
 void am_platform_mouse_button_callback_default(uint64 window_handle, am_mouse_map button, am_events event);
 void am_platform_mouse_motion_callback_default(uint64 window_handle, int32 x, int32 y, am_events event);
 void am_platform_mouse_scroll_callback_default(uint64 window_handle, am_events event);
-void am_platform_set_key_callback(void* function);
-void am_platform_set_mouse_button_callback(void* function);
-void am_platform_set_mouse_motion_callback(void* function);
-void am_platform_set_mouse_scroll_callback(void* function);
+void am_platform_window_motion_callback_default(uint64 window_handle, int32 x, int32 y, am_events event);
+void am_platform_window_resize_callback_default(uint64 window_handle, int32 width, int32 height, am_events event);
+
+#define am_platform_set_key_callback(platform, callback) platform->callbacks.am_platform_key_callback = callback
+#define am_platform_set_mouse_button_callback(platform, callback) platform->callbacks.am_platform_mouse_button_callback = callback
+#define am_platform_set_mouse_motion_callback(platform, callback) platform->callbacks.am_platform_mouse_motion_callback = callback
+#define am_platform_set_mouse_scroll_callback(platform, callback) platform->callbacks.am_platform_mouse_scroll_callback = callback  
+#define am_platform_set_window_motion_callback(platform, callback) platform->callbacks.am_platform_window_motion_callback = callback                           
+#define am_platform_set_window_resize_callback(platform, callback) platform->callbacks.am_platform_window_resize_callback = callback  
 
 //Window fns
-am_window *am_window_create(am_window_info window_info);
-am_window *am_window_lookup(uint64 handle); 
-int32 am_window_index_lookup(uint64 handle);
-void am_window_terminate(am_window *window);
+am_window *am_platform_window_create(am_window_info window_info);
+am_window *am_platform_window_lookup(uint64 handle); 
+int32 am_platform_window_index_lookup(uint64 handle);
+void am_platform_window_terminate(am_window *window);
 
 //TODO:REMOVE; TEMPORARY
 am_platform *test_platform;
@@ -658,12 +666,12 @@ am_platform *am_platform_create() {
     //TODO:Init more time related stuff if needed
     platform->time.elapsed = 0;
 
-    //TODO: Implement function to set callbacks
-    platform->callbacks.am_platform_key_callback = am_platform_key_callback_default;
-    //am_platform_set_key_callback(am_platform_key_callback_default);
-    platform->callbacks.am_platform_mouse_button_callback = am_platform_mouse_button_callback_default;
-    platform->callbacks.am_platform_mouse_motion_callback = am_platform_mouse_motion_callback_default;
-    platform->callbacks.am_platform_mouse_scroll_callback = am_platform_mouse_scroll_callback_default;
+    am_platform_set_key_callback(platform, am_platform_key_callback_default);
+    am_platform_set_mouse_button_callback(platform, am_platform_mouse_button_callback_default);
+    am_platform_set_mouse_motion_callback(platform, am_platform_mouse_motion_callback_default);
+    am_platform_set_mouse_scroll_callback(platform, am_platform_mouse_scroll_callback_default);
+    am_platform_set_window_motion_callback(platform, am_platform_window_motion_callback_default);
+    am_platform_set_window_resize_callback(platform, am_platform_window_resize_callback_default);
     return platform;
 };
 
@@ -680,6 +688,7 @@ void am_platform_update(am_platform *platform) {
     XEvent xevent;
     while (XPending(platform->display)) {
         XNextEvent(platform->display, &xevent);
+        am_window* current_window = am_platform_window_lookup(xevent.xany.window);
         switch (xevent.type) {
             case KeyPress: {
                 am_key_map key = platform->input.keycodes[xevent.xkey.keycode];
@@ -713,6 +722,15 @@ void am_platform_update(am_platform *platform) {
             };
             case MotionNotify: {
                 platform->callbacks.am_platform_mouse_motion_callback(xevent.xany.window, xevent.xbutton.x, xevent.xbutton.y, AM_EVENT_MOUSE_MOTION);
+                break;
+            };
+            case ConfigureNotify: {
+                if (xevent.xconfigure.width != current_window->info.window_width || xevent.xconfigure.height != current_window->info.window_height) {
+                    platform->callbacks.am_platform_window_resize_callback(xevent.xany.window, xevent.xconfigure.width, xevent.xconfigure.height, AM_EVENT_WINDOW_RESIZE);
+                };
+                if (xevent.xconfigure.x != current_window->info.window_position.x || xevent.xconfigure.y != current_window->info.window_position.y) {
+                    platform->callbacks.am_platform_window_motion_callback(xevent.xany.window, xevent.xconfigure.x, xevent.xconfigure.y, AM_EVENT_WINDOW_MOTION);
+                };
                 break;
             };
             case ClientMessage: {
@@ -877,18 +895,22 @@ void am_platform_mouse_scroll_callback_default(uint64 window_handle, am_events e
     };
 };
 
-//TODO: Not working, need to figure out how to do this
-void am_platform_set_key_callback(void* function) {
-    am_platform *platform = am_engine_get_subsystem(platform);
-    platform->callbacks.am_platform_key_callback = function;
+void am_platform_window_motion_callback_default(uint64 window_handle, int32 x, int32 y, am_events event) {
+    am_platform *platform = am_engine_get_subsystem(platofrm);
+    am_window *window = am_platform_window_lookup(window_handle);
+    window->info.window_position.x = x;
+    window->info.window_position.y = y;
 };
-/*
-void am_platform_set_mouse_button_callback(void* function);
-void am_platform_set_mouse_motion_callback(void* function);
-void am_platform_set_mouse_scroll_callback(void* function);*/
+
+void am_platform_window_resize_callback_default(uint64 window_handle, int32 width, int32 height, am_events event) {
+    am_platform *platform = am_engine_get_subsystem(platofrm);
+    am_window *window = am_platform_window_lookup(window_handle);
+    window->info.window_height = height;
+    window->info.window_width = width; 
+};
 
 //TODO: Freeing colormap breaks the window
-am_window *am_window_create(am_window_info window_info) {
+am_window *am_platform_window_create(am_window_info window_info) {
     am_window *new_window = (am_window*)am_malloc(sizeof(am_window)); 
     assert(new_window != NULL);
     new_window->info = window_info;
@@ -932,7 +954,7 @@ am_window *am_window_create(am_window_info window_info) {
     return new_window;
 };
 
-am_window *am_window_lookup(uint64 handle) {
+am_window *am_platform_window_lookup(uint64 handle) {
     am_platform *platform = am_engine_get_subsystem(platform);
     for (int32 i = 0; i < platform->windows.length; i++)
         if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->handle == handle) 
@@ -940,7 +962,7 @@ am_window *am_window_lookup(uint64 handle) {
     return NULL;
 };
 
-int32 am_window_index_lookup(uint64 handle) {
+int32 am_platform_window_index_lookup(uint64 handle) {
     am_platform *platform = am_engine_get_subsystem(platform);
     for (int32 i = 0; i < platform->windows.length; i++)
         if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->handle == handle)
@@ -948,7 +970,7 @@ int32 am_window_index_lookup(uint64 handle) {
     return -1;
 };
 
-void am_window_terminate(am_window *window) {
+void am_platform_window_terminate(am_window *window) {
     am_platform *platform = am_engine_get_subsystem(platform);
     XEvent xevent;
     xevent.xclient.type = ClientMessage;
@@ -959,7 +981,7 @@ void am_window_terminate(am_window *window) {
     xevent.xclient.data.l[1] = CurrentTime;
     XSendEvent(platform->display, window->handle, false, NoEventMask, &xevent);
 
-    am_dyn_array_remove(&platform->windows, am_window_index_lookup(window->handle), 1);  
+    am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(window->handle), 1);  
 };
 
 //----------------------------------------------------------------------------//
@@ -978,7 +1000,7 @@ int main() {
         .parent = AM_WINDOW_ROOT_PARENT,
         .is_fullscreen = false
     };
-    am_window *wind = am_window_create(test);
+    am_window *wind = am_platform_window_create(test);
     XSetWindowBackground(test_platform->display, wind->handle, 0x00FF00);
 
     am_window_info test2 = {
@@ -989,7 +1011,7 @@ int main() {
         .parent = wind->handle,
         .is_fullscreen = false
     };
-    am_window *wind2 = am_window_create(test2);
+    am_window *wind2 = am_platform_window_create(test2);
     XSetWindowBackground(test_platform->display, wind2->handle, 0xFF0000);
 
     am_window_info test3 = {
@@ -1000,7 +1022,7 @@ int main() {
         .parent = wind2->handle,
         .is_fullscreen = false
     };
-    am_window *wind3 = am_window_create(test3);
+    am_window *wind3 = am_platform_window_create(test3);
     XSetWindowBackground(test_platform->display, wind3->handle, 0x0000FF);
 
     XEvent event;
@@ -1009,7 +1031,7 @@ int main() {
     while (true) {
         t++;
         am_platform_update(test_platform);
-        if (am_platform_key_pressed(AM_KEYCODE_SPACE)) am_window_terminate(wind3);
+        if (am_platform_key_pressed(AM_KEYCODE_SPACE)) am_platform_window_terminate(wind3);
         if (am_platform_key_down(AM_KEYCODE_W)) printf("w %d\n",t);
         if (am_platform_mouse_moved()) {
             am_platform_mouse_position(&mx, &my);
