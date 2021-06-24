@@ -1,4 +1,4 @@
-//24-jun-2021 8:00:00
+//24-jun-2021 18:00:00
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
@@ -46,7 +46,7 @@ typedef double float64;
 typedef enum {false, true} bool;
 typedef enum {FAILURE, SUCCESS, IN_PROGRESS} am_result;
 
-#define MAX_KEYCODES 512
+#define AM_MAX_KEYCODE_COUNT 512
 #define AM_ROOT_WIN_CLASS "AM_ROOT"
 #define AM_CHILD_WIN_CLASS "AM_CHILD"
 
@@ -277,7 +277,7 @@ typedef struct am_platform_callbacks {
 } am_platform_callbacks;
 
 typedef struct am_platform_input {
-    am_key_map keycodes[MAX_KEYCODES]; //LUT
+    am_key_map keycodes[AM_MAX_KEYCODE_COUNT]; //LUT
     bool keyboard_map[AM_KEYCODE_COUNT]; 
     bool prev_keyboard_map[AM_KEYCODE_COUNT];
     bool mouse_map[AM_MOUSE_BUTTON_COUNT];
@@ -371,16 +371,13 @@ typedef struct am_engine_info {
     void (*init)();
     void (*update)();
     void (*shutdown)();
-    const char* window_title;
-    uint32 window_width;
-    uint32 window_height; 
     bool is_running;
     bool vsync_enabled;
     bool fullscreen_enabled;
 } am_engine_info;
 
 typedef struct am_engine {
-    am_engine_info engine_info;
+    am_engine_info info;
     am_platform *platform;
     //am_audio audio; TODO: Implement
     //am_pfngl pfngl; TODO: Implement
