@@ -791,9 +791,11 @@ am_platform *am_platform_create() {
 	window_class.cbWndExtra = 0;
 	window_class.lpszMenuName = NULL;
 	window_class.hbrBackground = NULL;
+    //HACK: Colored here just for visuals
     window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
 	window_class.lpszClassName = "AM_ROOT";
 	RegisterClass(&window_class);
+    //HACK: Colored here just for visuals
     window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
     window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
     window_class.lpszClassName = "AM_CHILD";
@@ -1153,7 +1155,7 @@ void am_platform_mouse_scroll_callback_default(uint64 window_handle, am_events e
     };
 };
 
-//FIX: Freeing colormap breaks the window
+//FIXME: Freeing colormap breaks the window
 am_window *am_platform_window_create(am_window_info window_info) {
     am_window *new_window = (am_window*)am_malloc(sizeof(am_window)); 
     assert(new_window != NULL);
@@ -1304,7 +1306,7 @@ int main() {
         t++;
         am_platform_update(test_platform);
         if (am_platform_key_pressed(AM_KEYCODE_SPACE)) {
-            break;
+            printf("Nr. of windows: %d\n", test_platform->windows.length);
         }
         if (am_platform_key_down(AM_KEYCODE_W)) printf("w %lu\n",t);
         if (am_platform_mouse_moved()) {
