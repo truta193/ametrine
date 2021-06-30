@@ -50,6 +50,7 @@ typedef enum {FAILURE, SUCCESS, IN_PROGRESS} am_result;
 #define AM_ROOT_WIN_CLASS "AM_ROOT"
 #define AM_CHILD_WIN_CLASS "AM_CHILD"
 
+//HACK: Temporary
 bool temp_check = true;
 
 //----------------------------------------------------------------------------//
@@ -876,27 +877,27 @@ void am_platform_linux_event_handler(XEvent *xevent) {
             platform->callbacks.am_platform_mouse_motion_callback(xevent->xany.window, xevent->xbutton.x, xevent->xbutton.y, AM_EVENT_MOUSE_MOTION);
             break;
         };  
-        //TODO: (LINUX) Send message from am_platform_window_terminate & look at windows version for solution here
+        //REVIEW: Looks good, needs further testing to make sure
+        case DestroyNotify: {
+            printf("Destroying window %d!\n", am_platform_window_lookup(xevent->xclient.window)->internal_id);
+            am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(xevent->xany.window), 1);
+            am_free(am_platform_window_lookup(xevent->xclient.window));
+
+            bool check_no_root = true;
+            for (int32 i = 0; i < platform->windows.length; i++) 
+                if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->info.parent == AM_WINDOW_ROOT_PARENT) {
+                    check_no_root = false;
+                    break;
+                };
+
+            //HACK: Temporary var. to quit loop, should send proper closing signal
+            if (check_no_root) temp_check = false;
+            break;
+        };
         case ClientMessage: {
             if (xevent->xclient.data.l[0] = XInternAtom(platform->display, "WM_DELETE_WINDOW", false)) {
-                bool check_last_root = false;
-                int8 count = 0;
-
-                for (int32 i = 0; i < platform->windows.length; i++) {
-                    if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->info.parent == AM_WINDOW_ROOT_PARENT) ++count;
-                    if (count > 1) break;
-                };
-                if (count < 2) check_last_root = true;
-
-                //HACK: Temp check to quit loop, should be signal to close app
-                if (check_last_root) temp_check = false;
-
                 XUnmapWindow(platform->display, xevent->xany.window);
                 XDestroyWindow(platform->display, xevent->xany.window);
-                am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup((uint64)xevent->xany.window), 1);
-                am_free(am_platform_window_lookup((uint64)xevent->xany.window));
-                     
-                
             };
             break;
         };
@@ -1249,10 +1250,17 @@ int32 am_platform_window_index_lookup(uint64 handle) {
 void am_platform_window_terminate(am_window *window) {
     am_platform *platform = am_engine_get_subsystem(platform);
     #if defined(AM_LINUX)
-    XUnmapWindow(platform->display, (Window)window->handle);
-    XDestroyWindow(platform->display, (Window)window->handle);
-    am_free(window);
-    am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(window->handle), 1); 
+    /*
+    XEvent event;
+    event.xclient.type = ClientMessage;
+    event.xclient.window = window->handle;
+    event.xclient.message_type = XInternAtom(platform->display, "WM_PROTOCOLS", true);
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = XInternAtom(platform->display, "WM_DELETE_WINDOW", false);
+    event.xclient.data.l[1] = CurrentTime;
+    XSendEvent(platform->display, window->handle, False, NoEventMask, &event);*/
+    XUnmapWindow(platform->display, window->handle);
+    XDestroyWindow(platform->display, window->handle);
     #else
     DestroyWindow((HWND)window->handle);
     #endif
@@ -1275,7 +1283,7 @@ int main() {
         .is_fullscreen = false
     };
     am_window *wind = am_platform_window_create(test);
-    //XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
+    XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
 
     am_window_info test2 = {
         .window_height = 50,
@@ -1286,7 +1294,7 @@ int main() {
         .is_fullscreen = false
     };
     am_window *wind2 = am_platform_window_create(test2);
-    //XSetWindowBackground(test_platform->display, wind2->handle, 0x00FF00);
+    XSetWindowBackground(test_platform->display, wind2->handle, 0x00FF00);
     
     am_window_info test3 = {
         .window_height = 100,
@@ -1297,7 +1305,7 @@ int main() {
         .is_fullscreen = false
     };
     am_window *wind3 = am_platform_window_create(test3);
-    //XSetWindowBackground(test_platform->display, wind3->handle, 0xFF0000);
+    XSetWindowBackground(test_platform->display, wind3->handle, 0xFF0000);
 
 
     uint64 t = 0;
