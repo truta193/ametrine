@@ -1,4 +1,3 @@
-//FIXME: MINGW I HAVE IS 32BITS ONLY
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
@@ -361,7 +360,6 @@ am_int32 am_platform_window_index_lookup(am_uint64 handle);
 void am_platform_window_terminate(am_window *window);
 
 //Time
-//TODO: This is windows only, implement linux
 void am_platform_timer_create();
 void am_platform_timer_sleep(am_float32 ms);
 am_uint64 am_platform_timer_value();
@@ -1288,7 +1286,6 @@ void am_platform_timer_sleep(am_float32 ms) {
     #endif
 };
 
-//TODO: Work to be done here
 am_uint64 am_platform_timer_value() {
     #if defined(AM_LINUX)
     struct timespec ts;
