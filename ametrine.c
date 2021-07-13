@@ -1,4 +1,4 @@
-//27-jun-2021 09:57:00
+//FIXME: MINGW I HAVE IS 32BITS ONLY
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
@@ -7,7 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <assert.h>
+#include <unistd.h>
+#include <time.h>
 #if (defined _WIN32 || defined _WIN64)
     #define OEMRESOURCE
     #define AM_WINDOWS
@@ -33,17 +36,17 @@
 #define am_realloc(mem, size) realloc(mem, size)
 #define am_calloc(mem, size) calloc(mem, size)
 
-typedef signed char int8;
-typedef unsigned char uint8;
-typedef signed short int16;
-typedef unsigned short uint16;
-typedef signed int  int32;
-typedef unsigned int  uint32;
-typedef signed long int int64;
-typedef unsigned long int uint64;
-typedef float float32;
-typedef double float64;
-typedef enum {false, true} bool;
+typedef signed char am_int8;
+typedef unsigned char am_uint8;
+typedef signed short am_int16;
+typedef unsigned short am_uint16;
+typedef signed int  am_int32;
+typedef unsigned int  am_uint32;
+typedef signed long long int am_int64; //Can be 4 bytes on 32bit OSes
+typedef unsigned long long int am_uint64;
+typedef float am_float32;
+typedef double am_float64;
+typedef enum {false, true} am_bool;
 typedef enum {FAILURE, SUCCESS, IN_PROGRESS} am_result;
 
 #define AM_MAX_KEYCODE_COUNT 512
@@ -51,7 +54,7 @@ typedef enum {FAILURE, SUCCESS, IN_PROGRESS} am_result;
 #define AM_CHILD_WIN_CLASS "AM_CHILD"
 
 //HACK: Temporary
-bool temp_check = true;
+am_bool temp_check = true;
 
 //----------------------------------------------------------------------------//
 //                             END TYPES AND DEFS                             //
@@ -63,18 +66,18 @@ bool temp_check = true;
 //----------------------------------------------------------------------------//
 
 typedef struct am_dyn_array {
-    uint8 *data;
-    uint32 length;
-    uint32 alloc_length;
-    uint32 element_size;
+    am_uint8 *data;
+    am_uint32 length;
+    am_uint32 alloc_length;
+    am_uint32 element_size;
 } am_dyn_array;
 
-void am_dyn_array_init(am_dyn_array *array, uint32 element_size);
-bool am_dyn_array_resize(am_dyn_array *array, uint32 newsize);
-bool am_dyn_array_push(am_dyn_array *array, void *data, uint32 length);
-bool am_dyn_array_insert(am_dyn_array *array, void *data, uint32 length, uint32 index);
-bool am_dyn_array_pop(am_dyn_array *array, uint32 length);
-bool am_dyn_array_remove(am_dyn_array *array, uint32 index, uint32 length);
+void am_dyn_array_init(am_dyn_array *array, am_uint32 element_size);
+am_bool am_dyn_array_resize(am_dyn_array *array, am_uint32 newsize);
+am_bool am_dyn_array_push(am_dyn_array *array, void *data, am_uint32 length);
+am_bool am_dyn_array_insert(am_dyn_array *array, void *data, am_uint32 length, am_uint32 index);
+am_bool am_dyn_array_pop(am_dyn_array *array, am_uint32 length);
+am_bool am_dyn_array_remove(am_dyn_array *array, am_uint32 index, am_uint32 length);
 void am_dyn_array_cleanup(am_dyn_array *array);
 
 #define am_dyn_array_create(name, type) am_dyn_array name; am_dyn_array_init(&name, (uint32)sizeof(type))
@@ -92,8 +95,8 @@ void am_dyn_array_cleanup(am_dyn_array *array);
 //----------------------------------------------------------------------------//
 
 typedef struct am_vec2i {
-    int32 x;
-    int32 y;
+    am_int32 x;
+    am_int32 y;
 } am_vec2i;
 
 //----------------------------------------------------------------------------//
@@ -256,41 +259,42 @@ typedef enum am_events {
 } am_events;
 
 typedef struct am_window_info {
-    uint64 parent;
+    am_uint64 parent;
     const char* window_title;
-    uint32 window_width;
-    uint32 window_height; 
+    am_uint32 window_width;
+    am_uint32 window_height; 
     am_vec2i window_position; 
-    bool is_fullscreen; //Useless for child windows
+    am_bool is_fullscreen; //Useless for child windows
 } am_window_info;
 
 typedef struct am_window {
-    uint64 handle;
-    int32 internal_id;
+    am_uint64 handle;
+    am_int32 internal_id;
     am_window_info info;
 } am_window;
 
 typedef struct am_platform_callbacks {
-    void (*am_platform_key_callback)(uint64, am_key_map, am_events);
-    void (*am_platform_mouse_button_callback)(uint64, am_mouse_map, am_events);
-    void (*am_platform_mouse_motion_callback)(uint64, int32, int32, am_events);
-    void (*am_platform_mouse_scroll_callback)(uint64, am_events);
+    void (*am_platform_key_callback)(am_uint64, am_key_map, am_events);
+    void (*am_platform_mouse_button_callback)(am_uint64, am_mouse_map, am_events);
+    void (*am_platform_mouse_motion_callback)(am_uint64, am_int32, am_int32, am_events);
+    void (*am_platform_mouse_scroll_callback)(am_uint64, am_events);
 } am_platform_callbacks;
 
 typedef struct am_platform_input {
     am_key_map keycodes[AM_MAX_KEYCODE_COUNT]; //LUT
-    bool keyboard_map[AM_KEYCODE_COUNT]; 
-    bool prev_keyboard_map[AM_KEYCODE_COUNT];
-    bool mouse_map[AM_MOUSE_BUTTON_COUNT];
-    bool prev_mouse_map[AM_MOUSE_BUTTON_COUNT];
-    int32 wheel_delta;
+    am_bool keyboard_map[AM_KEYCODE_COUNT]; 
+    am_bool prev_keyboard_map[AM_KEYCODE_COUNT];
+    am_bool mouse_map[AM_MOUSE_BUTTON_COUNT];
+    am_bool prev_mouse_map[AM_MOUSE_BUTTON_COUNT];
+    am_int32 wheel_delta;
     am_vec2i mouse_position;
-    bool mouse_moved;
+    am_bool mouse_moved;
 } am_platform_input;
 
 typedef struct am_platform_time {
     //TODO: Complete this as things come up
-    uint64 elapsed;
+    am_uint64 offset;
+    am_uint64 frequency;
 } am_platform_time;
 
 typedef struct am_platform {
@@ -304,15 +308,15 @@ typedef struct am_platform {
 } am_platform;
 
 
-//Platform fns
+//Platform 
 #if defined(AM_LINUX)
-am_key_map am_platform_translate_keysym(KeySym *key_syms, int32 width);
+am_key_map am_platform_translate_keysym(KeySym *key_syms, am_int32 width);
 #endif
-am_mouse_map am_platform_translate_button(uint32 button);
+am_mouse_map am_platform_translate_button(am_uint32 button);
 am_platform *am_platform_create();
 void am_platform_poll_events();
 #if defined(AM_WINDOWS) 
-LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, uint32 event, WPARAM wparam, LPARAM lparam);
+LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam);
 #else
 void am_platform_linux_event_handler(XEvent *xevent);
 #endif
@@ -322,39 +326,47 @@ void am_platform_terminate(am_platform *platform);
 //Keyboard input
 void am_platform_key_press(am_key_map key); 
 void am_platform_key_release(am_key_map key); 
-bool am_platform_key_pressed(am_key_map key); 
-bool am_platform_key_down(am_key_map key);
-bool am_platform_key_released(am_key_map key); 
-bool am_platform_key_up(am_key_map key);
+am_bool am_platform_key_pressed(am_key_map key); 
+am_bool am_platform_key_down(am_key_map key);
+am_bool am_platform_key_released(am_key_map key); 
+am_bool am_platform_key_up(am_key_map key);
 
 //Mouse input
 void am_platform_mouse_button_press(am_mouse_map button); 
 void am_platform_mouse_button_release(am_mouse_map button); 
-bool am_platform_mouse_button_pressed(am_mouse_map button); 
-bool am_platform_mouse_button_down(am_mouse_map button); 
-bool am_platform_mouse_button_released(am_mouse_map button); 
-bool am_platform_mouse_button_up(am_mouse_map button);
-void am_platform_mouse_position(int32 *x, int32 *y); 
+am_bool am_platform_mouse_button_pressed(am_mouse_map button); 
+am_bool am_platform_mouse_button_down(am_mouse_map button); 
+am_bool am_platform_mouse_button_released(am_mouse_map button); 
+am_bool am_platform_mouse_button_up(am_mouse_map button);
+void am_platform_mouse_position(am_int32 *x, am_int32 *y); 
 am_vec2i am_platform_mouse_position_vec();
-int32 am_platform_mouse_wheel_delta();
-bool am_platform_mouse_moved();
+am_int32 am_platform_mouse_wheel_delta();
+am_bool am_platform_mouse_moved();
 
 //Platform default callbacks
-void am_platform_key_callback_default(uint64 window_handle, am_key_map key, am_events event);
-void am_platform_mouse_button_callback_default(uint64 window_handle, am_mouse_map button, am_events event);
-void am_platform_mouse_motion_callback_default(uint64 window_handle, int32 x, int32 y, am_events event);
-void am_platform_mouse_scroll_callback_default(uint64 window_handle, am_events event);
+void am_platform_key_callback_default(am_uint64 window_handle, am_key_map key, am_events event);
+void am_platform_mouse_button_callback_default(am_uint64 window_handle, am_mouse_map button, am_events event);
+void am_platform_mouse_motion_callback_default(am_uint64 window_handle, am_int32 x, am_int32 y, am_events event);
+void am_platform_mouse_scroll_callback_default(am_uint64 window_handle, am_events event);
 
 #define am_platform_set_key_callback(platform, callback) platform->callbacks.am_platform_key_callback = callback
 #define am_platform_set_mouse_button_callback(platform, callback) platform->callbacks.am_platform_mouse_button_callback = callback
 #define am_platform_set_mouse_motion_callback(platform, callback) platform->callbacks.am_platform_mouse_motion_callback = callback
 #define am_platform_set_mouse_scroll_callback(platform, callback) platform->callbacks.am_platform_mouse_scroll_callback = callback  
 
-//Window fns
+//Windows
 am_window *am_platform_window_create(am_window_info window_info);
-am_window *am_platform_window_lookup(uint64 handle); 
-int32 am_platform_window_index_lookup(uint64 handle);
+am_window *am_platform_window_lookup(am_uint64 handle); 
+am_int32 am_platform_window_index_lookup(am_uint64 handle);
 void am_platform_window_terminate(am_window *window);
+
+//Time
+//TODO: This is windows only, implement linux
+void am_platform_timer_create();
+void am_platform_timer_sleep(am_float32 ms);
+am_uint64 am_platform_timer_value();
+am_uint64 am_platform_elapsed_time();
+
 
 //HACK: TEMPORARY
 am_platform *test_platform;
@@ -372,9 +384,9 @@ typedef struct am_engine_info {
     void (*init)();
     void (*update)();
     void (*shutdown)();
-    bool is_running;
-    bool vsync_enabled;
-    bool fullscreen_enabled;
+    am_bool is_running;
+    am_bool vsync_enabled;
+    am_bool fullscreen_enabled;
 } am_engine_info;
 
 typedef struct am_engine {
@@ -419,26 +431,26 @@ ENGINE
 //                             DYNAMIC  ARRAY IMPL                            //
 //----------------------------------------------------------------------------//
 
-void am_dyn_array_init(am_dyn_array *array, uint32 element_size) {
+void am_dyn_array_init(am_dyn_array *array, am_uint32 element_size) {
     array->data = NULL;
     array->length = 0;
     array->alloc_length = 0;
     array->element_size = element_size;
 };
 
-bool am_dyn_array_resize(am_dyn_array *array, uint32 new_length) {
+am_bool am_dyn_array_resize(am_dyn_array *array, am_uint32 new_length) {
     if (new_length > array->alloc_length) {
         void *buffer = NULL;
         buffer = realloc(array->data, (new_length + (array->alloc_length >> 1u))*am_dyn_array_data_length(array, 1));
         if (buffer) {
             array->alloc_length = new_length + (array->alloc_length >> 1u);
-            array->data = (uint8*) buffer;
+            array->data = (am_uint8*) buffer;
         } else return false;
     };
     return true;
 };
 
-bool am_dyn_array_push(am_dyn_array *array, void *data, uint32 length) {
+am_bool am_dyn_array_push(am_dyn_array *array, void *data, am_uint32 length) {
     if (length >=0) { //Useless check, just keeping the same function type for prettiness
         am_dyn_array_resize(array, array->length + length);
         memcpy(am_dyn_array_data_pos(array, array->length), data, am_dyn_array_data_length(array, length));
@@ -448,7 +460,7 @@ bool am_dyn_array_push(am_dyn_array *array, void *data, uint32 length) {
     return false;
 };
 
-bool am_dyn_array_insert(am_dyn_array *array, void *data, uint32 length, uint32 index) {
+am_bool am_dyn_array_insert(am_dyn_array *array, void *data, am_uint32 length, am_uint32 index) {
     if (index <= array->length) {
         am_dyn_array_resize(array, array->length + length);
         memcpy(am_dyn_array_data_pos(array, index+length), am_dyn_array_data_pos(array, index), am_dyn_array_data_length(array, length));
@@ -459,7 +471,7 @@ bool am_dyn_array_insert(am_dyn_array *array, void *data, uint32 length, uint32 
     return false;
 };
 
-bool am_dyn_array_pop(am_dyn_array *array, uint32 length) {
+am_bool am_dyn_array_pop(am_dyn_array *array, am_uint32 length) {
     if (length <= array->length) {
         array->length -= length;
         return true;
@@ -467,7 +479,7 @@ bool am_dyn_array_pop(am_dyn_array *array, uint32 length) {
     return false;
 };
 
-bool am_dyn_array_remove(am_dyn_array *array, uint32 index, uint32 length) {
+am_bool am_dyn_array_remove(am_dyn_array *array, am_uint32 index, am_uint32 length) {
     if (index + length > array->length) return false;
     memcpy(am_dyn_array_data_pos(array, index), am_dyn_array_data_pos(array, index+length), am_dyn_array_data_length(array, array->length - length));
     array->length -= length;
@@ -493,7 +505,7 @@ void am_dyn_array_cleanup(am_dyn_array *array) {
 
 
 #if defined(AM_LINUX)
-am_key_map am_platform_translate_keysym(KeySym *key_syms, int32 width) {
+am_key_map am_platform_translate_keysym(KeySym *key_syms, am_int32 width) {
     if (width > 1) {
         switch (key_syms[1]) {
             case XK_KP_0:           return AM_KEYCODE_NUMPAD_0;
@@ -637,7 +649,7 @@ am_key_map am_platform_translate_keysym(KeySym *key_syms, int32 width) {
 };
 #endif
 
-am_mouse_map am_platform_translate_button(uint32 button) {
+am_mouse_map am_platform_translate_button(am_uint32 button) {
     switch (button) {
         case 1: return AM_MOUSE_BUTTON_LEFT;
         case 2: return AM_MOUSE_BUTTON_MIDDLE;
@@ -646,7 +658,6 @@ am_mouse_map am_platform_translate_button(uint32 button) {
     return AM_MOUSE_BUTTON_INVALID;
 };
 
-//TODO: Init time related stuff when there's more
 am_platform *am_platform_create() {
     am_platform *platform = (am_platform*)am_malloc(sizeof(am_platform));
     assert(platform != NULL);
@@ -655,11 +666,11 @@ am_platform *am_platform_create() {
     #if defined(AM_LINUX)
     platform->display = XOpenDisplay(NULL);
     memset(platform->input.keycodes, -1, sizeof(platform->input.keycodes));
-    int32 min, max;
+    am_int32 min, max;
     XDisplayKeycodes(platform->display, &min, &max);
-    int32 width;
+    am_int32 width;
     KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
-    for (int32 i = min; i < max; i++)  platform->input.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
+    for (am_int32 i = min; i < max; i++)  platform->input.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
     XFree(key_syms);
     #else
     platform->input.keycodes[0x00B] = AM_KEYCODE_0;
@@ -793,11 +804,11 @@ am_platform *am_platform_create() {
 	window_class.lpszMenuName = NULL;
 	window_class.hbrBackground = NULL;
     //HACK: Colored here just for visuals
-    window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
+    //window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
 	window_class.lpszClassName = "AM_ROOT";
 	RegisterClass(&window_class);
     //HACK: Colored here just for visuals
-    window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
+    //window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
     window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
     window_class.lpszClassName = "AM_CHILD";
     RegisterClass(&window_class);
@@ -812,13 +823,11 @@ am_platform *am_platform_create() {
     memset(platform->input.mouse_map, 0, sizeof(platform->input.mouse_map));
     memset(platform->input.mouse_map, 0, sizeof(platform->input.prev_mouse_map));
 
-    //TODO: Init more time related stuff if needed
-    platform->time.elapsed = 0;
-
     am_platform_set_key_callback(platform, am_platform_key_callback_default);
     am_platform_set_mouse_button_callback(platform, am_platform_mouse_button_callback_default);
     am_platform_set_mouse_motion_callback(platform, am_platform_mouse_motion_callback_default);
     am_platform_set_mouse_scroll_callback(platform, am_platform_mouse_scroll_callback_default);
+
     return platform;
 };
 
@@ -883,8 +892,8 @@ void am_platform_linux_event_handler(XEvent *xevent) {
             am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(xevent->xany.window), 1);
             am_free(am_platform_window_lookup(xevent->xclient.window));
 
-            bool check_no_root = true;
-            for (int32 i = 0; i < platform->windows.length; i++) 
+            am_bool check_no_root = true;
+            for (am_int32 i = 0; i < platform->windows.length; i++) 
                 if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->info.parent == AM_WINDOW_ROOT_PARENT) {
                     check_no_root = false;
                     break;
@@ -905,9 +914,9 @@ void am_platform_linux_event_handler(XEvent *xevent) {
     };
 };
 #else
-LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, uint32 event, WPARAM wparam, LPARAM lparam) {
+LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    uint64 window_handle = (uint64) handle;
+    am_uint64 window_handle = (am_uint64) handle;
     switch (event) {
         case WM_KEYDOWN: {
             am_key_map key = platform->input.keycodes[(HIWORD(lparam) & (KF_EXTENDED | 0xff))];
@@ -948,8 +957,8 @@ LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, uint32 event, WPAR
             break;
         };
         case WM_MOUSEMOVE: {
-            uint16 x = lparam & 0xFFFF;
-            uint16 y = (lparam >> 16) & 0xFFFF;
+            am_uint16 x = lparam & 0xFFFF;
+            am_uint16 y = (lparam >> 16) & 0xFFFF;
             platform->callbacks.am_platform_mouse_motion_callback(window_handle, x, y, AM_EVENT_MOUSE_MOTION);
             break;
         };
@@ -961,10 +970,10 @@ LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, uint32 event, WPAR
         };
         case WM_DESTROY: {
             am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(window_handle), 1);
-            am_free(am_platform_window_index_lookup(window_handle));
+            am_free(am_platform_window_lookup(window_handle));
             
-            bool check_no_root = true;
-            for (int32 i = 0; i < platform->windows.length; i++) 
+            am_bool check_no_root = true;
+            for (am_int32 i = 0; i < platform->windows.length; i++) 
                 if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->info.parent == AM_WINDOW_ROOT_PARENT) {
                     check_no_root = false;
                     break;
@@ -980,9 +989,8 @@ LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, uint32 event, WPAR
 };
 #endif
 
-//TODO: Update time
+//REVIEW: Passing pointer argument is probably unnecessary, only one platform instance should exist
 void am_platform_update(am_platform *platform) {
-    //TODO:Update time
     memcpy(platform->input.prev_mouse_map, platform->input.mouse_map, sizeof(platform->input.mouse_map));
     memcpy(platform->input.prev_keyboard_map, platform->input.keyboard_map, sizeof(platform->input.keyboard_map));
     platform->input.wheel_delta = 0;
@@ -992,14 +1000,13 @@ void am_platform_update(am_platform *platform) {
 };
 
 void am_platform_terminate(am_platform *platform) {
-    for (int32 i = 0; i <platform->windows.length; i++) am_platform_window_terminate(am_dyn_array_data_retrieve(&platform->windows, am_window*, i));
+    for (am_int32 i = 0; i <platform->windows.length; i++) am_platform_window_terminate(am_dyn_array_data_retrieve(&platform->windows, am_window*, i));
 
     #if defined(AM_LINUX)
     am_platform_update(test_platform);
     #else
-    //am_platform_window_terminate(am_dyn_array_data_retrieve(&platform->windows, am_window*, 0));
-    if (UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL))) printf("Unregistered root "); else printf("Failed to unregister ");
-    if (UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL))) printf("Unregistered child "); else printf("Failed to unregister ");
+    UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
+    UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
     #endif
     
     am_free(platform->windows.data);
@@ -1018,25 +1025,25 @@ void am_platform_key_release(am_key_map key) {
     platform->input.keyboard_map[key] = false; 
 }; 
 
-bool am_platform_key_pressed(am_key_map key) {
+am_bool am_platform_key_pressed(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.keyboard_map[key] && !platform->input.prev_keyboard_map[key]; 
 }; 
 
-bool am_platform_key_down(am_key_map key) {
+am_bool am_platform_key_down(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.keyboard_map[key] && platform->input.prev_keyboard_map[key];
 }; 
 
-bool am_platform_key_released(am_key_map key) {
+am_bool am_platform_key_released(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return !platform->input.keyboard_map[key] && platform->input.prev_keyboard_map[key]; 
 }; 
 
-bool am_platform_key_up(am_key_map key) {
+am_bool am_platform_key_up(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return !platform->input.keyboard_map[key];
@@ -1055,31 +1062,31 @@ void am_platform_mouse_button_release(am_mouse_map button) {
 
 };
 
-bool am_platform_mouse_button_pressed(am_mouse_map button) {
+am_bool am_platform_mouse_button_pressed(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.mouse_map[button] && !platform->input.prev_mouse_map[button];
 };
 
-bool am_platform_mouse_button_down(am_mouse_map button) {
+am_bool am_platform_mouse_button_down(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.mouse_map[button] && platform->input.prev_mouse_map[button];
 };
 
-bool am_platform_mouse_button_released(am_mouse_map button) {
+am_bool am_platform_mouse_button_released(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return !platform->input.mouse_map[button] && platform->input.prev_mouse_map[button];
 };
 
-bool am_platform_mouse_button_up(am_mouse_map button) {
+am_bool am_platform_mouse_button_up(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return !platform->input.mouse_map[button];  
 };
 
-void am_platform_mouse_position(int32 *x, int32 *y) {
+void am_platform_mouse_position(am_int32 *x, am_int32 *y) {
     am_platform *platform = am_engine_get_subsystem(platform);
     *x = platform->input.mouse_position.x;
     *y = platform->input.mouse_position.y;
@@ -1093,17 +1100,17 @@ am_vec2i am_platform_mouse_position_vec() {
     return position;
 }; 
 
-int32 am_platform_mouse_wheel_delta() {
+am_int32 am_platform_mouse_wheel_delta() {
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.wheel_delta;
 };
 
-bool am_platform_mouse_moved() {
+am_bool am_platform_mouse_moved() {
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.mouse_moved;
 };
 
-void am_platform_key_callback_default(uint64 window_handle, am_key_map key, am_events event) {
+void am_platform_key_callback_default(am_uint64 window_handle, am_key_map key, am_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_KEY_PRESS: {
@@ -1118,7 +1125,7 @@ void am_platform_key_callback_default(uint64 window_handle, am_key_map key, am_e
     };
 };
 
-void am_platform_mouse_button_callback_default(uint64 window_handle, am_mouse_map button, am_events event) {
+void am_platform_mouse_button_callback_default(am_uint64 window_handle, am_mouse_map button, am_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_MOUSE_BUTTON_PRESS: {
@@ -1133,15 +1140,14 @@ void am_platform_mouse_button_callback_default(uint64 window_handle, am_mouse_ma
     };
 };
 
-void am_platform_mouse_motion_callback_default(uint64 window_handle, int32 x, int32 y, am_events event) {
+void am_platform_mouse_motion_callback_default(am_uint64 window_handle, am_int32 x, am_int32 y, am_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    printf("Win handle: %ld\n", window_handle);
     platform->input.mouse_moved = true;
     platform->input.mouse_position.x = x;
     platform->input.mouse_position.y = y;
 };
 
-void am_platform_mouse_scroll_callback_default(uint64 window_handle, am_events event) {
+void am_platform_mouse_scroll_callback_default(am_uint64 window_handle, am_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_MOUSE_SCROLL_UP: {
@@ -1165,12 +1171,12 @@ am_window *am_platform_window_create(am_window_info window_info) {
 
     #if defined(AM_LINUX)
     XSetWindowAttributes window_attributes;
-    int32 attribs[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
+    am_int32 attribs[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
     XVisualInfo *visual_info = glXChooseVisual(platform->display, 0, attribs);
     Colormap color_map = XCreateColormap(platform->display, window_info.parent, visual_info->visual, AllocNone);
     window_attributes.colormap = color_map;
     window_attributes.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | StructureNotifyMask | EnterWindowMask | LeaveWindowMask;
-    uint64 window = (uint64)XCreateWindow(platform->display, window_info.parent, window_info.window_position.x, window_info.window_position.y, window_info.window_width, window_info.window_height, 0, visual_info->depth, InputOutput, visual_info->visual, CWColormap | CWEventMask, &window_attributes);
+    am_uint64 window = (am_uint64)XCreateWindow(platform->display, window_info.parent, window_info.window_position.x, window_info.window_position.y, window_info.window_width, window_info.window_height, 0, visual_info->depth, InputOutput, visual_info->visual, CWColormap | CWEventMask, &window_attributes);
     assert(window != BadAlloc && window != BadColor && window != BadCursor && window != BadMatch && window != BadPixmap && window != BadValue && window != BadWindow);
     new_window->handle = window;
     
@@ -1213,10 +1219,10 @@ am_window *am_platform_window_create(am_window_info window_info) {
     window_rect.top = 0;
     window_rect.bottom = new_window->info.window_height;
     AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
-    int32 rect_width = window_rect.right - window_rect.left;
-    int32 rect_height = window_rect.bottom - window_rect.top;
+    am_int32 rect_width = window_rect.right - window_rect.left;
+    am_int32 rect_height = window_rect.bottom - window_rect.top;
 
-    new_window->handle = (uint64)CreateWindowEx(dwExStyle, new_window->info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, new_window->info.window_title, dwStyle, new_window->info.window_position.x, new_window->info.window_position.y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
+    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, new_window->info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, new_window->info.window_title, dwStyle, new_window->info.window_position.x, new_window->info.window_position.y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
     if ((new_window->info.parent != AM_WINDOW_ROOT_PARENT)) {
         SetParent((HWND)new_window->handle, (HWND)new_window->info.parent);
         SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
@@ -1225,45 +1231,80 @@ am_window *am_platform_window_create(am_window_info window_info) {
     
     #endif
 
-    new_window->internal_id = (int32)platform->windows.length;
+    new_window->internal_id = (am_int32)platform->windows.length;
     am_dyn_array_push(&platform->windows, &new_window, 1);
     return new_window;
 };
 
-am_window *am_platform_window_lookup(uint64 handle) {
+am_window *am_platform_window_lookup(am_uint64 handle) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    for (int32 i = 0; i < platform->windows.length; i++)
+    for (am_int32 i = 0; i < platform->windows.length; i++)
         if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->handle == handle) 
             return am_dyn_array_data_retrieve(&platform->windows, am_window*, i);
     return NULL;
 };
 
-int32 am_platform_window_index_lookup(uint64 handle) {
+am_int32 am_platform_window_index_lookup(am_uint64 handle) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    for (int32 i = 0; i < platform->windows.length; i++)
+    for (am_int32 i = 0; i < platform->windows.length; i++)
         if (am_dyn_array_data_retrieve(&platform->windows, am_window*, i)->handle == handle)
             return i;
     return -1;
 };
 
-//TODO: (LINUX) Send message to loop
 void am_platform_window_terminate(am_window *window) {
-    am_platform *platform = am_engine_get_subsystem(platform);
     #if defined(AM_LINUX)
-    /*
-    XEvent event;
-    event.xclient.type = ClientMessage;
-    event.xclient.window = window->handle;
-    event.xclient.message_type = XInternAtom(platform->display, "WM_PROTOCOLS", true);
-    event.xclient.format = 32;
-    event.xclient.data.l[0] = XInternAtom(platform->display, "WM_DELETE_WINDOW", false);
-    event.xclient.data.l[1] = CurrentTime;
-    XSendEvent(platform->display, window->handle, False, NoEventMask, &event);*/
+    am_platform *platform = am_engine_get_subsystem(platform);
     XUnmapWindow(platform->display, window->handle);
     XDestroyWindow(platform->display, window->handle);
     #else
-    DestroyWindow((HWND)window->handle);
+    DestroyWindow((HWND)(window->handle));
     #endif
+};
+
+//SEARCH_POINT TIME
+void am_platform_timer_create() {
+    am_platform *platform = am_engine_get_subsystem(platform);
+    #if defined(AM_LINUX)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+
+    platform->time.frequency = 1000000000;
+    printf("Offset, frequency: %llu %llu\n", platform->time.offset, platform->time.frequency);
+    #else
+    QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
+    QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
+    #endif
+};
+
+void am_platform_timer_sleep(am_float32 ms) {
+    #if defined(AM_LINUX)
+    usleep(ms*1000.0f);
+    #else
+    timeBeginPeriod(1);
+    Sleep((uint64_t)ms);
+    timeEndPeriod(1);
+    #endif
+};
+
+//TODO: Work to be done here
+am_uint64 am_platform_timer_value() {
+    #if defined(AM_LINUX)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+    //return (am_uint64) ts.tv_nsec;
+    #else
+    am_uint64 value;
+    QueryPerformanceCounter((LARGE_INTEGER*)&value);
+    return value;
+    #endif
+};
+
+am_uint64 am_platform_elapsed_time() {
+    am_platform *platform = am_engine_get_subsystem(platform);
+    return (am_platform_timer_value() - platform->time.offset);
 };
 
 //----------------------------------------------------------------------------//
@@ -1272,8 +1313,10 @@ void am_platform_window_terminate(am_window *window) {
 
 int main() {
     test_platform = am_platform_create(); 
+    am_platform_timer_create();
+    printf("%llu\n", am_platform_elapsed_time());
+    printf("%llu\n", am_platform_elapsed_time());
 
-    printf("pfcr\n");
     am_window_info test = {
         .window_height = 500,
         .window_width = 500,
@@ -1283,40 +1326,45 @@ int main() {
         .is_fullscreen = false
     };
     am_window *wind = am_platform_window_create(test);
-    XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
+    //XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
 
     am_window_info test2 = {
         .window_height = 50,
         .window_width = 50,
         .window_title = "Win2",
         .window_position = {50,50},
-        .parent = wind->handle,
+        .parent = AM_WINDOW_ROOT_PARENT,
         .is_fullscreen = false
     };
     am_window *wind2 = am_platform_window_create(test2);
-    XSetWindowBackground(test_platform->display, wind2->handle, 0x00FF00);
+    //XSetWindowBackground(test_platform->display, wind2->handle, 0x00FF00);
     
     am_window_info test3 = {
         .window_height = 100,
         .window_width = 100,
-        .window_title = "Win2",
-        .window_position = {50,800},
+        .window_title = "Win3",
+        .window_position = {50,300},
         .parent = AM_WINDOW_ROOT_PARENT,
         .is_fullscreen = false
     };
     am_window *wind3 = am_platform_window_create(test3);
-    XSetWindowBackground(test_platform->display, wind3->handle, 0xFF0000);
+    //XSetWindowBackground(test_platform->display, wind3->handle, 0xFF0000);
 
-
-    uint64 t = 0;
-    int32 mx, my;
+    am_uint64 t = 0;
+    am_int32 mx, my;
+    
     while (temp_check) {
         t++;
+        
         am_platform_update(test_platform);
+        if (am_platform_key_pressed(AM_KEYCODE_Q)) {
+            am_platform_timer_sleep(3000.0f);
+        };
         if (am_platform_key_pressed(AM_KEYCODE_SPACE)) {
-            printf("Nr. of windows: %d\n", test_platform->windows.length);
-        }
-        if (am_platform_key_down(AM_KEYCODE_W)) printf("w %lu\n",t);
+            printf("%llu\n", am_platform_elapsed_time());
+            
+        };
+        //if (am_platform_key_down(AM_KEYCODE_W)) printf("w %lu\n",t);
         if (am_platform_mouse_moved()) {
             am_platform_mouse_position(&mx, &my);
             printf("Mouse pos: %d %d\n", mx, my);
@@ -1329,4 +1377,4 @@ int main() {
     getchar();
     printf("done\n");
     return 0;
-}
+};
