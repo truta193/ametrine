@@ -1221,15 +1221,15 @@ void am_platform_window_motion_callback_default(am_uint64 window_handle, am_uint
 };
 
 //FIXME: Freeing colormap breaks the window
-//TODO: Add fullscreen procedure here in case window is requested to be fullscreen 
+//TODO: Redo, use window_info for all details and fill in new_window at the end
 am_window *am_platform_window_create(am_window_info window_info) {
     am_window *new_window = (am_window*)am_malloc(sizeof(am_window)); 
     assert(new_window != NULL);
-    new_window->info = window_info;
     am_platform *platform = am_engine_get_subsystem(platform);
 
     new_window->internal_id = (am_int32)platform->windows.length;
     am_dyn_array_push(&platform->windows, &new_window, 1);
+
     #if defined(AM_LINUX)
     XSetWindowAttributes window_attributes;
     am_int32 attribs[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
@@ -1243,7 +1243,7 @@ am_window *am_platform_window_create(am_window_info window_info) {
     
     Atom wm_delete = XInternAtom(platform->display, "WM_DELETE_WINDOW", true);
     XSetWMProtocols(platform->display, (Window)new_window->handle, &wm_delete, 1);
-    XStoreName(platform->display, (Window)new_window->handle, new_window->info.window_title);
+    XStoreName(platform->display, (Window)new_window->handle, window_info.window_title);
     XMapWindow(platform->display, (Window)new_window->handle);
     XFree(visual_info);
     //FIX: Freeing colormap breaks the window
@@ -1252,29 +1252,34 @@ am_window *am_platform_window_create(am_window_info window_info) {
     #else
 	DWORD dwExStyle = WS_EX_LEFT; // 0
     DWORD dwStyle = WS_OVERLAPPED; // 0
-    if (new_window->info.parent == AM_WINDOW_ROOT_PARENT) {
+    if (window_info.parent == AM_WINDOW_ROOT_PARENT) {
 	    dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
         dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     };
 
     RECT window_rect = {
         .left = 0,
-        .right = new_window->info.window_width,
+        .right = window_info.window_width,
         .top = 0,
-        .bottom = new_window->info.window_height
+        .bottom = window_info.window_height
     };
     AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
     am_int32 rect_width = window_rect.right - window_rect.left;
     am_int32 rect_height = window_rect.bottom - window_rect.top;
 
-    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, new_window->info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, new_window->info.window_title, dwStyle, new_window->info.window_position.x, new_window->info.window_position.y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
+    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, window_info.window_title, dwStyle, window_info.window_position.x, window_info.window_position.y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
 
-    if ((new_window->info.parent != AM_WINDOW_ROOT_PARENT)) {
-        SetParent((HWND)new_window->handle, (HWND)new_window->info.parent);
+    if ((window_info.parent != AM_WINDOW_ROOT_PARENT)) {
+        SetParent((HWND)new_window->handle, (HWND)window_info.parent);
         SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
     };
     ShowWindow((HWND)new_window->handle, 1);
     #endif
+    //TODO: Works for linux need to test on windows
+    new_window->info.is_fullscreen = false;
+    new_window->info.parent = window_info.parent;
+    am_platform_window_fullscreen(new_window->handle, window_info.is_fullscreen);
+    new_window->info = window_info;
     return new_window;
 };
 
@@ -1351,7 +1356,6 @@ void am_platform_window_move(am_uint64 handle, am_uint32 x, am_uint32 y) {
 };
 
 //REVIEW: Child windows could go "fullscreen" by taking the parent's client dimensions
-//TODO: LINUX
 void am_platform_window_fullscreen(am_uint64 handle, am_bool state) {
     am_window *window = am_platform_window_lookup(handle);
     if (window->info.is_fullscreen == state || window->info.parent != AM_WINDOW_ROOT_PARENT) return;
@@ -1363,7 +1367,6 @@ void am_platform_window_fullscreen(am_uint64 handle, am_bool state) {
     am_window_info temp_cache = window->cache;
 
     #if defined(AM_LINUX)
-    //TODO: Update size and pos in window info
     am_platform *platform = am_engine_get_subsystem(platform);
     Atom wm_state = XInternAtom(platform->display, "_NET_WM_STATE", false);
     Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
@@ -1471,7 +1474,7 @@ int main() {
         .window_title = "Win1",
         .window_position = {600,600},
         .parent = AM_WINDOW_ROOT_PARENT,
-        .is_fullscreen = false,
+        .is_fullscreen = true,
     };
     am_window *wind = am_platform_window_create(test);
     XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
@@ -1500,7 +1503,7 @@ int main() {
     
     am_uint64 t = 0;
     am_int32 mx, my;
-    am_bool fs = true;
+    am_bool fs = false;
     
     while (temp_check) {
         t++;
