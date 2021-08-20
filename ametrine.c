@@ -674,10 +674,9 @@ am_mouse_map am_platform_translate_button(am_uint32 button) {
     return AM_MOUSE_BUTTON_INVALID;
 };
 
-//TODO: Checks for mem alloc and platform creation on Windows
 am_platform *am_platform_create() {
     am_platform *platform = (am_platform*)am_malloc(sizeof(am_platform));
-    if (platform == NULL) printf("[FAIL] Could not allocate memory for platform\n");
+    if (platform == NULL) printf("[FAIL] Could not allocate memory for platform!\n");
     assert(platform != NULL);
     am_dyn_array_init(&platform->windows, sizeof(am_window*));
     
@@ -824,12 +823,18 @@ am_platform *am_platform_create() {
     //HACK: Colored here just for visuals
     window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
 	window_class.lpszClassName = "AM_ROOT";
-	RegisterClass(&window_class);
+	if (!RegisterClass(&window_class)) {
+        printf("[FAIL] Failed to register root class!\n");
+        return NULL;
+    };
     //HACK: Colored here just for visuals
     window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
     window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
     window_class.lpszClassName = "AM_CHILD";
-    RegisterClass(&window_class);
+    if (!RegisterClass(&window_class)) {
+        printf("[FAIL] Failed to register child class!\n");
+        return NULL;
+    };
     #endif
 
     platform->input.wheel_delta = 0;
@@ -847,7 +852,7 @@ am_platform *am_platform_create() {
     am_platform_set_mouse_scroll_callback(platform, am_platform_mouse_scroll_callback_default);
     am_platform_set_window_motion_callback(platform, am_platform_window_motion_callback_default);
     am_platform_set_window_size_callback(platform, am_platform_window_size_callback_default);
-    printf("[OK] Platform init successful\n");
+    printf("[OK] Platform init successful!\n");
     return platform;
 };
 
@@ -988,10 +993,7 @@ LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, W
             break;
         };
         case WM_MOUSEMOVE: {
-            //TODO: LOWORD & HIWORD
-            am_uint16 x = lparam & 0xFFFF;
-            am_uint16 y = (lparam >> 16) & 0xFFFF;
-            platform->callbacks.am_platform_mouse_motion_callback(window_handle, x, y, AM_EVENT_MOUSE_MOTION);
+            platform->callbacks.am_platform_mouse_motion_callback(window_handle, LOWORD(lparam), HIWORD(lparam), AM_EVENT_MOUSE_MOTION);
             break;
         };
         case WM_GETMINMAXINFO: {
@@ -1228,7 +1230,7 @@ void am_platform_window_motion_callback_default(am_uint64 window_handle, am_uint
 am_window *am_platform_window_create(am_window_info window_info) {
     am_window *new_window = (am_window*)am_malloc(sizeof(am_window)); 
     if (new_window == NULL) {
-        printf("[FAIL] Could not allocate memory for window\n");
+        printf("[FAIL] Could not allocate memory for window!\n");
         return NULL;
     }
     am_platform *platform = am_engine_get_subsystem(platform);
@@ -1245,7 +1247,7 @@ am_window *am_platform_window_create(am_window_info window_info) {
     window_attributes.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | StructureNotifyMask | EnterWindowMask | LeaveWindowMask;
     am_uint64 window = (am_uint64)XCreateWindow(platform->display, window_info.parent, window_info.window_position.x, window_info.window_position.y, window_info.window_width, window_info.window_height, 0, visual_info->depth, InputOutput, visual_info->visual, CWColormap | CWEventMask, &window_attributes);
     if (window == BadAlloc || window == BadColor || window == BadCursor || window == BadMatch || window == BadPixmap || window == BadValue || window == BadWindow) {
-        printf("[FAIL] Could not create window\n");
+        printf("[FAIL] Could not create window!\n");
         return NULL;
     };
     new_window->handle = window;
@@ -1276,14 +1278,18 @@ am_window *am_platform_window_create(am_window_info window_info) {
     am_int32 rect_height = window_rect.bottom - window_rect.top;
 
     new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, window_info.window_title, dwStyle, window_info.window_position.x, window_info.window_position.y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
-
+    if (new_window->handle == 0) {
+        printf("[FAIL] Could not create window!\n");
+        return NULL;
+    };
     if ((window_info.parent != AM_WINDOW_ROOT_PARENT)) {
         SetParent((HWND)new_window->handle, (HWND)window_info.parent);
         SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
     };
     ShowWindow((HWND)new_window->handle, 1);
     #endif
-    //TODO: Works for linux need to test on windows
+    //TODO: Fixed Windows, test on Linux although this should be fine
+    new_window->info.window_position = window_info.window_position;
     new_window->info.is_fullscreen = false;
     new_window->info.parent = window_info.parent;
     am_platform_window_fullscreen(new_window->handle, window_info.is_fullscreen);
@@ -1396,8 +1402,7 @@ void am_platform_window_fullscreen(am_uint64 handle, am_bool state) {
 
     #else
     DWORD dw_style = GetWindowLong((HWND)handle, GWL_STYLE);
-    //REVIEW: Don't need to sniff window styles, can check window.is_fullscreen
-    if (dw_style & WS_OVERLAPPEDWINDOW) {
+    if (window->info.is_fullscreen) {
         printf("Going fullscreen\n");
         MONITORINFO monitor_info = {sizeof(monitor_info)};
         GetMonitorInfo(MonitorFromWindow((HWND)handle, MONITOR_DEFAULTTONEAREST), &monitor_info);
@@ -1484,7 +1489,7 @@ int main() {
         .is_fullscreen = true,
     };
     am_window *wind = am_platform_window_create(test);
-    XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
+    //XSetWindowBackground(test_platform->display, wind->handle, 0x0000FF);
     
     am_window_info test2 = {
         .window_height = 50,
@@ -1495,7 +1500,7 @@ int main() {
         .is_fullscreen = false
     };
     am_window *wind2 = am_platform_window_create(test2);
-    XSetWindowBackground(test_platform->display, wind2->handle, 0x00FF00);
+    //XSetWindowBackground(test_platform->display, wind2->handle, 0x00FF00);
     
     am_window_info test3 = {
         .window_height = 30,
@@ -1506,7 +1511,7 @@ int main() {
         .is_fullscreen = false
     };
     am_window *wind3 = am_platform_window_create(test3);
-    XSetWindowBackground(test_platform->display, wind3->handle, 0xFF0000);
+    //XSetWindowBackground(test_platform->display, wind3->handle, 0xFF0000);
     
     am_uint64 t = 0;
     am_int32 mx, my;
