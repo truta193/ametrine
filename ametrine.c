@@ -268,7 +268,6 @@ typedef struct am_window_info {
     am_uint32 window_height; 
     am_vec2i window_position; 
     am_bool is_fullscreen; //Useless for child windows
-    am_bool is_resizable;
 } am_window_info;
 
 typedef struct am_window {
@@ -276,6 +275,9 @@ typedef struct am_window {
     am_int32 internal_id;
     am_window_info info;
     am_window_info cache;
+    #if defined(AM_LINUX)
+        Colormap colormap;
+    #endif
 } am_window;
 
 typedef struct am_platform_callbacks {
@@ -299,7 +301,6 @@ typedef struct am_platform_input {
 } am_platform_input;
 
 typedef struct am_platform_time {
-    //TODO: Complete this as things come up
     am_uint64 offset;
     am_uint64 frequency;
 } am_platform_time;
@@ -673,8 +674,10 @@ am_mouse_map am_platform_translate_button(am_uint32 button) {
     return AM_MOUSE_BUTTON_INVALID;
 };
 
+//TODO: Checks for mem alloc and platform creation on Windows
 am_platform *am_platform_create() {
     am_platform *platform = (am_platform*)am_malloc(sizeof(am_platform));
+    if (platform == NULL) printf("[FAIL] Could not allocate memory for platform\n");
     assert(platform != NULL);
     am_dyn_array_init(&platform->windows, sizeof(am_window*));
     
@@ -685,7 +688,7 @@ am_platform *am_platform_create() {
     XDisplayKeycodes(platform->display, &min, &max);
     am_int32 width;
     KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
-    for (am_int32 i = min; i < max; i++)  platform->input.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
+    for (am_int32 i = min; i < max; i++) platform->input.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
     XFree(key_syms);
     #else
     platform->input.keycodes[0x00B] = AM_KEYCODE_0;
@@ -844,7 +847,7 @@ am_platform *am_platform_create() {
     am_platform_set_mouse_scroll_callback(platform, am_platform_mouse_scroll_callback_default);
     am_platform_set_window_motion_callback(platform, am_platform_window_motion_callback_default);
     am_platform_set_window_size_callback(platform, am_platform_window_size_callback_default);
-    printf("End plfr init\n");
+    printf("[OK] Platform init successful\n");
     return platform;
 };
 
@@ -1043,6 +1046,7 @@ void am_platform_terminate(am_platform *platform) {
     for (am_int32 i = 0; i <platform->windows.length; i++) am_platform_window_terminate(am_dyn_array_data_retrieve(&platform->windows, am_window*, i));
 
     #if defined(AM_LINUX)
+    //This sends the proper closing xevents
     am_platform_update(test_platform);
     #else
     UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
@@ -1220,11 +1224,13 @@ void am_platform_window_motion_callback_default(am_uint64 window_handle, am_uint
     printf("Window pos callback: %d %d\n", x, y);
 };
 
-//FIXME: Freeing colormap breaks the window
-//TODO: Redo, use window_info for all details and fill in new_window at the end
+//TODO: Checks for mem alloc and window creation on Windows
 am_window *am_platform_window_create(am_window_info window_info) {
     am_window *new_window = (am_window*)am_malloc(sizeof(am_window)); 
-    assert(new_window != NULL);
+    if (new_window == NULL) {
+        printf("[FAIL] Could not allocate memory for window\n");
+        return NULL;
+    }
     am_platform *platform = am_engine_get_subsystem(platform);
 
     new_window->internal_id = (am_int32)platform->windows.length;
@@ -1234,20 +1240,22 @@ am_window *am_platform_window_create(am_window_info window_info) {
     XSetWindowAttributes window_attributes;
     am_int32 attribs[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
     XVisualInfo *visual_info = glXChooseVisual(platform->display, 0, attribs);
-    Colormap color_map = XCreateColormap(platform->display, window_info.parent, visual_info->visual, AllocNone);
-    window_attributes.colormap = color_map;
+    new_window->colormap = XCreateColormap(platform->display, window_info.parent, visual_info->visual, AllocNone);
+    window_attributes.colormap = new_window->colormap;
     window_attributes.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | StructureNotifyMask | EnterWindowMask | LeaveWindowMask;
     am_uint64 window = (am_uint64)XCreateWindow(platform->display, window_info.parent, window_info.window_position.x, window_info.window_position.y, window_info.window_width, window_info.window_height, 0, visual_info->depth, InputOutput, visual_info->visual, CWColormap | CWEventMask, &window_attributes);
-    assert(window != BadAlloc && window != BadColor && window != BadCursor && window != BadMatch && window != BadPixmap && window != BadValue && window != BadWindow);
+    if (window == BadAlloc || window == BadColor || window == BadCursor || window == BadMatch || window == BadPixmap || window == BadValue || window == BadWindow) {
+        printf("[FAIL] Could not create window\n");
+        return NULL;
+    };
     new_window->handle = window;
     
     Atom wm_delete = XInternAtom(platform->display, "WM_DELETE_WINDOW", true);
     XSetWMProtocols(platform->display, (Window)new_window->handle, &wm_delete, 1);
     XStoreName(platform->display, (Window)new_window->handle, window_info.window_title);
     XMapWindow(platform->display, (Window)new_window->handle);
+    //REVIEW: Freeing visual_info seems to not affect anything
     XFree(visual_info);
-    //FIX: Freeing colormap breaks the window
-    //XFreeColormap(platform->display, color_map);
 
     #else
 	DWORD dwExStyle = WS_EX_LEFT; // 0
@@ -1411,6 +1419,7 @@ void am_platform_window_terminate(am_window *window) {
     #if defined(AM_LINUX)
     am_platform *platform = am_engine_get_subsystem(platform);
     XUnmapWindow(platform->display, window->handle);
+    XFreeColormap(platform->display, window->colormap);
     XDestroyWindow(platform->display, window->handle);
     #else
     DestroyWindow((HWND)(window->handle));
@@ -1465,8 +1474,6 @@ am_uint64 am_platform_elapsed_time() {
 int main() {
     test_platform = am_platform_create(); 
     am_platform_timer_create();
-    //printf("%llu\n", am_platform_elapsed_time());
-    //printf("%llu\n", am_platform_elapsed_time());
 
     am_window_info test = {
         .window_height = 500,
@@ -1554,6 +1561,5 @@ int main() {
     printf("got here\n");
     am_platform_terminate(test_platform);
     getchar();
-    printf("done\n");
     return 0;
 };
