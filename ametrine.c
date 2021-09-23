@@ -16,6 +16,7 @@
     #define OEMRESOURCE
     #define AM_WINDOWS
     #include <windows.h>
+    #include <GL/glext.h>
 #else
     #define AM_LINUX
     #include <X11/Xatom.h>
@@ -59,7 +60,8 @@ typedef enum {FAILURE, SUCCESS, IN_PROGRESS} am_result;
     #define _CALL *
     #define amgl_get_proc_address(str) glXGetProcAddress((unsigned char*)(str))
 #else
-    //TODO: Windows counterparts
+    #define _CALL __stdcall*
+    #define amgl_get_proc_address(str) wglGetProcAddress((str))
 #endif
 
 //HACK: Temporary
@@ -67,8 +69,11 @@ am_bool temp_check = true;
 
 //REVIEW: OpenGL functions
 
-
+#if defined(AM_LINUX)
 typedef void (_CALL PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
+#else
+typedef BOOL (_CALL PFNWGLSWAPINTERVALEXTPROC) (int interval);
+#endif
 typedef GLuint (_CALL PFNGLCREATESHADERPROC) (GLenum type);
 typedef void (_CALL PFNGLSHADERSOURCEPROC) (GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length);
 typedef void (_CALL PFNGLCOMPILESHADERPROC) (GLuint shader);
@@ -97,7 +102,11 @@ typedef void (_CALL PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
 typedef GLint (_CALL PFNGLGETUNIFORMLOCATIONPROC) (GLuint program, const GLchar *name);
 typedef void (_CALL PFNGLGENERATEMIPMAPPROC) (GLenum target);
 
+#if defined(AM_LINUX)
 PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT = NULL;
+#else 
+PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
+#endif
 PFNGLCREATESHADERPROC glCreateShader = NULL;
 PFNGLSHADERSOURCEPROC glShaderSource = NULL;
 PFNGLCOMPILESHADERPROC glCompileShader = NULL;
@@ -342,7 +351,6 @@ typedef enum am_events {
     AM_EVENT_COUNT
 } am_events;
 
-//TODO: Remove window_ prefix, it is clear the data belongs to a window 
 typedef struct am_window_info {
     am_uint64 parent;
     const char* title;
@@ -365,6 +373,8 @@ typedef struct am_window {
         XVisualInfo *visual_info;
         GLXContext context;
     #else
+        HDC hdc;
+        HGLRC context;
         //Context windows
     #endif
 } am_window;
@@ -485,9 +495,7 @@ am_uint64 am_platform_elapsed_time();
 //----------------------------------------------------------------------------//
 
 //https://www.khronos.org/opengl/wiki/OpenGL_Object
-//BUFFERS shaders, textures, vertex, index, frame, uniform
-//TODO: Windows side of things
-
+//BUFFERS shaders\|, textures \|, vertex, index, frame, uniform
 
 //TODO: Shaders
 //Shader & program
@@ -508,7 +516,6 @@ typedef struct amgl_shader_info {
     am_uint32 num;
 } amgl_shader_info;
 
-//TODO: Figure out if it should be amgl_shader or amgl_shader_program
 typedef struct amgl_shader {
     am_uint32 handle;
     am_int32 am_id;
@@ -548,10 +555,9 @@ void amgl_shader_destroy(amgl_shader *shader);
 amgl_texture *amgl_texture_create(amgl_texture_info info);
 void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_bool flip);
 void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, size_t size, am_bool flip);
-//TODO: Implement | void amgl_texture_update(amgl_texture texture);
 void amgl_texture_destroy(amgl_texture *texture);
 
-//TODO: These
+//Various OGL
 void amgl_init(); //Create arrays for shaders, vertex b, index b, frame b etc, init gl addresses
 void amgl_terminate();
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
@@ -571,7 +577,6 @@ typedef struct am_engine_info {
     void (*update)();
     void (*shutdown)();
     am_bool is_running;
-    //REVIEW: Vsync global for all windows for now
     am_bool vsync_enabled;
     //Variables marked with initial_ will not be updated during runtime
     char *initial_title;
@@ -912,7 +917,7 @@ am_platform *am_platform_create() {
     if (platform == NULL) printf("[FAIL] Could not allocate memory for platform!\n");
     assert(platform != NULL);
     am_dyn_array_init(&platform->windows, sizeof(am_window));
-    
+
     #if defined(AM_LINUX)
     platform->display = XOpenDisplay(NULL);
     memset(platform->input.keycodes, -1, sizeof(platform->input.keycodes));
@@ -1073,7 +1078,6 @@ am_platform *am_platform_create() {
     platform->input.wheel_delta = 0;
     platform->input.mouse_x = 0;
     platform->input.mouse_y = 0;
-    
 
     memset(platform->input.keyboard_map, 0, sizeof(platform->input.keyboard_map));
     memset(platform->input.prev_keyboard_map, 0, sizeof(platform->input.prev_keyboard_map));
@@ -1460,11 +1464,10 @@ void am_platform_window_motion_callback_default(am_uint64 window_handle, am_uint
     printf("Window pos callback: %d %d\n", x, y);
 };
 
-//TODO: Checks for mem alloc and window creation on Windows
 am_window *am_platform_window_create(am_window_info window_info) {
     am_platform *platform = am_engine_get_subsystem(platform);
 
-    am_window *new_window = (am_window*)malloc(sizeof(am_window)); //Alloc to push then free since it's stored in the dynamic array now
+    am_window *new_window = (am_window*)am_malloc(sizeof(am_window)); //Alloc to push then free since it's stored in the dynamic array now
     if (new_window == NULL) {
         printf("[FAIL] Could not allocate memory for window!\n");
         return NULL;
@@ -1505,15 +1508,15 @@ am_window *am_platform_window_create(am_window_info window_info) {
 
     RECT window_rect = {
         .left = 0,
-        .right = window_info.window_width,
+        .right = window_info.width,
         .top = 0,
-        .bottom = window_info.window_height
+        .bottom = window_info.height
     };
     AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
     am_int32 rect_width = window_rect.right - window_rect.left;
     am_int32 rect_height = window_rect.bottom - window_rect.top;
 
-    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, window_info.window_title, dwStyle, window_info.window_x, window_info.window_y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
+    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_ROOT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS, window_info.title, dwStyle, window_info.x, window_info.y, rect_width, rect_height, NULL, NULL, GetModuleHandle(NULL), NULL);
     if (new_window->handle == 0) {
         printf("[FAIL] Could not create window!\n");
         return NULL;
@@ -1524,7 +1527,7 @@ am_window *am_platform_window_create(am_window_info window_info) {
     };
     ShowWindow((HWND)new_window->handle, 1);
     #endif
-    //TODO: Fixed Windows, test on Linux although this should be fine
+
     new_window->info.x = window_info.x;
     new_window->info.y = window_info.y;
 
@@ -1534,11 +1537,38 @@ am_window *am_platform_window_create(am_window_info window_info) {
     new_window->info = window_info;
 
     //REVIEW: All contexts share the data
-    new_window->context = NULL;
     am_window *main_window = am_platform_window_retrieve(0);
+    #if defined(AM_LINUX)
+    new_window->context = NULL;
     new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context/*NULL*/, GL_TRUE);
     glXMakeCurrent(platform->display, new_window->handle, new_window->context);
+    #else
+    new_window->hdc = GetDC((HWND)new_window->handle);
+    PIXELFORMATDESCRIPTOR pixel_format_desc = {
+        sizeof(PIXELFORMATDESCRIPTOR),
+        1,
+        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+        PFD_TYPE_RGBA,        
+        32,                   
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        24,                   
+        8,                    
+        0,                    
+        PFD_MAIN_PLANE,
+        0, 0, 0, 0
+    };
 
+    am_int32 suggested_pf_index = ChoosePixelFormat(new_window->hdc, &pixel_format_desc);
+    PIXELFORMATDESCRIPTOR suggested_pf;
+    DescribePixelFormat(new_window->hdc, suggested_pf_index, sizeof(suggested_pf), &suggested_pf);
+    SetPixelFormat(new_window->hdc, suggested_pf_index, &suggested_pf);
+
+    new_window->context = wglCreateContext(new_window->hdc);
+    wglMakeCurrent(new_window->hdc, new_window->context);
+    wglShareLists(new_window->context, main_window->context);
+    #endif
+
+    amgl_vsync(new_window, am_engine_get_instance()->info.vsync_enabled);
     return new_window;
 };
 
@@ -1610,8 +1640,8 @@ void am_platform_window_move(am_uint64 handle, am_uint32 x, am_uint32 y) {
     RECT rect = {
         .left = x,
         .top = y,
-        .bottom = window->info.window_height,
-        .right = window->info.window_width
+        .bottom = window->info.height,
+        .right = window->info.width
     };
     if (window->info.parent == AM_WINDOW_ROOT_PARENT) 
         AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
@@ -1664,8 +1694,8 @@ void am_platform_window_fullscreen(am_uint64 handle, am_bool state) {
     } else {
         printf("Going not fullscreen\n");
         SetWindowLong((HWND)handle, GWL_STYLE, dw_style | WS_OVERLAPPEDWINDOW);
-        am_platform_window_resize(handle, temp_cache.window_width, temp_cache.window_height);
-        am_platform_window_move(handle, temp_cache.window_x, temp_cache.window_y);
+        am_platform_window_resize(handle, temp_cache.width, temp_cache.height);
+        am_platform_window_move(handle, temp_cache.x, temp_cache.y);
         
     };
     #endif
@@ -1741,7 +1771,6 @@ amgl_shader *amgl_shader_create(amgl_shader_info info) {
     am_uint32 main_shader = glCreateProgram();
     //REVIEW: Is this a good option or would malloc be better?
     am_uint32 shader_list[info.num]; 
-
     for (am_int32 i = 0; i < info.num; i++) {
         am_uint32 shader = 0;
         switch (info.sources[i].type) {
@@ -1771,7 +1800,6 @@ amgl_shader *amgl_shader_create(amgl_shader_info info) {
         };
         glAttachShader(main_shader, shader);
     };
-
     glLinkProgram(main_shader);
 
     am_int32 is_linked = 0;
@@ -1792,7 +1820,7 @@ amgl_shader *amgl_shader_create(amgl_shader_info info) {
     };
 
     am_engine *engine = am_engine_get_instance();
-    amgl_shader *ret = (amgl_shader*)malloc(sizeof(amgl_shader));
+    amgl_shader *ret = (amgl_shader*)am_malloc(sizeof(amgl_shader));
     if (ret == NULL) {
         printf("[FAIL] Could not allocate memory for shader!\n");
         return NULL;  
@@ -1804,19 +1832,27 @@ amgl_shader *amgl_shader_create(amgl_shader_info info) {
     ret = am_dyn_array_data_retrieve(&engine->ctx_data.shaders, amgl_shader, dyn_id);
     ret->handle = main_shader;
     ret->info = info;
+    printf("SHADER COMPILATION DONE\n");
     return ret;
 };
 
-//TODO: Windows impl if necessary
 void amgl_shader_load_from_file(const char *path, amgl_shader_source_info *info) {
     FILE *source = fopen(path, "rb");
     am_int32 rd_size = 0;
     char* buffer = NULL;
     if (source) {
+        #if defined(AM_LINUX)
         struct stat st;
         stat(path, &st);
         rd_size = st.st_size;
-        buffer = (char*)malloc(rd_size+1);
+        #else
+        HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        LARGE_INTEGER size;
+        GetFileSizeEx(file_hwnd, &size);
+        rd_size = (am_int32) size.QuadPart;
+        CloseHandle(file_hwnd);
+        #endif
+        buffer = (char*)am_malloc(rd_size+1);
         if (buffer) fread(buffer, 1, rd_size, source);
         buffer[rd_size] = '\0';
     };
@@ -1825,7 +1861,6 @@ void amgl_shader_load_from_file(const char *path, amgl_shader_source_info *info)
 
 };
 
-//TODO: Windows impl if necessary
 void amgl_shader_source_load_from_memory(const void *memory, amgl_shader_source_info *info, size_t size) {
     info->source = NULL;
     info->source = memory;
@@ -1835,18 +1870,16 @@ void amgl_shader_source_load_from_memory(const void *memory, amgl_shader_source_
     };
 };
 
-//TODO: Check if this is ok
 void amgl_shader_destroy(amgl_shader *shader) {
     am_engine *engine = am_engine_get_instance();
     glDeleteProgram(shader->handle);
     am_dyn_array_remove(&engine->ctx_data.shaders, shader->am_id, 1);
 };
 
-//TODO: Windows impl if necessary
 amgl_texture *amgl_texture_create(amgl_texture_info info) {
     am_engine *engine = am_engine_get_instance();
 
-    amgl_texture *texture = (amgl_texture*)malloc(sizeof(amgl_texture));
+    amgl_texture *texture = (amgl_texture*)am_malloc(sizeof(amgl_texture));
     if (texture == NULL) {
         printf("[FAIL] Could not allocate memory for texture!\n");
         return NULL;
@@ -1904,7 +1937,6 @@ amgl_texture *amgl_texture_create(amgl_texture_info info) {
     return texture;
 };
 
-//TODO: Windows impl if necessary
 void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_bool flip) {
     //STORE IMAGE INTO MEMORY
     FILE *file = fopen(path, "rb");
@@ -1912,18 +1944,26 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
     size_t rd_size = 0;
 
     if (file) {
+        #if defined(AM_LINUX)
         struct stat st;
         stat(path, &st);
         rd_size = st.st_size;
-        buffer = (char*)malloc(rd_size+1);
+        #else
+        HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        LARGE_INTEGER size;
+        GetFileSizeEx(file_hwnd, &size);
+        rd_size = (am_int32) size.QuadPart;
+        CloseHandle(file_hwnd);
+        #endif
+        buffer = (char*)am_malloc(rd_size+1);
         if (buffer) fread(buffer, 1, rd_size, file);
         buffer[rd_size] = '\0'; 
+
     };
     fclose(file);
     amgl_texture_load_from_memory(buffer, info, rd_size, flip);
 };
 
-//TODO: Windows impl if necessary
 void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, size_t size, am_bool flip) {
     am_int32 num_comps = 0;
     stbi_set_flip_vertically_on_load(flip);
@@ -1935,18 +1975,14 @@ void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, 
     };
 };
 
-//TODO: Check if this is ok
 void amgl_texture_destroy(amgl_texture *texture) {
     am_engine *engine = am_engine_get_instance();
     glDeleteTextures(1, &texture->handle);
     am_dyn_array_remove(&engine->ctx_data.textures, texture->am_id, 1);
 };
 
-//Create arrays for shaders, vertex b, index b, frame b etc, init gl addresses
-//TODO: Windows impl if necessary
 void amgl_init() {
     //TODO: Init all gl procedures and functions
-    glXSwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
     glCreateShader = (PFNGLCREATESHADERPROC)amgl_get_proc_address("glCreateShader");
     glShaderSource = (PFNGLSHADERSOURCEPROC)amgl_get_proc_address("glShaderSource");
     glCompileShader = (PFNGLCOMPILESHADERPROC)amgl_get_proc_address("glCompileShader");
@@ -1981,15 +2017,22 @@ void amgl_terminate() {
 
 };
 
-//TODO: Windows impl if necessary
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height) {
     glViewport(x, y, width, height);
 };
 
-//TODO: Windows impl if necessary
 void amgl_vsync(am_window *window, am_bool state) {
+    //REVIEW: Not sure if glFlush() is needed but I read it can help
+    glFlush();
+    //REVIEW have to load here because this is called for each window on creation
+    #if defined(AM_LINUX)
     am_platform *platform = am_engine_get_subsystem(platform);
-    glXSwapIntervalEXT(platform->display, window->handle, state);
+    if (glXSwapIntervalEXT == NULL) glXSwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
+        glXSwapIntervalEXT(platform->display, window->handle, state);
+    #else
+        if (wglSwapIntervalEXT == NULL) wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
+        wglSwapIntervalEXT(state == true ? 1:0);
+    #endif
 };
 
 
@@ -2004,19 +2047,17 @@ void amgl_vsync(am_window *window, am_bool state) {
 
 
 void am_engine_create(am_engine_info engine_info){
-    am_engine_get_instance() = (am_engine*)malloc(sizeof(am_engine));
+    am_engine_get_instance() = (am_engine*)am_malloc(sizeof(am_engine));
     am_engine *engine = am_engine_get_instance();
     engine->info = engine_info;
 
     engine->platform = am_platform_create();
     am_platform_timer_create();
-    amgl_init();
 
     //TODO: Init all ctx_data arrays
     am_dyn_array_init(&engine->ctx_data.textures, sizeof(amgl_texture));
     am_dyn_array_init(&engine->ctx_data.shaders, sizeof(amgl_shader));
 
-    printf("[OK] Before window create successful!\n");
     am_window_info main = {
         .height = engine->info.initial_height,
         .width = engine->info.initial_width,
@@ -2027,26 +2068,26 @@ void am_engine_create(am_engine_info engine_info){
         .is_fullscreen = engine->info.initial_fullscreen
     };
     am_platform_window_create(main);
-    printf("[OK] Window create successful!\n");
     #if defined(AM_LINUX)
     //XSetWindowBackground(am_engine_get_subsystem(platform)->display, main_wind->handle, 0x0000FF);
     #endif
-
+    amgl_init();
     amgl_set_viewport(0,0, (am_int32)main.width-10, (am_int32)main.height-10);
-    //TODO: Temporary
+    //HACK: Temporary
     engine->info.is_running = true;
-    printf("[OK] Engine create successful!\n");
 };
 
 void am_engine_terminate(){
     am_engine *engine = am_engine_get_instance();
     am_platform_terminate(am_engine_get_subsystem(platform));
 
+    for (am_int32 i = 0; i < engine->ctx_data.textures.length; i++) amgl_texture_destroy(am_dyn_array_data_retrieve(&engine->ctx_data.textures, amgl_texture, i));
     am_dyn_array_cleanup(&engine->ctx_data.textures);
+    for (am_int32 i = 0; i < engine->ctx_data.shaders.length; i++) amgl_shader_destroy(am_dyn_array_data_retrieve(&engine->ctx_data.shaders, amgl_shader, i));
     am_dyn_array_cleanup(&engine->ctx_data.shaders);
 
     amgl_terminate();
-    //TODO: Temporary
+    //HACK: Temporary
     engine->info.is_running = false;
     am_free(engine);
 };
@@ -2055,32 +2096,38 @@ void am_engine_terminate(){
 //                               END ENGINE IMPL                              //
 //----------------------------------------------------------------------------//
 
-
 int main() {
     am_engine_info eng_inf = {
     .initial_title = "Main",
     .initial_fullscreen = false,
     .initial_width = 500,
     .initial_height = 500,
-    .initial_x = 100,
-    .initial_y = 100
+    .initial_x = 900,
+    .initial_y = 900
     };
     am_engine_create(eng_inf);
-    /*
+    
     am_window_info childw = {
-        .height = 100,
-        .width = 100,
+        .height = 400,
+        .width = 400,
         .x = 70,
         .y = 70,
         .parent = am_platform_window_retrieve(0)->handle,
         .is_fullscreen = false
     };
     am_window *ccc = am_platform_window_create(childw);
-    XSetWindowBackground(am_engine_get_subsystem(platform)->display, ccc->handle, 0xFF0000);*/
-
+    //XSetWindowBackground(am_engine_get_subsystem(platform)->display, ccc->handle, 0xFF0000);
     am_platform *platform = am_engine_get_subsystem(platform);
     am_bool run = true;
     am_uint64 t = 0;
+
+    #if defined(AM_LINUX)
+    glXMakeCurrent(platform->display, am_platform_window_retrieve(0)->handle, am_platform_window_retrieve(0)->context);
+    #else
+    wglMakeCurrent(am_platform_window_retrieve(0)->hdc, am_platform_window_retrieve(0)->context);
+    #endif
+    //amgl_set_viewport(0,0,400,400);
+    //Test texture loading
     amgl_texture_info texinfo = {
         .format = GL_RGBA,
         .mag_filter = GL_LINEAR,
@@ -2088,25 +2135,32 @@ int main() {
         .wrap_s = GL_REPEAT,
         .wrap_t = GL_REPEAT
     };
-    amgl_texture_load_from_file("/home/truta/Downloads/color_test.png", &texinfo, true);
+    amgl_texture_load_from_file("color_test.png", &texinfo, true);
     amgl_texture *test = amgl_texture_create(texinfo);
 
-    //Load shader source
-    amgl_shader_source_info shader_src = {
+    
+    //Test shader source loading
+    amgl_shader_source_info shaderv_src = {
         .type = AMGL_SHADER_VERTEX
     };
-    amgl_shader_load_from_file("test_v.glsl", &shader_src);
-    printf("TEST SHADER %s\n", shader_src.source);
+    amgl_shader_load_from_file("test_v.glsl", &shaderv_src);
+
+    amgl_shader_source_info shaderf_src = {
+        .type = AMGL_SHADER_FRAGMENT
+    };
+    amgl_shader_load_from_file("test_f.glsl", &shaderf_src);
 
     //Create shader info struct & shader
+    amgl_shader_source_info srcs[2];
+    srcs[0] = shaderv_src;
+    srcs[1] = shaderf_src;
     amgl_shader_info test_shader= {
-        .num = 1,
-        .sources = &shader_src
+        .num = 2,
+        .sources = srcs
     };
     amgl_shader *tt = amgl_shader_create(test_shader);
+    printf("SHADER COMPILED\n");
 
-    glXMakeCurrent(platform->display, am_platform_window_retrieve(0)->handle, am_platform_window_retrieve(0)->context);
-    printf("CHECK POINTERS AT DYN ARRAY TEXTURES (TEXTURE0): %p vs %p\n", am_dyn_array_data_retrieve(&am_engine_get_instance()->ctx_data.textures, amgl_texture, 0), am_engine_get_instance()->ctx_data.textures.data);
     while(run) {
         t++;/*
         if (t % 2 == 1) glXMakeCurrent(platform->display, am_platform_window_retrieve(0)->handle, am_platform_window_retrieve(0)->context);
@@ -2126,14 +2180,18 @@ int main() {
         glTexCoord2f(1, 1); glVertex3f(  1,  1, -1 );
         glEnd();
         glFlush();
+        #if defined(AM_LINUX)
         glXSwapBuffers(platform->display, am_platform_window_retrieve(0)->handle);
+        #else
+        SwapBuffers(am_platform_window_retrieve(0)->hdc);
+        #endif
         //if (t % 2 == 1) glXSwapBuffers(platform->display, am_platform_window_retrieve(0)->handle);
         //else glXSwapBuffers(platform->display, am_platform_window_retrieve(1)->handle);
         
         am_platform_update(am_engine_get_subsystem(platform));
         if (am_platform_key_released(AM_KEYCODE_X)) run = false;
     };
-    am_platform_terminate(am_engine_get_subsystem(platform));
+    am_engine_terminate();
     getchar();
     return 0;
 };
