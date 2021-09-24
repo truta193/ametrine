@@ -3,3 +3,5 @@
 *.exe
 ge.c
 ametrine
+*.glsl
+*.png
