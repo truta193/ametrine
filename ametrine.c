@@ -101,6 +101,7 @@ typedef GLint (_CALL PFNGLGETATTRIBLOCATIONPROC) (GLuint program, const GLchar *
 typedef void (_CALL PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
 typedef GLint (_CALL PFNGLGETUNIFORMLOCATIONPROC) (GLuint program, const GLchar *name);
 typedef void (_CALL PFNGLGENERATEMIPMAPPROC) (GLenum target);
+typedef void (_CALL PFNGLBUFFERSUBDATAPROC) (GLenum target, GLintptr offset, GLsizeiptr size, const void* data);
 
 #if defined(AM_LINUX)
 PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT = NULL;
@@ -134,6 +135,7 @@ PFNGLGETATTRIBLOCATIONPROC glGetAttribLocation = NULL;
 PFNGLUNIFORM1IPROC glUniform1i = NULL;
 PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = NULL;
 PFNGLGENERATEMIPMAPPROC glGenerateMipmap = NULL;
+PFNGLBUFFERSUBDATAPROC glBufferSubData = NULL;
 
 
 //----------------------------------------------------------------------------//
@@ -497,7 +499,7 @@ am_uint64 am_platform_elapsed_time();
 //https://www.khronos.org/opengl/wiki/OpenGL_Object
 //BUFFERS shaders\|, textures \|, vertex, index, frame, uniform
 
-//TODO: Shaders
+//TODO: Compute Shaders
 //Shader & program
 //Removed compute shader for now
 typedef enum amgl_shader_type {
@@ -522,13 +524,74 @@ typedef struct amgl_shader {
     amgl_shader_info info;
 } amgl_shader;
 
-//TODO: Textures
+typedef enum amgl_buffer_usage {
+    AMGL_BUFFER_USAGE_DYNAMIC,
+    AMGL_BUFFER_USAGE_STATIC,
+    AMGL_BUFFER_USAGE_STREAM
+} amgl_buffer_usage;
+
+typedef enum amgl_buffer_update_type {
+    AMGL_BUFFER_UPDATE_SUBDATA,
+    AMGL_BUFFER_UPDATE_RECREATE
+} amgl_buffer_update_type;
+
+typedef enum amgl_vertex_buffer_attribute_format {
+AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4, 
+AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3,
+AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2,
+AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT,
+AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT4, 
+AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT3, 
+AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT2, 
+AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT,  
+AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE, 
+AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE2,
+AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE3,
+AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE4
+} amgl_vertex_buffer_attribute_format;
+
+typedef struct amgl_vertex_buffer_attribute {
+    const char *name;
+    size_t stride;
+    size_t offset;
+    amgl_vertex_buffer_attribute_format format;
+    //REVIEW: IS this needed?
+    am_uint32 parent_buffer_handle;
+} amgl_vertex_buffer_attribute;
+
+typedef struct amgl_vertex_buffer_layout {
+    amgl_vertex_buffer_attribute *attributes;
+    am_uint32 num;
+} amgl_vertex_buffer_layout;
+
+typedef struct amgl_vertex_buffer_info {
+    void *data;
+    size_t size;
+    amgl_buffer_usage usage;
+    amgl_vertex_buffer_layout layout;
+} amgl_vertex_buffer_info;
+
+typedef struct amgl_vertex_buffer {
+    am_uint32 handle;
+    am_int32 am_id;
+    amgl_vertex_buffer_info info;
+} amgl_vertex_buffer;
+
+//TODO: Textures: Change loading style, delete after upload to GPU
 //Textures
+typedef enum amgl_texture_update_type {
+    AMGL_TEXTURE_UPDATE_RECREATE,
+    AMGL_TEXTURE_UPDATE_SUBDATA
+    //TODO: PBO, FBO
+} amgl_texture_update_type;
+
 typedef struct amgl_texture_info {
-    char *identifier;
+    //REVIEW: CHANGED NAMING HERE
+    const char *name;
     void *data;
     am_uint32 width;
     am_uint32 height;
+    //TODO: Specify formats in another enum
     GLenum format;
     GLenum min_filter;
     GLenum mag_filter;
@@ -545,16 +608,33 @@ typedef struct amgl_texture {
     amgl_texture_info info;
 } amgl_texture;
 
+typedef struct amgl_draw_info {
+    amgl_vertex_buffer *vertex_buffer;
+    //TODO: Index goes here too probably
+    am_uint32 start;
+    am_uint32 count;
+} amgl_draw_info;
+
 //Shaders
 amgl_shader *amgl_shader_create(amgl_shader_info info);
+//TODO: Update
 void amgl_shader_source_load_from_file(const char *path, amgl_shader_source_info *info);
 void amgl_shader_source_load_from_memory(const void *memory, amgl_shader_source_info *info, size_t size);
+amgl_shader *amgl_shader_retrieve(am_uint32 index);
 void amgl_shader_destroy(amgl_shader *shader);
+
+//Vertex buffer
+amgl_vertex_buffer *amgl_vertex_buffer_create(amgl_vertex_buffer_info info);
+void amgl_vertex_buffer_update(amgl_vertex_buffer *vbuffer, amgl_vertex_buffer_info info, size_t offset, amgl_buffer_update_type type);
+amgl_vertex_buffer *amgl_vertex_buffer_retrieve(am_uint32 index);
+void amgl_vertex_buffer_destroy(amgl_vertex_buffer *vertex_buffer);
 
 //Textures
 amgl_texture *amgl_texture_create(amgl_texture_info info);
+void amgl_texture_update(amgl_texture *texture, amgl_texture_info info, amgl_texture_update_type type);
 void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_bool flip);
 void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, size_t size, am_bool flip);
+amgl_texture *amgl_texture_retrieve(am_uint32 index);
 void amgl_texture_destroy(amgl_texture *texture);
 
 //Various OGL
@@ -562,6 +642,8 @@ void amgl_init(); //Create arrays for shaders, vertex b, index b, frame b etc, i
 void amgl_terminate();
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
 void amgl_vsync(am_window *window, am_bool state);
+//void amgl_draw(amgl_vertex_buffer *vertex_buffer, amgl_draw_info info);
+void amgl_draw(amgl_draw_info info);
 
 //----------------------------------------------------------------------------//
 //                                   END GL                                   //
@@ -591,6 +673,7 @@ typedef struct am_engine_info {
 typedef struct amgl_ctx_data {
     am_dyn_array textures; //of amgl_texture
     am_dyn_array shaders; //of amgl_shader
+    am_dyn_array vertex_buffers; //of amgl_vertex_buffer
     //TODO: Rest of object arrays and other user data
 } amgl_ctx_data;
 
@@ -640,7 +723,7 @@ ENGINE
 //----------------------------------------------------------------------------//
 //                             DYNAMIC  ARRAY IMPL                            //
 //----------------------------------------------------------------------------//
-
+//TODO: Fatal flaw for removing textures, am_ids will duplicate
 void am_dyn_array_init(am_dyn_array *array, am_uint32 element_size) {
     array->data = NULL;
     array->length = 0;
@@ -1163,7 +1246,9 @@ void am_platform_linux_event_handler(XEvent *xevent) {
         //REVIEW: Looks good, needs further testing to make sure
         case DestroyNotify: {
             printf("Destroying window %d!\n", am_platform_window_lookup(xevent->xclient.window)->am_id);
-            am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(handle), 1);
+            am_int32 index = am_platform_window_index_lookup(handle);
+            am_dyn_array_remove(&platform->windows, index, 1);
+            for (am_int32 i = index; i < platform->windows.length; i++) --am_dyn_array_data_retrieve(&platform->windows, am_window, i)->am_id;
             am_free(am_platform_window_lookup(xevent->xclient.window));
 
             am_bool check_no_root = true;
@@ -1251,7 +1336,10 @@ LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, W
             break;
         };
         case WM_DESTROY: {
-            am_dyn_array_remove(&platform->windows, am_platform_window_index_lookup(window_handle), 1);
+            //TODO: Check this
+            am_int32 index = am_platform_window_index_lookup(window_handle);
+            am_dyn_array_remove(&platform->windows, index, 1);
+            for (am_int32 i = index; i < platform->windows.length; i++) --am_dyn_array_data_retrieve(&platform->windows, am_window, index)->am_id;
             am_free(am_platform_window_lookup(window_handle));
             
             am_bool check_no_root = true;
@@ -1540,7 +1628,7 @@ am_window *am_platform_window_create(am_window_info window_info) {
     am_window *main_window = am_platform_window_retrieve(0);
     #if defined(AM_LINUX)
     new_window->context = NULL;
-    new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context/*NULL*/, GL_TRUE);
+    new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
     glXMakeCurrent(platform->display, new_window->handle, new_window->context);
     #else
     new_window->hdc = GetDC((HWND)new_window->handle);
@@ -1870,10 +1958,78 @@ void amgl_shader_source_load_from_memory(const void *memory, amgl_shader_source_
     };
 };
 
+amgl_shader *amgl_shader_retrieve(am_uint32 index) {
+    am_engine *engine = am_engine_get_instance();
+    return am_dyn_array_data_retrieve(&engine->ctx_data.shaders, amgl_shader, index);
+};
+
 void amgl_shader_destroy(amgl_shader *shader) {
     am_engine *engine = am_engine_get_instance();
     glDeleteProgram(shader->handle);
-    am_dyn_array_remove(&engine->ctx_data.shaders, shader->am_id, 1);
+    am_int32 index = shader->am_id;
+    am_dyn_array_remove(&engine->ctx_data.shaders, index, 1);
+    for (am_int32 i = index; i < engine->ctx_data.shaders.length; i++) --am_dyn_array_data_retrieve(&engine->ctx_data.shaders, amgl_shader, i)->am_id;
+};
+
+amgl_vertex_buffer *amgl_vertex_buffer_create(amgl_vertex_buffer_info info) {
+    am_engine *engine = am_engine_get_instance();
+
+    amgl_vertex_buffer *v_buffer = (amgl_vertex_buffer*)am_malloc(sizeof(amgl_vertex_buffer));
+    if (v_buffer == NULL) {
+        printf("[FAIL] Could not allocate memory for vertex buffer!\n");
+        return NULL;     
+    };
+    v_buffer->am_id = engine->ctx_data.vertex_buffers.length;
+    am_dyn_array_push(&engine->ctx_data.vertex_buffers, v_buffer, 1);
+    am_int32 dyn_id = v_buffer->am_id;
+    am_free(v_buffer);
+    v_buffer = am_dyn_array_data_retrieve(&engine->ctx_data.vertex_buffers, amgl_vertex_buffer, dyn_id);
+
+    am_int32 usage = 0;
+    switch (info.usage) {
+        case AMGL_BUFFER_USAGE_STATIC: usage = GL_STATIC_DRAW; break;
+        case AMGL_BUFFER_USAGE_STREAM: usage = GL_STREAM_DRAW; break;
+        case AMGL_BUFFER_USAGE_DYNAMIC: usage = GL_DYNAMIC_DRAW; break;
+    };
+
+    glGenBuffers(1, &v_buffer->handle);
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer->handle);
+    glBufferData(GL_ARRAY_BUFFER, info.size, info.data, usage);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    
+    v_buffer->info = info;
+    return v_buffer;
+};
+
+//TODO: Needs testing
+void amgl_vertex_buffer_update(amgl_vertex_buffer *vbuffer, amgl_vertex_buffer_info info, size_t offset, amgl_buffer_update_type type) {
+    glBindBuffer(GL_ARRAY_BUFFER, vbuffer->handle);
+    switch (type) {
+        case AMGL_BUFFER_UPDATE_SUBDATA: {
+            glBufferSubData(GL_ARRAY_BUFFER, offset, info.size, info.data);
+            break;
+        };
+        case AMGL_BUFFER_UPDATE_RECREATE: {
+            glBufferData(GL_ARRAY_BUFFER, info.size, info.data, info.usage);
+            break;
+        };
+    };
+    vbuffer->info = info;
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+};
+
+amgl_vertex_buffer *amgl_vertex_buffer_retrieve(am_uint32 index) {
+    am_engine *engine = am_engine_get_instance();
+    return am_dyn_array_data_retrieve(&engine->ctx_data.vertex_buffers, amgl_vertex_buffer, index);
+};
+
+void amgl_vertex_buffer_destroy(amgl_vertex_buffer *vertex_buffer) {
+    am_engine *engine = am_engine_get_instance();
+    glDeleteBuffers(1, &vertex_buffer->handle);
+    am_int32 index = vertex_buffer->am_id;
+    am_dyn_array_remove(&engine->ctx_data.vertex_buffers, index, 1);
+    for (am_int32 i = index; i < engine->ctx_data.vertex_buffers.length; i++) --am_dyn_array_data_retrieve(&engine->ctx_data.vertex_buffers, amgl_vertex_buffer, i)->am_id;
 };
 
 amgl_texture *amgl_texture_create(amgl_texture_info info) {
@@ -1937,6 +2093,29 @@ amgl_texture *amgl_texture_create(amgl_texture_info info) {
     return texture;
 };
 
+void amgl_texture_update(amgl_texture *texture, amgl_texture_info info, amgl_texture_update_type type) {
+    glBindTexture(GL_TEXTURE_2D, texture->handle);
+    switch (type) {
+        case AMGL_TEXTURE_UPDATE_SUBDATA: {
+            //TODO: Have to update mipmaps as well, will implement later
+            break;
+        };
+        case AMGL_TEXTURE_UPDATE_RECREATE: {
+            am_engine *engine = am_engine_get_instance();
+            am_int32 dyn_id = texture->am_id;
+            glDeleteTextures(1, &texture->handle);
+            amgl_texture *temp = amgl_texture_create(info);
+            memmove((void*)texture, (void*)temp, sizeof(amgl_texture));
+            am_dyn_array_pop(&engine->ctx_data.textures, 1);
+            texture->am_id = dyn_id;
+            texture->info = info;
+            break;
+        };
+    };
+    
+    glBindTexture(GL_TEXTURE_2D, 0);
+};
+
 void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_bool flip) {
     //STORE IMAGE INTO MEMORY
     FILE *file = fopen(path, "rb");
@@ -1975,10 +2154,17 @@ void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, 
     };
 };
 
+amgl_texture *amgl_texture_retrieve(am_uint32 index){ 
+    am_engine *engine = am_engine_get_instance();
+    return am_dyn_array_data_retrieve(&engine->ctx_data.textures, amgl_texture, index);
+};
+
 void amgl_texture_destroy(amgl_texture *texture) {
     am_engine *engine = am_engine_get_instance();
     glDeleteTextures(1, &texture->handle);
-    am_dyn_array_remove(&engine->ctx_data.textures, texture->am_id, 1);
+    am_int32 index = texture->am_id;
+    am_dyn_array_remove(&engine->ctx_data.textures, index, 1);
+    for (am_int32 i = index; i < engine->ctx_data.textures.length; i++) --am_dyn_array_data_retrieve(&engine->ctx_data.textures, amgl_texture, i)->am_id;
 };
 
 void amgl_init() {
@@ -2010,6 +2196,7 @@ void amgl_init() {
     glUniform1i = (PFNGLUNIFORM1IPROC)amgl_get_proc_address("glUniform1i");
     glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)amgl_get_proc_address("glGetUniformLocation");
     glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)amgl_get_proc_address("glGenerateMipmap");
+    glBufferSubData = (PFNGLBUFFERSUBDATAPROC)amgl_get_proc_address("glBufferSubData");
 };
 
 //TODO: Windows impl if necessary
@@ -2035,6 +2222,37 @@ void amgl_vsync(am_window *window, am_bool state) {
     #endif
 };
 
+//TODO: temporary form and needs more polish
+//TODO: Not sure if supporting multiple primitives is worth it
+void amgl_draw(amgl_draw_info info) {
+    am_engine *engine = am_engine_get_instance();
+    glBindBuffer(GL_ARRAY_BUFFER, info.vertex_buffer->handle);
+
+    for (am_int32 i = 0; i < info.vertex_buffer->info.layout.num; i++) {
+        glEnableVertexAttribArray(i);
+        size_t stride = info.vertex_buffer->info.layout.attributes[i].stride;
+        size_t offset = info.vertex_buffer->info.layout.attributes[i].offset;
+        switch (info.vertex_buffer->info.layout.attributes[i].format) {
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4: glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3: glVertexAttribPointer(i, 3, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2: glVertexAttribPointer(i, 2, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT: glVertexAttribPointer(i, 1, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT4: glVertexAttribPointer(i, 4, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT3: glVertexAttribPointer(i, 3, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT2: glVertexAttribPointer(i, 2, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT: glVertexAttribPointer(i, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE4: glVertexAttribPointer(i, 4, GL_UNSIGNED_BYTE, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE3: glVertexAttribPointer(i, 3, GL_UNSIGNED_BYTE, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE2: glVertexAttribPointer(i, 2, GL_UNSIGNED_BYTE, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE: glVertexAttribPointer(i, 1, GL_UNSIGNED_BYTE, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            default: break;
+        };
+    };
+    glDrawArrays(GL_TRIANGLES, info.start, info.count);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+};
+
 
 //----------------------------------------------------------------------------//
 //                                 END GL IMPL                                //
@@ -2057,6 +2275,7 @@ void am_engine_create(am_engine_info engine_info){
     //TODO: Init all ctx_data arrays
     am_dyn_array_init(&engine->ctx_data.textures, sizeof(amgl_texture));
     am_dyn_array_init(&engine->ctx_data.shaders, sizeof(amgl_shader));
+    am_dyn_array_init(&engine->ctx_data.vertex_buffers, sizeof(amgl_vertex_buffer));
 
     am_window_info main = {
         .height = engine->info.initial_height,
@@ -2072,7 +2291,7 @@ void am_engine_create(am_engine_info engine_info){
     //XSetWindowBackground(am_engine_get_subsystem(platform)->display, main_wind->handle, 0x0000FF);
     #endif
     amgl_init();
-    amgl_set_viewport(0,0, (am_int32)main.width-10, (am_int32)main.height-10);
+    amgl_set_viewport(0,0, (am_int32)main.width, (am_int32)main.height);
     //HACK: Temporary
     engine->info.is_running = true;
 };
@@ -2085,6 +2304,8 @@ void am_engine_terminate(){
     am_dyn_array_cleanup(&engine->ctx_data.textures);
     for (am_int32 i = 0; i < engine->ctx_data.shaders.length; i++) amgl_shader_destroy(am_dyn_array_data_retrieve(&engine->ctx_data.shaders, amgl_shader, i));
     am_dyn_array_cleanup(&engine->ctx_data.shaders);
+    for (am_int32 i = 0; i < engine->ctx_data.vertex_buffers.length; i++) amgl_vertex_buffer_destroy(am_dyn_array_data_retrieve(&engine->ctx_data.vertex_buffers, amgl_vertex_buffer, i));
+    am_dyn_array_cleanup(&engine->ctx_data.vertex_buffers);
 
     amgl_terminate();
     //HACK: Temporary
@@ -2100,23 +2321,14 @@ int main() {
     am_engine_info eng_inf = {
     .initial_title = "Main",
     .initial_fullscreen = false,
-    .initial_width = 500,
+    .vsync_enabled = true,
+    .initial_width = 800,
     .initial_height = 500,
     .initial_x = 900,
     .initial_y = 900
     };
     am_engine_create(eng_inf);
     
-    am_window_info childw = {
-        .height = 400,
-        .width = 400,
-        .x = 70,
-        .y = 70,
-        .parent = am_platform_window_retrieve(0)->handle,
-        .is_fullscreen = false
-    };
-    am_window *ccc = am_platform_window_create(childw);
-    //XSetWindowBackground(am_engine_get_subsystem(platform)->display, ccc->handle, 0xFF0000);
     am_platform *platform = am_engine_get_subsystem(platform);
     am_bool run = true;
     am_uint64 t = 0;
@@ -2126,7 +2338,19 @@ int main() {
     #else
     wglMakeCurrent(am_platform_window_retrieve(0)->hdc, am_platform_window_retrieve(0)->context);
     #endif
-    //amgl_set_viewport(0,0,400,400);
+
+    //REVIEW: Windows limitation: windows must be created before any opengl objects such as textures
+    am_window_info childwin_info = {
+        .height = 100,
+        .width = 100,
+        .x = 50,
+        .y = 60,
+        .is_fullscreen = false,
+        .parent = am_platform_window_retrieve(0)->handle,
+        .title = "Child"
+    };
+    am_window *childwin = am_platform_window_create(childwin_info);
+    
     //Test texture loading
     amgl_texture_info texinfo = {
         .format = GL_RGBA,
@@ -2137,7 +2361,6 @@ int main() {
     };
     amgl_texture_load_from_file("color_test.png", &texinfo, true);
     amgl_texture *test = amgl_texture_create(texinfo);
-
     
     //Test shader source loading
     amgl_shader_source_info shaderv_src = {
@@ -2151,24 +2374,76 @@ int main() {
     amgl_shader_load_from_file("test_f.glsl", &shaderf_src);
 
     //Create shader info struct & shader
-    amgl_shader_source_info srcs[2];
-    srcs[0] = shaderv_src;
-    srcs[1] = shaderf_src;
-    amgl_shader_info test_shader= {
-        .num = 2,
-        .sources = srcs
-    };
-    amgl_shader *tt = amgl_shader_create(test_shader);
+    amgl_shader *tt = amgl_shader_create((amgl_shader_info){
+        .num = 2, 
+        .sources = (amgl_shader_source_info[2]){
+            shaderv_src, 
+            shaderf_src
+        }
+    });
     printf("SHADER COMPILED\n");
 
+    amgl_vertex_buffer *vbuffer = amgl_vertex_buffer_create((amgl_vertex_buffer_info) {
+        .data = (float[]) {
+            -0.5f, -0.5f, 0.0f,
+            0.5f, -0.5f, 0.0f,
+            0.0f,  0.5f, 0.0f
+        },
+        .size = 9*sizeof(float),
+        .usage = AMGL_BUFFER_USAGE_STATIC,
+        .layout = (amgl_vertex_buffer_layout){
+            .attributes = &(amgl_vertex_buffer_attribute) {
+                .offset = 0,
+                .stride = 3*sizeof(float),
+                .format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3
+            },
+            .num = 1
+        }
+    });
+
+    amgl_vertex_buffer *vbuffer2 = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = (float[]) {
+            -0.0f, -0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+            0.9f, -0.9f, 0.0f, 0.0f, 0.0f, 0.0f,
+            0.0f,  0.9f, 0.0f, 0.0f, 0.0f, 0.0f
+        },
+        .size = 18*sizeof(float),
+        .usage = AMGL_BUFFER_USAGE_STATIC,
+        .layout = (amgl_vertex_buffer_layout) {
+            .num  = 2,
+            .attributes = (amgl_vertex_buffer_attribute[]) {
+                (amgl_vertex_buffer_attribute) {
+                    .offset = 0,
+                    .stride = 6*sizeof(float),
+                    .format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3 
+                },
+                (amgl_vertex_buffer_attribute) {
+                    .offset = 3*sizeof(float),
+                    .stride = 6*sizeof(float),
+                    .format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3
+                }
+            }
+        }
+    });
+
+    //amgl_texture_load_from_file("teo.png", &texinfo, true);
+    //amgl_texture_update(test, texinfo, AMGL_TEXTURE_UPDATE_RECREATE);
     while(run) {
-        t++;/*
+        t++;
+        #if defined(AM_LINUX)
         if (t % 2 == 1) glXMakeCurrent(platform->display, am_platform_window_retrieve(0)->handle, am_platform_window_retrieve(0)->context);
-        else glXMakeCurrent(platform->display, am_platform_window_retrieve(1)->handle, am_platform_window_retrieve(1)->context);*/
+        else glXMakeCurrent(platform->display, am_platform_window_retrieve(1)->handle, am_platform_window_retrieve(1)->context);
+        #else
+        if (t % 2 == 1) wglMakeCurrent(am_platform_window_retrieve(0)->hdc, am_platform_window_retrieve(0)->context); 
+        else wglMakeCurrent(am_platform_window_retrieve(1)->hdc, am_platform_window_retrieve(1)->context); 
+        #endif
+        printf("glerraftermake %d\n", glGetError());
         //DOES WORK
+        
         glClearColor(1,1,0,0);
         glClear(GL_COLOR_BUFFER_BIT);
-        glBindTexture(GL_TEXTURE_2D, am_dyn_array_data_retrieve(&am_engine_get_instance()->ctx_data.textures, amgl_texture, 0)->handle);
+        glBindTexture(GL_TEXTURE_2D, amgl_texture_retrieve(0)->handle);
+/*
         glBegin(GL_TRIANGLES);
         //glColor3f(0.1, 0.2, 0.3);
         glTexCoord2f(0, 0); glVertex3f( -1,  0, -1 );
@@ -2178,16 +2453,35 @@ int main() {
         glTexCoord2f(1, 0); glVertex3f(  1,  0, -1 );
         glTexCoord2f(0, 1); glVertex3f( -1,  1, -1 );
         glTexCoord2f(1, 1); glVertex3f(  1,  1, -1 );
-        glEnd();
+        glEnd();*/
+
+        glUseProgram(1);
+        amgl_draw((amgl_draw_info) {
+            .start = 0,
+            .count = 3,
+            .vertex_buffer = amgl_vertex_buffer_retrieve(0)
+        });
+        amgl_draw((amgl_draw_info) {
+            .start = 0,
+            .count = 3,
+            .vertex_buffer = amgl_vertex_buffer_retrieve(1)
+        });
         glFlush();
+
+        /*
         #if defined(AM_LINUX)
         glXSwapBuffers(platform->display, am_platform_window_retrieve(0)->handle);
         #else
         SwapBuffers(am_platform_window_retrieve(0)->hdc);
+        #endif*/
+        #if defined(AM_LINUX)
+        if (t % 2 == 1) glXSwapBuffers(platform->display, am_platform_window_retrieve(0)->handle);
+        else glXSwapBuffers(platform->display, am_platform_window_retrieve(1)->handle);
+        #else
+        if (t % 2 == 1) SwapBuffers(am_platform_window_retrieve(0)->hdc);
+        else SwapBuffers(am_platform_window_retrieve(1)->hdc);
         #endif
-        //if (t % 2 == 1) glXSwapBuffers(platform->display, am_platform_window_retrieve(0)->handle);
-        //else glXSwapBuffers(platform->display, am_platform_window_retrieve(1)->handle);
-        
+
         am_platform_update(am_engine_get_subsystem(platform));
         if (am_platform_key_released(AM_KEYCODE_X)) run = false;
     };
@@ -2195,3 +2489,6 @@ int main() {
     getchar();
     return 0;
 };
+
+/*//REVIEW: for i := 1 to vertex_buffer_count glDrawElements; Start simple and make it more efficient if need be later on
+//REVIEW: ONE DRAW CALL PER BUFFER*/
