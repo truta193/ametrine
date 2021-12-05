@@ -1,4 +1,4 @@
-//13-nov-2021 1:03:10PM
+//TODO: Could change int num_* property of some structs to size_t size so it matches with the other ones
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
@@ -74,9 +74,9 @@ am_bool temp_check = true;
 //REVIEW: OpenGL functions
 
 #if defined(AM_LINUX)
-typedef void (_CALL PFNGLXSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
+typedef void (_CALL PFNGLSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
 #else
-typedef BOOL (_CALL PFNWGLSWAPINTERVALEXTPROC) (int interval);
+typedef BOOL (_CALL PFNGLSWAPINTERVALEXTPROC) (int interval);
 #endif
 typedef GLuint (_CALL PFNGLCREATESHADERPROC) (GLenum type);
 typedef void (_CALL PFNGLSHADERSOURCEPROC) (GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length);
@@ -115,12 +115,7 @@ typedef void (_CALL PFNGLUNIFORM1FVPROC) (GLint location, GLsizei count, const G
 typedef void (_CALL PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
 typedef void (_CALL PFNGLGETUNIFORMFVPROC) (GLuint program, GLint location, GLfloat *params);
 
-
-#if defined(AM_LINUX)
-PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT = NULL;
-#else 
-PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
-#endif
+PFNGLSWAPINTERVALEXTPROC glSwapInterval = NULL;
 PFNGLCREATESHADERPROC glCreateShader = NULL;
 PFNGLSHADERSOURCEPROC glShaderSource = NULL;
 PFNGLCOMPILESHADERPROC glCompileShader = NULL;
@@ -408,7 +403,6 @@ typedef struct am_window_info {
     am_uint32 height; 
     am_uint32 x;
     am_uint32 y;
-    //am_vec2i window_position; 
     am_bool is_fullscreen; //Useless for child windows
 } am_window_info;
 
@@ -474,10 +468,11 @@ am_mouse_map am_platform_translate_button(am_uint32 button);
 am_platform *am_platform_create();
 void am_platform_poll_events();
 #if defined(AM_WINDOWS) 
-LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam);
+LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam);
 #else
-void am_platform_linux_event_handler(XEvent *xevent);
+void am_platform_event_handler(XEvent *xevent);
 #endif
+//REVIEW: Passing pointer argument is probably unnecessary, only one platform instance should exist
 void am_platform_update(am_platform *platform);
 void am_platform_terminate(am_platform *platform);
 
@@ -819,7 +814,7 @@ typedef struct am_engine {
     am_engine_info info;
     am_platform *platform;
     amgl_ctx_data ctx_data;
-    //TODO: Change cache to scene
+    //IDEA: A scene scructure, maybe scenegraph?
     //am_audio audio; TODO: Implement
     //am_pfngl pfngl; TODO: Implement
 } am_engine;
@@ -849,52 +844,13 @@ char* am_util_read_file(const char *path);
 //----------------------------------------------------------------------------//
 //                                  END UTIL                                  //
 //----------------------------------------------------------------------------//
-/*
 
-//FIX 
-//FIX 
-//FIX 
-//FIX 
-// REVIEW
-//TODO: Remove vertex_buffer and index_buffer from amgl_draw_info and instead bind them here
-amgl_apply_bindings(amgl_bind_info info);
-amgl_bind_info {
-    framebuffer (with subelements)
-    uniform (with subelements)
-    texture (with subelements)
-    vertex 
-    index
-}
-
-amgl_clear_bindings(FLAGS)
-    eg  framebuffer 00000001
-        uniform     00000010
-        texture     00000100
-    etc
-
-ENGINE
-   |
-   - PLATFORM
-   |    |
-   |    - INPUT
-   |    - TIME
-   |    - WINDOW ARRAY
-   |    - CALLBACKS
-   |
-   - AUDIO
-   |
-   - PFNGL* //Maybe not needed here
-   |   |
-   |   - Pointers to all OpenGL functions needed
-   |
-   - USER DATA POINTER
-*/
 
 //----------------------------------------------------------------------------//
 //                             DYNAMIC  ARRAY IMPL                            //
 //----------------------------------------------------------------------------//
 
-//Initialized with TA_EMPTY_START_SLOTS empty slots, cuts down a few reallocs and doesn't occupy much memory
+//Initialized with AM_DYN_ARRAY_EMPTY_START_SLOTS empty slots, cuts down a few reallocs and doesn't occupy much memory
 void am_dyn_array_init(am_dyn_array *array, size_t element_size) {
     array->data = malloc(AM_DYN_ARRAY_EMPTY_START_SLOTS * sizeof(element_size));
     assert(array->data);
@@ -1363,7 +1319,7 @@ am_platform *am_platform_create() {
     //REVIEW: Might not be necessary, come back after OpenGL is implemented
 	window_class.style = CS_HREDRAW | CS_VREDRAW;
 	window_class.hInstance = GetModuleHandle(NULL);
-	window_class.lpfnWndProc = am_platform_win32_event_handler;
+	window_class.lpfnWndProc = am_platform_event_handler;
 	window_class.cbClsExtra = 0;
 	window_class.cbWndExtra = 0;
 	window_class.lpszMenuName = NULL;
@@ -1410,7 +1366,7 @@ void am_platform_poll_events() {
     XEvent xevent;
     while (XPending(platform->display)) {
         XNextEvent(platform->display, &xevent);
-        am_platform_linux_event_handler(&xevent);  
+        am_platform_event_handler(&xevent);  
     };
     #else
     MSG msg;
@@ -1422,7 +1378,7 @@ void am_platform_poll_events() {
 };
 
 #if defined(AM_LINUX) 
-void am_platform_linux_event_handler(XEvent *xevent) {
+void am_platform_event_handler(XEvent *xevent) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_uint64 handle = xevent->xany.window;
     am_int32 id = am_platform_window_lookup_by_handle(handle)->am_id;
@@ -1499,7 +1455,7 @@ void am_platform_linux_event_handler(XEvent *xevent) {
     };
 };
 #else
-LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam) {
+LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_uint64 window_handle = (am_uint64) handle;
     am_int32 id = am_platform_window_lookup_by_handle(handle)->am_id;
@@ -1586,7 +1542,6 @@ LRESULT CALLBACK am_platform_win32_event_handler(HWND handle, am_uint32 event, W
 };
 #endif
 
-//REVIEW: Passing pointer argument is probably unnecessary, only one platform instance should exist
 void am_platform_update(am_platform *platform) {
     memcpy(platform->input.prev_mouse_map, platform->input.mouse_map, sizeof(platform->input.mouse_map));
     memcpy(platform->input.prev_keyboard_map, platform->input.keyboard_map, sizeof(platform->input.keyboard_map));
@@ -1883,9 +1838,9 @@ am_int32 am_platform_window_create(am_window_info window_info) {
     wglShareLists(new_window->context, main_window->context);
     #endif
 
-    //TODO: VSYNC REMOVE COMMENT
-    //amgl_vsync(new_window, am_engine_get_instance()->info.vsync_enabled);
-    //TODO: REVIEW THIS
+    //REVIEW: Check if this isn't broken
+    amgl_vsync(new_window, am_engine_get_instance()->info.vsync_enabled);
+
     #if defined(AM_LINUX)
         glXMakeCurrent(platform->display, 0, 0);
     #else
@@ -2660,11 +2615,11 @@ void amgl_vsync(am_window *window, am_bool state) {
     //Have to load SwapInterval here because this is called for each window on creation, so before amgl_init()
     #if defined(AM_LINUX)
     am_platform *platform = am_engine_get_subsystem(platform);
-    if (glXSwapIntervalEXT == NULL) glXSwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
-        glXSwapIntervalEXT(platform->display, window->handle, state);
+    if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
+        glSwapInterval(platform->display, window->handle, state);
     #else
-        if (wglSwapIntervalEXT == NULL) wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
-        wglSwapIntervalEXT(state == true ? 1:0);
+        if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
+        glSwapInterval(state == true ? 1:0);
     #endif
 };
 
@@ -2858,7 +2813,7 @@ int main() {
         .wrap_s = GL_REPEAT,
         .wrap_t = GL_REPEAT
     };
-    amgl_texture_load_from_file("teo.png", &tex_info, true);
+    amgl_texture_load_from_file("pics/t3.png", &tex_info, true);
     am_int32 tex1_id = amgl_texture_create(tex_info);
 
 
