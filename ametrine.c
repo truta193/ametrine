@@ -202,7 +202,6 @@ void am_packed_array_clear(am_packed_array *pa);
 am_int32 am_packed_array_add(am_packed_array *pa, void* element);
 void am_packed_array_erase(am_packed_array *pa, am_int32 id);
 
-
 #define am_packed_array_get_val(array_ptr, index, type) (*(type*)((array_ptr)->elements.data + (array_ptr)->elements.element_size * (index)))
 #define am_packed_array_get_idx(array_ptr, id, type) (*(type*)((array_ptr)->indices.data + (array_ptr)->indices.element_size * (id)))
 #define am_packed_array_get_ptr(array_ptr, index, type) ((type*)((array_ptr)->elements.data + (array_ptr)->elements.element_size * (index)))
@@ -713,6 +712,48 @@ typedef struct amgl_draw_info {
     am_uint32 count;
 } amgl_draw_info;
 
+typedef struct amgl_render_pass_info {
+    am_int32 framebuffer_id;
+    am_int32 *color_attachments;
+    size_t color_size; //In bytes
+    am_int32 stencil_attachment;
+    am_int32 depth_attachment;
+} amgl_render_pass_info;
+
+typedef struct amgl_render_pass {
+    am_int32 am_id;
+    amgl_render_pass_info info;
+} amgl_render_pass;
+
+//TODO
+/*
+Renderpass:
+    -framebuffer
+    -color attachments
+    -size of ^
+    -stencil attachment
+    -depth attachment
+----------------------------------
+Raster:
+    -face_culling
+    -winding_order
+    -primitive
+    -shader
+    -index_buffer_element_size (?)
+
+Layout:
+    -vertex_attrib_info
+    -sizeof ^
+
+Pipeline:
+    -blend state
+    -depth
+    -stencil
+    -layout
+    -raster
+----------------------------------
+*/
+
 //IDEA: Lookup by handle could be helpful?
 
 //Shaders
@@ -772,7 +813,12 @@ void amgl_init(); //Create arrays for shaders, vertex b, index b, frame b etc, i
 void amgl_terminate();
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
 void amgl_vsync(am_window *window, am_bool state);
-void amgl_draw(amgl_draw_info info);
+
+
+//Renderer
+void amgl_render_pass_begin(am_int32 render_pass_id);
+void amgl_render_pass_end();
+
 
 //----------------------------------------------------------------------------//
 //                                   END GL                                   //
