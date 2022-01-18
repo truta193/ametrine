@@ -99,6 +99,7 @@ typedef void (_CALL PFNGLGENVERTEXARRAYSPROC) (GLsizei n, GLuint *arrays);
 typedef void (_CALL PFNGLDELETEVERTEXARRAYSPROC) (GLsizei n, const GLuint *arrays);
 typedef void (_CALL PFNGLBINDVERTEXARRAYPROC) (GLuint array);
 typedef void (_CALL PFNGLVERTEXATTRIBPOINTERPROC) (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+typedef void (_CALL PFNGLVERTEXATTRIBIPOINTERPROC) (GLuint index, GLint size, GLenum type, GLsizei stride, const void * pointer);
 typedef void (_CALL PFNGLENABLEVERTEXATTRIBARRAYPROC) (GLuint index);
 typedef GLint (_CALL PFNGLGETATTRIBLOCATIONPROC) (GLuint program, const GLchar *name);
 typedef void (_CALL PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
@@ -113,6 +114,7 @@ typedef void (_CALL PFNGLFRAMEBUFFERTEXTURE2DPROC) (GLenum target, GLenum attach
 typedef void (_CALL PFNGLUNIFORM1FVPROC) (GLint location, GLsizei count, const GLfloat *value);
 typedef void (_CALL PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
 typedef void (_CALL PFNGLGETUNIFORMFVPROC) (GLuint program, GLint location, GLfloat *params);
+typedef void (_CALL PFNGLBINDIMAGETEXTUREPROC) (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
 
 PFNGLSWAPINTERVALEXTPROC glSwapInterval = NULL;
 PFNGLCREATESHADERPROC glCreateShader = NULL;
@@ -137,6 +139,7 @@ PFNGLGENVERTEXARRAYSPROC glGenVertexArrays = NULL;
 PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays = NULL;
 PFNGLBINDVERTEXARRAYPROC glBindVertexArray = NULL;
 PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer = NULL;
+PFNGLVERTEXATTRIBIPOINTERPROC glVertexAttribIPointer = NULL;
 PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray = NULL;
 PFNGLGETATTRIBLOCATIONPROC glGetAttribLocation = NULL;
 PFNGLUNIFORM1IPROC glUniform1i = NULL;
@@ -150,7 +153,7 @@ PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D = NULL;
 PFNGLUNIFORM1FVPROC glUniform1fv = NULL;
 PFNGLUNIFORM1FPROC glUniform1f = NULL;
 PFNGLGETUNIFORMFVPROC glGetUniformfv = NULL;
-
+PFNGLBINDIMAGETEXTUREPROC glBindImageTexture = NULL;
 
 //----------------------------------------------------------------------------//
 //                             END TYPES AND DEFS                             //
@@ -588,6 +591,7 @@ typedef struct amgl_vertex_buffer_attribute {
     size_t stride;
     size_t offset;
     amgl_vertex_buffer_attribute_format format;
+    am_uint32 buffer_index; 
 } amgl_vertex_buffer_attribute;
 
 typedef struct amgl_vertex_buffer_layout {
@@ -599,7 +603,6 @@ typedef struct amgl_vertex_buffer_info {
     void *data;
     size_t size;
     amgl_buffer_usage usage;
-    amgl_vertex_buffer_layout layout;
 } amgl_vertex_buffer_info;
 
 typedef struct amgl_vertex_buffer {
@@ -640,7 +643,7 @@ typedef struct amgl_uniform_info {
     void* data;
     const char* name;
     size_t size;
-    GLenum type;
+    amgl_uniform_type type;
     am_uint32 shader_id;
     //am_uint32 texture_slot; //NOTE: Ignore for now
 } amgl_uniform_info;
@@ -755,6 +758,60 @@ typedef struct amgl_render_pass {
     amgl_render_pass_info info;
 } amgl_render_pass;
 
+typedef struct amgl_vertex_buffer_bind_info {
+    am_int32 vertex_buffer_id;
+    //size_t offset;
+} amgl_vertex_buffer_bind_info;
+
+typedef struct amgl_index_buffer_bind_info {
+    am_int32 index_buffer_id;
+} amgl_index_buffer_bind_info;
+
+typedef struct amgl_texture_bind_info {
+    am_int32 texture_id;
+    am_uint32 binding;
+} amgl_texture_bind_info;
+
+typedef struct amgl_uniform_bind_info {
+    am_int32 uniform_id;
+    void *data;
+    am_uint32 binding;
+} amgl_uniform_bind_info;
+
+typedef struct amgl_bindings_info {
+    struct {
+        amgl_vertex_buffer_bind_info *info;
+        size_t size;
+    } vertex_buffers;
+
+    struct {
+        amgl_index_buffer_bind_info *info;
+        size_t size;
+    } index_buffers;
+
+    struct {
+        amgl_uniform_bind_info *info;
+        size_t size;
+    } uniforms;
+
+    struct {
+        amgl_texture_bind_info *info;
+        size_t size;
+    } textures;
+} amgl_bindings_info;
+
+typedef struct amgl_frame_cache {
+    amgl_index_buffer index_buffer;
+    size_t index_element_size;
+    am_dyn_array(amgl_vertex_buffer) vertex_buffers;
+    amgl_pipeline pipeline;
+} amgl_frame_cache;
+
+typedef struct amgl_draw_info {
+    am_uint32 start;
+    am_uint32 count;
+} amgl_draw_info;
+
 //Shaders
 am_int32 amgl_shader_create(amgl_shader_info info);
 void amgl_shader_destroy(am_int32 id);
@@ -803,6 +860,9 @@ void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
 void amgl_vsync(am_window *window, am_bool state);
 void amgl_start_render_pass(am_int32 render_pass_id);
 void amgl_end_render_pass(am_int32 render_pass_id);
+void amgl_bind_pipeline(am_int32 pipeline_id);
+void amgl_set_bindings(amgl_bindings_info *info);
+void amgl_draw(amgl_draw_info *info);
 
 //----------------------------------------------------------------------------//
 //                                   END GL                                   //
@@ -837,6 +897,7 @@ typedef struct amgl_ctx_data {
     am_packed_array(amgl_uniform) uniforms;
     am_packed_array(amgl_render_pass) render_passes;
     am_packed_array(amgl_pipeline) pipelines;
+    amgl_frame_cache frame_cache;
     //TODO: Rest of object arrays and other user data
 } amgl_ctx_data;
 
@@ -914,9 +975,9 @@ void am_dyn_array_replace(void *array, void *values, size_t offset, size_t size)
 
 void am_dyn_array_clear(void *array) {
     am_dyn_array_header *header = am_dyn_array_get_header(array);
-    header->capacity = 0;
+    //header->capacity = AM_DYN_ARRAY_EMPTY_START_SLOTS;
     header->size = 0;
-    am_free(header);
+    //am_free(header);
 };
 
 //----------------------------------------------------------------------------//
@@ -1377,7 +1438,6 @@ void am_platform_event_handler(XEvent *xevent) {
     for (am_uint32 i = 0; i < am_packed_array_get_count(platform->windows); i++)
         if (platform->windows->elements[i].handle == handle) 
             id = platform->windows->elements[i].id;
-    printf("id: %d\n", id);
     switch (xevent->type) {
         case KeyPress: {
             am_key_map key = platform->input.keycodes[xevent->xkey.keycode];
@@ -2086,7 +2146,6 @@ am_int32 amgl_shader_create(amgl_shader_info info) {
 
 void amgl_shader_destroy(am_int32 id) {
     am_engine *engine = am_engine_get_instance();
-    am_platform *platform = am_engine_get_subsystem(platform);
     amgl_shader *shader = am_packed_array_get_ptr(engine->ctx_data.shaders, id);
     glDeleteProgram(shader->handle);
     am_packed_array_erase(engine->ctx_data.shaders, id);
@@ -2197,6 +2256,7 @@ am_int32 amgl_uniform_create(amgl_uniform_info info) {
         return -1;
     };
     uniform->info = info;
+    uniform->location = 0xFFFFFFFF;
     uniform->id = engine->ctx_data.uniforms->next_id;
     am_int32 ret_id = am_packed_array_add(engine->ctx_data.uniforms, *uniform);
     am_free(uniform);
@@ -2425,7 +2485,6 @@ am_int32 amgl_render_pass_create(amgl_render_pass_info info) {
 
 void amgl_render_pass_destroy(am_int32 id) {
     am_engine *engine = am_engine_get_instance();
-    amgl_render_pass *render_pass = am_packed_array_get_ptr(engine->ctx_data.render_passes, id);
     am_packed_array_erase(engine->ctx_data.render_passes, id);
 };
 
@@ -2446,7 +2505,6 @@ am_int32 amgl_pipeline_create(amgl_pipeline_info info) {
 
 void amgl_pipeline_destroy(am_int32 id) {
     am_engine *engine = am_engine_get_instance();
-    amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, id);
     am_packed_array_erase(engine->ctx_data.pipelines, id);  
 };
 
@@ -2475,6 +2533,7 @@ void amgl_init() {
     glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)amgl_get_proc_address("glDeleteVertexArrays");
     glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)amgl_get_proc_address("glBindVertexArray");
     glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)amgl_get_proc_address("glVertexAttribPointer");
+    glVertexAttribIPointer = (PFNGLVERTEXATTRIBIPOINTERPROC)amgl_get_proc_address("glVertexAttribIPointer");
     glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)amgl_get_proc_address("glEnableVertexAttribArray");
     glGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC)amgl_get_proc_address("glGetAttribLocation");
     glUniform1i = (PFNGLUNIFORM1IPROC)amgl_get_proc_address("glUniform1i");
@@ -2488,11 +2547,30 @@ void amgl_init() {
     glUniform1fv = (PFNGLUNIFORM1FVPROC)amgl_get_proc_address("glUniform1fv");
     glUniform1f = (PFNGLUNIFORM1FPROC)amgl_get_proc_address("glUniform1f");
     glGetUniformfv = (PFNGLGETUNIFORMFVPROC)amgl_get_proc_address("glGetUniformfv");
+    glBindImageTexture = (PFNGLBINDIMAGETEXTUREPROC)amgl_get_proc_address("glBindImageTexture");
 
     //NOTE: Adding default framebuffer since it is a framebuffer
     //REVIEW: Is this a good choice?
     am_engine *engine = am_engine_get_instance();
-    am_packed_array_add(engine->ctx_data.frame_buffers, (amgl_frame_buffer){.handle = 0});
+    /*typedef struct amgl_frame_buffer_info {
+    am_uint32 width;
+    am_uint32 height;
+} amgl_frame_buffer_info;
+
+typedef struct amgl_frame_buffer {
+    am_int32 id;
+    am_uint32 handle;
+    amgl_frame_buffer_info info;
+} amgl_frame_buffer;*/
+    amgl_frame_buffer base_fbo = {
+        .handle = 0,
+        .id = 0,
+        .info = {
+            .height = engine->info.initial_height,
+            .width = engine->info.initial_width
+        }
+    };
+    am_packed_array_add(engine->ctx_data.frame_buffers, base_fbo);
 };
 
 //TODO: Windows impl if necessary
@@ -2534,8 +2612,14 @@ void amgl_start_render_pass(am_int32 render_pass_id) {
     };
 };
 
-void amgl_end_render_pass(am_int32 render_pass_id) {\
-    //TODO: Reset frame cache here as well
+void amgl_end_render_pass(am_int32 render_pass_id) {
+    am_engine* engine = am_engine_get_instance();
+
+    engine->ctx_data.frame_cache.index_buffer = (amgl_index_buffer){.id = 0xFFFFFFFF};
+    engine->ctx_data.frame_cache.index_element_size = 0;
+    engine->ctx_data.frame_cache.pipeline = (amgl_pipeline){.id = 0xFFFFFFFF};
+    am_dyn_array_clear(engine->ctx_data.frame_cache.vertex_buffers);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -2543,6 +2627,232 @@ void amgl_end_render_pass(am_int32 render_pass_id) {\
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_BLEND);
+};
+
+void amgl_bind_pipeline(am_int32 pipeline_id) {
+    am_engine* engine = am_engine_get_instance();
+    if (am_packed_array_has(engine->ctx_data.pipelines, pipeline_id)) {
+        
+        engine->ctx_data.frame_cache.index_buffer = (amgl_index_buffer){.id = 0xFFFFFFFF};
+        engine->ctx_data.frame_cache.index_element_size = 0;
+        engine->ctx_data.frame_cache.pipeline = (amgl_pipeline){.id = 0xFFFFFFFF};
+        am_dyn_array_clear(engine->ctx_data.frame_cache.vertex_buffers);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        
+        amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, pipeline_id);
+        engine->ctx_data.frame_cache.pipeline = *pipeline;
+
+        
+        if (!pipeline->info.depth.func) {
+            glDisable(GL_DEPTH_TEST);
+        } else {
+            glEnable(GL_DEPTH_TEST);
+            //TODO: Will have to change this if I add enums
+            glDepthFunc(pipeline->info.depth.func);
+        };
+
+        if (!pipeline->info.stencil.func) {
+            glDisable(GL_STENCIL_TEST);
+        } else {
+            glEnable(GL_STENCIL_TEST);
+            am_uint32 func = pipeline->info.stencil.func;
+            am_uint32 sfail = pipeline->info.stencil.sfail;
+            am_uint32 dpfail = pipeline->info.stencil.dpfail;
+            am_uint32 dppass = pipeline->info.stencil.dppass;
+            glStencilFunc(func, pipeline->info.stencil.ref, pipeline->info.stencil.comp_mask);
+            glStencilMask(pipeline->info.stencil.write_mask);
+            glStencilOp(sfail, dpfail, dppass);
+        };
+
+        if (!pipeline->info.blend.func) {
+            glDisable(GL_BLEND);
+        } else {
+            glEnable(GL_BLEND);
+            glBlendEquation(pipeline->info.blend.func);
+            glBlendFunc(pipeline->info.blend.src, pipeline->info.blend.dst);
+        };
+
+        if (!pipeline->info.raster.face_culling) {
+            glDisable(GL_CULL_FACE);
+        } else {
+            glEnable(GL_CULL_FACE);
+            glCullFace(pipeline->info.raster.face_culling);
+        };
+
+        //FIX add enum and converter where default (0) is GL_CW
+        glFrontFace(pipeline->info.raster.winding_order == 0 ? GL_CW : GL_CCW);
+
+        if (am_packed_array_has(engine->ctx_data.shaders, pipeline->info.raster.shader_id)){
+            glUseProgram(am_packed_array_get_ptr(engine->ctx_data.shaders, pipeline->info.raster.shader_id)->handle);
+        };
+    };
+};
+
+void amgl_set_bindings(amgl_bindings_info *info) {
+    am_engine *engine = am_engine_get_instance();
+    am_uint32 vertex_count = info->vertex_buffers.info ? info->vertex_buffers.size ? info->vertex_buffers.size / sizeof(amgl_vertex_buffer_bind_info) : 1 : 0;
+    am_uint32 index_count = info->index_buffers.info ? info->index_buffers.size ? info->index_buffers.size / sizeof(amgl_index_buffer_bind_info) : 1 : 0;
+    am_uint32 uniform_count = info->uniforms.info ? info->uniforms.size ? info->uniforms.size / sizeof(amgl_uniform_bind_info) : 1 : 0;
+    am_uint32 texture_count = info->textures.info ? info->textures.size ? info->textures.size / sizeof(amgl_texture_bind_info) : 1 : 0;
+    
+    
+    if (vertex_count) {
+        am_dyn_array_clear(engine->ctx_data.frame_cache.vertex_buffers);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    };
+
+    for (am_uint32 i = 0; i < vertex_count; i++) {
+        am_int32 id = info->vertex_buffers.info[i].vertex_buffer_id;
+        if (!am_packed_array_has(engine->ctx_data.vertex_buffers, id)) {
+            printf("[FAIL] Vertex buffer %d could not be found!\n", id);
+            break;
+        };
+        amgl_vertex_buffer vertex_buffer = am_packed_array_get_val(engine->ctx_data.vertex_buffers, id);
+        am_dyn_array_push(engine->ctx_data.frame_cache.vertex_buffers, vertex_buffer);
+    };
+
+    for (am_uint32 i = 0; i < index_count; i++) {
+        am_int32 id = info->index_buffers.info[i].index_buffer_id;;
+        if (!am_packed_array_has(engine->ctx_data.index_buffers, id)) {
+            printf("[FAIL] Index buffer %d could not be found!\n", id);
+            break;
+        };
+        amgl_index_buffer index_buffer = am_packed_array_get_val(engine->ctx_data.index_buffers, id);
+        engine->ctx_data.frame_cache.index_buffer = index_buffer;
+    };
+
+    for (am_uint32 i = 0; i < uniform_count; i++) {
+        am_int32 id = info->uniforms.info[i].uniform_id;
+        size_t size = am_packed_array_get_ptr(engine->ctx_data.uniforms, id)->info.size;
+        am_uint32 binding = info->uniforms.info[i].binding;
+
+        if (!am_packed_array_has(engine->ctx_data.uniforms, id)) {
+            printf("[FAIL] Uniform %d could not be found!\n", id);
+            break;
+        };
+
+        if (!am_packed_array_has(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id)) {
+            printf("[FAIL] Cannot bind uniform %d since pipeline %d could not be found!\n", id, engine->ctx_data.frame_cache.pipeline.id);
+            break;
+        }
+        amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
+        amgl_uniform *uniform = am_packed_array_get_ptr(engine->ctx_data.uniforms, id);
+
+        am_int32 shader_id = pipeline->info.raster.shader_id;
+
+        if ((uniform->location == 0xFFFFFFFF && uniform->location != 0xFFFFFFFF - 1 )|| uniform->info.shader_id != pipeline->info.raster.shader_id) {
+            if (!am_packed_array_has(engine->ctx_data.shaders, shader_id)) {
+                printf("[FAIL] Cannot bind uniform %d since shader %d could not be found!\n", id, shader_id);
+                break;
+            };
+            amgl_shader shader = am_packed_array_get_val(engine->ctx_data.shaders, shader_id);
+            uniform->location = glGetUniformLocation(shader.handle, uniform->info.name ? uniform->info.name : "AM_UNIFORM_EMPTY_NAME");
+            if (uniform->location >= 0xFFFFFFFF) {
+                printf("[FAIL] Uniform %d not found by name!\n", uniform->id);
+                break;
+            };
+            uniform->info.shader_id = shader_id;
+            uniform->info.data = info->uniforms.info->data;
+
+            //TODO: Expand
+            switch (uniform->info.type) {
+                case AMGL_UNIFORM_TYPE_FLOAT: {
+                    glUniform1f(uniform->location, *((float*)uniform->info.data));
+                    break;
+                };
+                case AMGL_UNIFORM_TYPE_INT: {
+                    glUniform1i(uniform->location, *((int*)uniform->info.data));
+                    break;
+                };
+                case AMGL_UNIFORM_TYPE_SAMPLER2D: {
+                    amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, *((am_int32*)(uniform->info.data)));
+                    glActiveTexture(GL_TEXTURE0 + binding);
+                    glBindTexture(GL_TEXTURE_2D, texture->handle);
+                    glUniform1i(uniform->location, binding); //binding++ for when I add uniform list here
+                    break;
+                };
+                default: {
+                    printf("[FAIL] Invalid uniform type!\n");
+                    exit(1);
+                };
+            };
+        };
+    };
+
+    for (am_uint32 i = 0; i < texture_count; i++) {
+        am_int32 id = info->textures.info[i].texture_id;
+
+        if (!am_packed_array_has(engine->ctx_data.textures, id)) {
+            printf("[FAIL] Texture %d could not be found!\n", id);
+            break;       
+        };
+        amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, id);
+        //TODO: Will have to change this once I implement separate enum 
+        //HACK
+        am_uint32 format = texture->info.format;
+        //TODO: READ_WRITE for now, will have to implement some kind of image layer on top of a texture
+        glBindImageTexture(0, texture->handle, 0, GL_FALSE, 0, GL_READ_WRITE, format);
+    };
+};
+
+void amgl_draw(amgl_draw_info *info) {
+    am_engine *engine = am_engine_get_instance();
+    amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
+
+    if (am_dyn_array_get_count(engine->ctx_data.frame_cache.vertex_buffers) == 0) {
+        printf("[FAIL] No vertex buffer bound at draw time!\n");
+        exit(0);
+    };
+
+    for (am_uint32 i = 0; i < pipeline->info.layout.num_attribs; i++) {
+        am_uint32 vertex_idx = pipeline->info.layout.attributes[i].buffer_index;
+        amgl_vertex_buffer vertex_buffer = (vertex_idx < am_dyn_array_get_count(engine->ctx_data.frame_cache.vertex_buffers)) ? engine->ctx_data.frame_cache.vertex_buffers[vertex_idx] : engine->ctx_data.frame_cache.vertex_buffers[0];
+
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer.handle);
+        size_t stride = pipeline->info.layout.attributes[i].stride;
+        size_t offset = pipeline->info.layout.attributes[i].offset;
+        glEnableVertexAttribArray(i);
+        switch (pipeline->info.layout.attributes[i].format) {
+                
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4: glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3: glVertexAttribPointer(i, 3, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2: glVertexAttribPointer(i, 2, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT:  glVertexAttribPointer(i, 1, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT4:  glVertexAttribIPointer(i, 4, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT3:  glVertexAttribIPointer(i, 3, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT2:  glVertexAttribIPointer(i, 2, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT:   glVertexAttribIPointer(i, 1, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE:   glVertexAttribPointer(i, 1, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE2:  glVertexAttribPointer(i, 2, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE3:  glVertexAttribPointer(i, 3, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE4:  glVertexAttribPointer(i, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
+            default: {
+                printf("[FAIL] Invalid layout attribute format!\n");
+                exit(0);
+            };
+        };
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    };
+
+    //Not really needed
+    for (am_uint32 i = 0; i < am_dyn_array_get_count(engine->ctx_data.frame_cache.vertex_buffers); i++) glBindBuffer(GL_ARRAY_BUFFER, engine->ctx_data.frame_cache.vertex_buffers[i].handle);
+
+    if (am_packed_array_has(engine->ctx_data.index_buffers, engine->ctx_data.frame_cache.index_buffer.id)) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, engine->ctx_data.frame_cache.index_buffer.handle);
+    };
+    
+    //FIX SAME AS AMGL_PIPELINE_BIND WINDING PROBLEM
+    am_uint32 primitive = pipeline->info.raster.primitive == 0 ? GL_TRIANGLES : GL_LINES;
+    am_uint32 idx_buf_elem_size = pipeline->info.raster.index_buffer_element_size;
+
+    if (am_packed_array_has(engine->ctx_data.index_buffers, engine->ctx_data.frame_cache.index_buffer.id)) {
+        glDrawElements(primitive, info->count, GL_UNSIGNED_INT, (void*)(intptr_t)info->start);
+    } else {
+        glDrawArrays(primitive, info->start, info->count);
+    };
+
 };
 
 
@@ -2555,7 +2865,6 @@ void amgl_end_render_pass(am_int32 render_pass_id) {\
 //----------------------------------------------------------------------------//
 //                              START ENGINE IMPL                             //
 //----------------------------------------------------------------------------//
-
 
 void am_engine_create(am_engine_info engine_info){
     am_engine_get_instance() = (am_engine*)am_malloc(sizeof(am_engine));
@@ -2581,6 +2890,8 @@ void am_engine_create(am_engine_info engine_info){
     am_packed_array_init(engine->ctx_data.render_passes, sizeof(amgl_render_pass)*AM_DYN_ARRAY_EMPTY_START_SLOTS);
     engine->ctx_data.pipelines = NULL;
     am_packed_array_init(engine->ctx_data.pipelines, sizeof(amgl_pipeline)*AM_DYN_ARRAY_EMPTY_START_SLOTS);
+    engine->ctx_data.frame_cache.vertex_buffers = NULL;
+    am_dyn_array_init((void**)&(engine->ctx_data.frame_cache.vertex_buffers), sizeof(amgl_vertex_buffer));
 
     am_window_info main = {
         .height = engine->info.initial_height,
@@ -2604,7 +2915,7 @@ void am_engine_create(am_engine_info engine_info){
     engine->info.is_running = true;
 };
 
-
+//TODO: Go over this
 void am_engine_terminate(){
     am_engine *engine = am_engine_get_instance();
     am_platform_terminate(am_engine_get_subsystem(platform));
@@ -2619,12 +2930,12 @@ void am_engine_terminate(){
     am_packed_array_clear(engine->ctx_data.frame_buffers);
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.uniforms); i++) amgl_uniform_destroy(engine->ctx_data.uniforms->elements[i].id);
     am_packed_array_clear(engine->ctx_data.uniforms);
-    //TODO: Implement render_pass_destroy
-    //for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.render_passes); i++) amgl_render_pass_destroy(engine->ctx_data.render_passes->elements[i].id);
-    //am_packed_array_clear(engine->ctx_data.render_passes); 
-    //TODO: Inplement pipeline_destroy
-    //for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.pipelines); i++) amgl_pipeline_destroy(engine->ctx_data.pipelines->elements[i].id);
-    //am_packed_array_clear(engine->ctx_data.pipelines);  
+    for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.render_passes); i++) amgl_render_pass_destroy(engine->ctx_data.render_passes->elements[i].id);
+    am_packed_array_clear(engine->ctx_data.render_passes); 
+    for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.pipelines); i++) amgl_pipeline_destroy(engine->ctx_data.pipelines->elements[i].id);
+    am_packed_array_clear(engine->ctx_data.pipelines);  
+    am_dyn_array_clear(engine->ctx_data.frame_cache.vertex_buffers);
+    am_free(am_dyn_array_get_header(engine->ctx_data.frame_cache.vertex_buffers));
 
     amgl_terminate();
     //HACK: Temporary
@@ -2670,7 +2981,6 @@ char* am_util_read_file(const char *path) {
 //                               END  UTIL IMPL                               //
 //----------------------------------------------------------------------------//
 
-
 int main() {
     am_engine_create((am_engine_info){
         .initial_fullscreen = false,
@@ -2679,28 +2989,12 @@ int main() {
         .initial_title = "Test",
         .initial_x = 50,
         .initial_y = 50,
-        .vsync_enabled = false,
+        .vsync_enabled = true,
         .is_running = true
     });
     am_platform *platform = am_engine_get_subsystem(platform);
-    XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 0)->handle, 0xFF0000);
-
-    am_int32 child_id = am_platform_window_create((am_window_info) {
-        .height = 100,
-        .width = 100,
-        .x = 50,
-        .y = 50,
-        .title = "Child",
-        .is_fullscreen = false,
-        .parent = am_packed_array_get_ptr(platform->windows, 0)->handle
-    });
-    XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, 0xFFFF00);
-
     glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 0)->handle, am_packed_array_get_ptr(platform->windows, 0)->context);
-
-    am_bool run = 1;
-    am_bool toggle = true;
-
+    XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 0)->handle, 0xFF0000);
 
     am_int32 shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
@@ -2710,39 +3004,7 @@ int main() {
         }
     });
     
-    am_int32 v1_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info) {
-        .data = (float[]) {
-            0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 0.0f, 0.0f
-        },
-        .size = 10*sizeof(float),
-        .usage = AMGL_BUFFER_USAGE_STATIC,
-        .layout = (amgl_vertex_buffer_layout) {
-            .num_attribs = 1,
-            .attributes = &(amgl_vertex_buffer_attribute) {    
-                .format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT,
-                .offset = 0,
-                .stride = sizeof(float)     
-            }
-        }
-    });
-
-    am_int32 i1_id = amgl_index_buffer_create((amgl_index_buffer_info) {
-        .data = (int[]){ 1,2,3,2,3,4 },
-        .offset = 0,
-        .size = 6*sizeof(int),
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    int cost = 5;
-    am_int32 u1_id = amgl_uniform_create((amgl_uniform_info) {
-        .data = &cost,
-        .name = "costime",
-        .shader_id = am_packed_array_get_ptr(platform->windows, shader_id)->handle,
-        .size = sizeof(int),
-        .type = AMGL_UNIFORM_TYPE_INT
-    });
-
+    
     amgl_texture_info tex_info = {
         .format = GL_RGBA,
         .mag_filter = GL_LINEAR,
@@ -2751,16 +3013,80 @@ int main() {
         .wrap_t = GL_REPEAT
     };
     amgl_texture_load_from_file("pics/t3.png", &tex_info, true);
-    am_int32 tex1_id = amgl_texture_create(tex_info);
+    am_int32 tex_id = amgl_texture_create(tex_info);
 
+    
+    am_int32 uni_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_tex",
+        .type = AMGL_UNIFORM_TYPE_SAMPLER2D
+    });
 
-    printf("Glerror %d\n", glGetError());
+    am_int32 vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = (float[]) {
+            -0.5f, -0.5f,  0.0f, 0.0f,  // Top Left
+            0.5f, -0.5f,  1.0f, 0.0f,  // Top Right 
+            -0.5f,  0.5f,  0.0f, 1.0f,  // Bottom Left
+            0.5f,  0.5f,  1.0f, 1.0f   // Bottom Right
+        },
+        .size = sizeof(float)*16,
+        .usage = AMGL_BUFFER_USAGE_STATIC,
+    });
+    
+    am_int32 idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
+        .data = (am_uint32[]){
+            0, 3, 2,    // First Triangle
+            0, 1, 3     // Second Triangle
+        },
+        .size = sizeof(am_uint32)*6,
+        .offset = 0,
+        .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    am_int32 pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
+        .raster = {
+            .shader_id = shader_id,
+        },
+        .layout = {
+            .num_attribs = 2,
+            .attributes = (amgl_vertex_buffer_attribute[]){
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 0, .stride = 2*sizeof(float)},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 2*sizeof(float), .stride = 2*sizeof(float)}
+            }
+        }
+    });
+
+    am_int32 rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
+
+    am_bool run = true;
+
+    //TODO
+    //FIX 
+    //0x501 GL_INVALID_VALUE somewhere
+    am_engine *engine = am_engine_get_instance();
     while (run) {
         am_platform_update(am_engine_get_subsystem(platform));
-        if (am_platform_key_pressed(AM_KEYCODE_X)) am_platform_window_destroy(1);
+        amgl_bindings_info binds = {
+            .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
+            .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = idx_id}},
+            .uniforms = {.info = &(amgl_uniform_bind_info){.uniform_id = uni_id, .data = &tex_id, .binding = 0}}
+        };
+        amgl_start_render_pass(rp_id);
+            glEnable(GL_BLEND);
+            glClearColor(0.0f, 1.0f, 0.0f, 0.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            amgl_bind_pipeline(pipeline_id);
+            amgl_set_bindings(&binds);
+            amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
+        amgl_end_render_pass(rp_id);
+        //TODO: Will have to swap buffers for all existing windows
+        glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, 0)->handle);
+        if (am_platform_key_pressed(AM_KEYCODE_X)) {
+            am_engine_terminate();
+            run = !run;
+        };
+        
+
     };
+
     return 0;
 };
-
-/*//REVIEW: for i := 1 to vertex_buffer_count glDrawElements; Start simple and make it more efficient if need be later on
-//REVIEW: ONE DRAW CALL PER BUFFER*/
