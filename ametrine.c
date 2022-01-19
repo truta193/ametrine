@@ -379,7 +379,8 @@ typedef enum am_mouse_map {
     AM_MOUSE_BUTTON_COUNT
 } am_mouse_map;
 
-typedef enum am_events {
+//TODO: Rename this
+typedef enum am_platform_events {
     AM_EVENT_INVALID,
     AM_EVENT_KEY_PRESS,
     AM_EVENT_KEY_RELEASE,
@@ -391,7 +392,7 @@ typedef enum am_events {
     AM_EVENT_WINDOW_SIZE,
     AM_EVENT_WINDOW_MOTION,
     AM_EVENT_COUNT
-} am_events;
+} am_platform_events;
 
 typedef struct am_window_info {
     am_uint64 parent;
@@ -421,12 +422,12 @@ typedef struct am_window {
 } am_window;
 
 typedef struct am_platform_callbacks {
-    void (*am_platform_key_callback)(am_int32, am_key_map, am_events);
-    void (*am_platform_mouse_button_callback)(am_int32, am_mouse_map, am_events);
-    void (*am_platform_mouse_motion_callback)(am_int32, am_int32, am_int32, am_events);
-    void (*am_platform_mouse_scroll_callback)(am_int32, am_events);
-    void (*am_platform_window_size_callback)(am_int32, am_uint32, am_uint32, am_events);
-    void (*am_platform_window_motion_callback)(am_int32, am_uint32, am_uint32, am_events);
+    void (*am_platform_key_callback)(am_int32, am_key_map, am_platform_events);
+    void (*am_platform_mouse_button_callback)(am_int32, am_mouse_map, am_platform_events);
+    void (*am_platform_mouse_motion_callback)(am_int32, am_int32, am_int32, am_platform_events);
+    void (*am_platform_mouse_scroll_callback)(am_int32, am_platform_events);
+    void (*am_platform_window_size_callback)(am_int32, am_uint32, am_uint32, am_platform_events);
+    void (*am_platform_window_motion_callback)(am_int32, am_uint32, am_uint32, am_platform_events);
 } am_platform_callbacks;
 
 typedef struct am_platform_input {
@@ -494,12 +495,12 @@ am_int32 am_platform_mouse_wheel_delta();
 am_bool am_platform_mouse_moved();
 
 //Platform default callbacks
-void am_platform_key_callback_default(am_int32 id, am_key_map key, am_events event);
-void am_platform_mouse_button_callback_default(am_int32 idow_handle, am_mouse_map button, am_events event);
-void am_platform_mouse_motion_callback_default(am_int32 idow_handle, am_int32 x, am_int32 y, am_events event);
-void am_platform_mouse_scroll_callback_default(am_int32 id, am_events event);
-void am_platform_window_size_callback_default(am_int32 id, am_uint32 width, am_uint32 height, am_events event);
-void am_platform_window_motion_callback_default(am_int32 id, am_uint32 x, am_uint32 y, am_events event);
+void am_platform_key_callback_default(am_int32 id, am_key_map key, am_platform_events event);
+void am_platform_mouse_button_callback_default(am_int32 idow_handle, am_mouse_map button, am_platform_events event);
+void am_platform_mouse_motion_callback_default(am_int32 idow_handle, am_int32 x, am_int32 y, am_platform_events event);
+void am_platform_mouse_scroll_callback_default(am_int32 id, am_platform_events event);
+void am_platform_window_size_callback_default(am_int32 id, am_uint32 width, am_uint32 height, am_platform_events event);
+void am_platform_window_motion_callback_default(am_int32 id, am_uint32 x, am_uint32 y, am_platform_events event);
 
 #define am_platform_set_key_callback(platform, callback) platform->callbacks.am_platform_key_callback = callback
 #define am_platform_set_mouse_button_callback(platform, callback) platform->callbacks.am_platform_mouse_button_callback = callback
@@ -660,7 +661,6 @@ typedef struct amgl_uniform {
 typedef enum amgl_texture_update_type {
     AMGL_TEXTURE_UPDATE_RECREATE,
     AMGL_TEXTURE_UPDATE_SUBDATA
-    //TODO: PBO, FBO
 } amgl_texture_update_type;
 */
 
@@ -898,7 +898,6 @@ typedef struct amgl_ctx_data {
     am_packed_array(amgl_render_pass) render_passes;
     am_packed_array(amgl_pipeline) pipelines;
     amgl_frame_cache frame_cache;
-    //TODO: Rest of object arrays and other user data
 } amgl_ctx_data;
 
 
@@ -1719,7 +1718,7 @@ am_bool am_platform_mouse_moved() {
     return platform->input.mouse_moved;
 };
 
-void am_platform_key_callback_default(am_int32 id, am_key_map key, am_events event) {
+void am_platform_key_callback_default(am_int32 id, am_key_map key, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_KEY_PRESS: {
@@ -1734,7 +1733,7 @@ void am_platform_key_callback_default(am_int32 id, am_key_map key, am_events eve
     };
 };
 
-void am_platform_mouse_button_callback_default(am_int32 id, am_mouse_map button, am_events event) {
+void am_platform_mouse_button_callback_default(am_int32 id, am_mouse_map button, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_MOUSE_BUTTON_PRESS: {
@@ -1749,14 +1748,14 @@ void am_platform_mouse_button_callback_default(am_int32 id, am_mouse_map button,
     };
 };
 
-void am_platform_mouse_motion_callback_default(am_int32 id, am_int32 x, am_int32 y, am_events event) {
+void am_platform_mouse_motion_callback_default(am_int32 id, am_int32 x, am_int32 y, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     platform->input.mouse_moved = true;
     platform->input.mouse_x = x;
     platform->input.mouse_y = y;
 };
 
-void am_platform_mouse_scroll_callback_default(am_int32 id, am_events event) {
+void am_platform_mouse_scroll_callback_default(am_int32 id, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_MOUSE_SCROLL_UP: {
@@ -1771,7 +1770,7 @@ void am_platform_mouse_scroll_callback_default(am_int32 id, am_events event) {
     };
 };
 
-void am_platform_window_size_callback_default(am_int32 id, am_uint32 width, am_uint32 height, am_events event) {
+void am_platform_window_size_callback_default(am_int32 id, am_uint32 width, am_uint32 height, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
 
@@ -1782,7 +1781,7 @@ void am_platform_window_size_callback_default(am_int32 id, am_uint32 width, am_u
     printf("Window size callback: %d %d\n", width, height);
 };
 
-void am_platform_window_motion_callback_default(am_int32 id, am_uint32 x, am_uint32 y, am_events event) {
+void am_platform_window_motion_callback_default(am_int32 id, am_uint32 x, am_uint32 y, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
     window->cache.x = window->info.x;
@@ -2549,19 +2548,7 @@ void amgl_init() {
     glGetUniformfv = (PFNGLGETUNIFORMFVPROC)amgl_get_proc_address("glGetUniformfv");
     glBindImageTexture = (PFNGLBINDIMAGETEXTUREPROC)amgl_get_proc_address("glBindImageTexture");
 
-    //NOTE: Adding default framebuffer since it is a framebuffer
-    //REVIEW: Is this a good choice?
     am_engine *engine = am_engine_get_instance();
-    /*typedef struct amgl_frame_buffer_info {
-    am_uint32 width;
-    am_uint32 height;
-} amgl_frame_buffer_info;
-
-typedef struct amgl_frame_buffer {
-    am_int32 id;
-    am_uint32 handle;
-    amgl_frame_buffer_info info;
-} amgl_frame_buffer;*/
     amgl_frame_buffer base_fbo = {
         .handle = 0,
         .id = 0,
@@ -3058,10 +3045,6 @@ int main() {
     am_int32 rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
 
     am_bool run = true;
-
-    //TODO
-    //FIX 
-    //0x501 GL_INVALID_VALUE somewhere
     am_engine *engine = am_engine_get_instance();
     while (run) {
         am_platform_update(am_engine_get_subsystem(platform));
