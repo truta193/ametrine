@@ -1,7 +1,7 @@
 //REVIEW: Could change int num_* property of some structs to size_t size, so it matches with the other ones
 
-//TODO: 0 is the default value for filling structs, should start array indexing at 1 for proper warn/error messages
-//TODO: Should create object entry first thing upon creation; in case of failure to create, free the spot
+//
+//
 //TODO: Lines 209, 559, 678, 700, 738, 779, 1009, 2777, 2902, 2934, 3045, 3093, 3333
 
 //----------------------------------------------------------------------------//
