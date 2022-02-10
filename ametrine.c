@@ -1,8 +1,7 @@
 //REVIEW: Could change int num_* property of some structs to size_t size, so it matches with the other ones
 
-//
-//
-//TODO: Lines 209, 559, 678, 700, 738, 779, 1009, 2777, 2902, 2934, 3045, 3093, 3333
+//TODO: Halve array space once size goes below half of capacity?
+//TODO: 3D camera
 
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
@@ -259,7 +258,7 @@ static inline am_vec2 am_vec2_scale(am_float32 scalar, am_vec2 vec);
 #define AM_WINDOW_DEFAULT_WIDTH 500
 #define AM_WINDOW_DEFAULT_HEIGHT 500
 #define AM_WINDOW_DEFAULT_NAME "Ametrine"
-#define AM_WINDOW_DEFAULT_NAME_WITH_ID(id) AM_WINDOW_DEFAULT_NAME #id
+
 #if defined(AM_LINUX) 
     #define AM_WINDOW_DEFAULT_PARENT DefaultRootWindow(am_engine_get_subsystem(platform)->display)
 #else 
@@ -470,6 +469,13 @@ typedef struct am_platform_input {
 typedef struct am_platform_time {
     am_uint64 offset;
     am_uint64 frequency;
+    am_float64 current;
+    am_float64 update;
+    am_float64 previous;
+    am_float64 render;
+    am_float64 frame;
+    am_float64 delta;
+    am_float64 target;
 } am_platform_time;
 
 typedef struct am_platform {
@@ -577,6 +583,7 @@ am_uint64 am_platform_elapsed_time();
 
 
 typedef enum amgl_shader_type {
+    AMGL_SHADER_INVALID,
     AMGL_SHADER_VERTEX,
     AMGL_SHADER_FRAGMENT
     //compute
@@ -586,6 +593,7 @@ typedef struct amgl_shader_source_info {
     //REVIEW: Would a name here have a use?
     amgl_shader_type type;
     char *source;
+    char *path;
 } amgl_shader_source_info;
 
 typedef struct amgl_shader_info {
@@ -601,6 +609,7 @@ typedef struct amgl_shader {
 } amgl_shader;
 
 typedef enum amgl_buffer_usage {
+    AMGL_BUFFER_USAGE_INVALID,
     AMGL_BUFFER_USAGE_STATIC,
     AMGL_BUFFER_USAGE_DYNAMIC,
     AMGL_BUFFER_USAGE_STREAM
@@ -614,6 +623,7 @@ typedef enum amgl_buffer_update_type {
 */
 
 typedef enum amgl_vertex_buffer_attribute_format {
+    AMGL_VERTEX_BUFFER_ATTRIBUTE_INVALID,
     AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT,
     AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2,
     AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3,
@@ -677,6 +687,7 @@ typedef struct amgl_index_buffer {
 
 //TODO: Support for more uniform types
 typedef enum amgl_uniform_type {
+    AMGL_UNIFORM_TYPE_INVALID,
     AMGL_UNIFORM_TYPE_FLOAT,
     AMGL_UNIFORM_TYPE_INT,
     AMGL_UNIFORM_TYPE_SAMPLER2D
@@ -707,6 +718,7 @@ typedef enum amgl_texture_update_type {
 */
 
 typedef enum amgl_texture_format {
+    AMGL_TEXTURE_FORMAT_INVALID,
     AMGL_TEXTURE_FORMAT_RGBA8,
     AMGL_TEXTURE_FORMAT_RGB8,
     AMGL_TEXTURE_FORMAT_RGBA16F,
@@ -724,6 +736,7 @@ typedef enum amgl_texture_format {
 } amgl_texture_format;
 
 typedef enum amgl_texture_wrap {
+    AMGL_TEXTURE_WRAP_INVALID,
     AMGL_TEXTURE_WRAP_REPEAT,
     AMGL_TEXTURE_WRAP_MIRRORED_REPEAT,
     AMGL_TEXTURE_WRAP_CLAMP_TO_EDGE,
@@ -731,6 +744,7 @@ typedef enum amgl_texture_wrap {
 } amgl_texture_wrap;
 
 typedef enum amgl_texture_filter {
+    AMGL_TEXTURE_FILTER_INVALID,
     AMGL_TEXTURE_FILTER_NEAREST,
     AMGL_TEXTURE_FILTER_LINEAR
 } amgl_texture_filter;
@@ -739,6 +753,7 @@ typedef enum amgl_texture_filter {
 typedef struct amgl_texture_info {
     char name[AM_MAX_NAME_LENGTH];
     void *data;
+    char *path;
     am_uint32 width;
     am_uint32 height;
     amgl_texture_format format;
@@ -776,33 +791,116 @@ typedef struct amgl_frame_buffer {
 // Pipeline Description: vert-layout, shader, bindable, render states
 // Pass Description: render pass, action on render targets (clear, set viewport, etc.)
 
-//TODO: Make enums for most of these
+typedef enum amgl_blend_func {
+    AMGL_BLEND_FUNC_INVALID,
+    AMGL_BLEND_FUNC_ADD,
+    AMGL_BLEND_FUNC_SUBSTRACT,
+    AMGL_BLEND_FUNC_REVERSE_SUBSTRACT,
+    AMGL_BLEND_FUNC_MIN,
+    AMGL_BLEND_FUNC_MAX
+} amgl_blend_func;
+
+typedef enum amgl_blend_mode {
+    AMGL_BLEND_MODE_INVALID,
+    AMGL_BLEND_MODE_ZERO,
+    AMGL_BLEND_MODE_ONE,
+    AMGL_BLEND_MODE_SRC_COLOR,
+    AMGL_BLEND_MODE_ONE_MINUS_SRC_COLOR,
+    AMGL_BLEND_MODE_DST_COLOR,
+    AMGL_BLEND_MODE_ONE_MINUS_DST_COLOR,
+    AMGL_BLEND_MODE_SRC_ALPHA,
+    AMGL_BLEND_MODE_ONE_MINUS_SRC_ALPHA,
+    AMGL_BLEND_MODE_DST_ALPHA,
+    AMGL_BLEND_MODE_ONE_MINUS_DST_ALPHA,
+    AMGL_BLEND_MODE_CONSTANT_COLOR,
+    AMGL_BLEND_MODE_ONE_MINUS_CONSTANT_COLOR,
+    AMGL_BLEND_MODE_CONSTANT_ALPHA,
+    AMGL_BLEND_MODE_ONE_MINUS_CONSTANT_ALPHA
+} amgl_blend_mode;
+
+//REVIEW: Check if blend, depth, stencil work properly
 typedef struct amgl_blend_info {
-    am_int32 func;
-    am_int32 src;
-    am_int32 dst;
+    amgl_blend_func func;
+    amgl_blend_mode src;
+    amgl_blend_mode dst;
 } amgl_blend_info;
 
+typedef enum amgl_depth_func {
+    AMGL_DEPTH_FUNC_INVALID,
+    AMGL_DEPTH_FUNC_NEVER,
+    AMGL_DEPTH_FUNC_LESS,
+    AMGL_DEPTH_FUNC_EQUAL,
+    AMGL_DEPTH_FUNC_LEQUAL,
+    AMGL_DEPTH_FUNC_GREATER,
+    AMGL_DEPTH_FUNC_NOTEQUAL,
+    AMGL_DEPTH_FUNC_GEQUAL,
+    AMGL_DEPTH_FUNC_ALWAYS
+} amgl_depth_func;
+
 typedef struct amgl_depth_info {
-    am_int32 func;
+    amgl_depth_func func;
 } amgl_depth_info;
 
+typedef enum amgl_stencil_func {
+    AMGL_STENCIL_FUNC_INVALID,
+    AMGL_STENCIL_FUNC_NEVER,
+    AMGL_STENCIL_FUNC_LESS,
+    AMGL_STENCIL_FUNC_EQUAL,
+    AMGL_STENCIL_FUNC_LEQUAL,
+    AMGL_STENCIL_FUNC_GREATER,
+    AMGL_STENCIL_FUNC_NOTEQUAL,
+    AMGL_STENCIL_FUNC_GEQUAL,
+    AMGL_STENCIL_FUNC_ALWAYS
+} amgl_stencil_func;
+
+typedef enum amgl_stencil_op {
+    AMGL_STENCIL_OP_INVALID,
+    AMGL_STENCIL_OP_KEEP,
+    AMGL_STENCIL_OP_ZERO,
+    AMGL_STENCIL_OP_REPLACE,
+    AMGL_STENCIL_OP_INCR,
+    AMGL_STENCIL_OP_INCR_WRAP,
+    AMGL_STENCIL_OP_DECR,
+    AMGL_STENCIL_OP_DECR_WRAP,
+    AMGL_STENCIL_OP_INVERT
+} amgl_stencil_op;
+
 typedef struct amgl_stencil_info {
-    am_int32 func;
+    amgl_stencil_func func;
     am_int32 ref;
     am_int32 comp_mask;
     am_int32 write_mask;
-    am_int32 sfail;
-    am_int32 dpfail;
-    am_int32 dppass;
+    amgl_stencil_op sfail;
+    amgl_stencil_op dpfail;
+    amgl_stencil_op dppass;
 } amgl_stencil_info;
 
+typedef enum amgl_face_cull {
+    AMGL_FACE_CULL_INVALID,
+    AMGL_FACE_CULL_FRONT,
+    AMGL_FACE_CULL_BACK,
+    AMGL_FACE_CULL_FRONT_AND_BACK
+} amgl_face_cull;
+
+typedef enum amgl_winding_order {
+    AMGL_WINDING_ORDER_INVALID,
+    AMGL_WINDING_ORDER_CCW,
+    AMGL_WINDING_ORDER_CW
+} amgl_winding_order;
+
+typedef enum amgl_primitive {
+    AMGL_PRIMITIVE_INVALID,
+    AMGL_PRIMITIVE_LINES,
+    AMGL_PRIMITIVE_TRIANGLES,
+    AMGL_PRIMITIVE_QUADS
+} amgl_primitive;
+
 typedef struct amgl_raster_info {
-    am_int32 face_culling;
-    am_int32 winding_order;
-    am_int32 primitive;
-    am_int32 shader_id; //?
-    am_int32 index_buffer_element_size; //?
+    amgl_face_cull face_culling;
+    amgl_winding_order winding_order;
+    amgl_primitive primitive;
+    am_id shader_id;
+    am_int32 index_buffer_element_size;
 } amgl_raster_info;
 
 typedef struct amgl_pipeline_info {
@@ -923,7 +1021,6 @@ void amgl_uniform_destroy(am_id id);
 am_id amgl_texture_create(amgl_texture_info info);
 //NOTE: Ignore for now
 //void amgl_texture_update(am_int32 id, amgl_texture_info info, amgl_texture_update_type type);
-
 am_int32 amgl_texture_translate_format(amgl_texture_format format);
 am_int32 amgl_texture_translate_wrap(amgl_texture_wrap wrap);
 GLenum amgl_texture_translate_filter(amgl_texture_filter filter);
@@ -941,16 +1038,24 @@ void amgl_render_pass_destroy(am_id id);
 
 //Pipeline
 am_id amgl_pipeline_create(amgl_pipeline_info info);
-void amgl_pipeline_destroy(am_int32 id);
+am_int32 amgl_blend_translate_func(amgl_blend_func func);
+am_int32 amgl_blend_translate_mode(amgl_blend_mode mode);
+am_int32 amgl_depth_translate_func(amgl_depth_func func);
+am_int32 amgl_stencil_translate_func(amgl_stencil_func func);
+am_int32 amgl_stencil_translate_op(amgl_stencil_op op);
+am_int32 amgl_face_cull_translate(amgl_face_cull face_cull);
+am_int32 amgl_primitive_translate(amgl_primitive prim);
+am_int32 amgl_index_buffer_size_translate(size_t size);
+void amgl_pipeline_destroy(am_id id);
 
 //Various OGL
 void amgl_init(); //Create arrays for shaders, vertex b, index b, frame b etc., init gl addresses
 void amgl_terminate();
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
 void amgl_vsync(am_id window_id, am_bool state);
-void amgl_start_render_pass(am_int32 render_pass_id);
-void amgl_end_render_pass(am_int32 render_pass_id);
-void amgl_bind_pipeline(am_int32 pipeline_id);
+void amgl_start_render_pass(am_id render_pass_id);
+void amgl_end_render_pass(am_id render_pass_id);
+void amgl_bind_pipeline(am_id pipeline_id);
 void amgl_set_bindings(amgl_bindings_info *info);
 void amgl_draw(amgl_draw_info *info);
 
@@ -969,6 +1074,7 @@ typedef struct am_engine_info {
     void (*shutdown)();
     am_bool is_running;
     am_bool vsync_enabled;
+    float desired_fps;
     char win_name[AM_MAX_NAME_LENGTH];
     am_bool win_fullscreen;
     am_uint32 win_width;
@@ -996,6 +1102,7 @@ typedef struct am_engine {
     void (*shutdown)();
     am_bool is_running;
     am_bool vsync_enabled;
+    float desired_fps;
     am_platform *platform;
     amgl_ctx_data ctx_data;
     //IDEA: A scene structure, maybe scenegraph?
@@ -1011,6 +1118,7 @@ am_engine *_am_engine_instance;
 #define am_engine_get_subsystem(sys) am_engine_get_instance()->sys
 
 void am_engine_create(am_engine_info engine_info);
+void am_engine_frame();
 void am_engine_terminate();
 
 
@@ -1328,6 +1436,8 @@ am_platform *am_platform_create() {
     assert(platform != NULL);
     platform->windows = NULL;
     am_packed_array_init(platform->windows, sizeof(am_window));
+
+    memset(&platform->time, 0, sizeof(platform->time));
 
     #if defined(AM_LINUX)
     platform->display = XOpenDisplay(NULL);
@@ -1900,7 +2010,7 @@ am_id am_platform_window_create(am_window_info window_info) {
 
     am_window *new_window = (am_window*)am_malloc(sizeof(am_window));
     if (new_window == NULL) {
-        printf("[FAIL] am_platform_window_create: Could not allocate memory for window!\n");
+        printf("[FAIL] am_platform_window_create (id: %u): Could not allocate memory for window!\n", platform->windows->next_id);
         return AM_PA_INVALID_ID;
     };
 
@@ -1912,27 +2022,27 @@ am_id am_platform_window_create(am_window_info window_info) {
     //Defaults
     if (!window_info.x) {
         window_info.x = AM_WINDOW_DEFAULT_X;
-        printf("[WARN] am_platform_window_create: info.x is 0, setting to default (%d)! (id: %u)\n", AM_WINDOW_DEFAULT_X, ret_id);
+        printf("[WARN] am_platform_window_create (id: %u): info.x is 0, setting to default (%d)!\n", ret_id, AM_WINDOW_DEFAULT_X);
     };
     if (!window_info.y) {
         window_info.y = AM_WINDOW_DEFAULT_Y;
-        printf("[WARN] am_platform_window_create: info.y is 0, setting to default (%d)! (id: %u)\n", AM_WINDOW_DEFAULT_Y, ret_id);
+        printf("[WARN] am_platform_window_create (id: %u): info.y is 0, setting to default (%d)!\n", ret_id, AM_WINDOW_DEFAULT_Y);
     }
     if (!window_info.width) {
         window_info.width = AM_WINDOW_DEFAULT_WIDTH;
-        printf("[WARN] am_platform_window_create: info.width is 0, setting to default (%d)! (id: %u)\n", AM_WINDOW_DEFAULT_WIDTH, ret_id);
+        printf("[WARN] am_platform_window_create (id: %u): info.width is 0, setting to default (%d)!\n", ret_id, AM_WINDOW_DEFAULT_WIDTH);
     }
     if (!window_info.height) {
         window_info.height = AM_WINDOW_DEFAULT_HEIGHT;
-        printf("[WARN] am_platform_window_create: info.height is 0, setting to default (%d)! (id: %u)\n", AM_WINDOW_DEFAULT_HEIGHT, ret_id);
+        printf("[WARN] am_platform_window_create (id: %u): info.height is 0, setting to default (%d)!\n", ret_id, AM_WINDOW_DEFAULT_HEIGHT);
     }
     if (!strlen(window_info.name)) {
         snprintf(window_info.name, AM_MAX_NAME_LENGTH, "%s%d", AM_WINDOW_DEFAULT_NAME, ret_id);
-        printf("[WARN] am_platform_window_create: info.name is empty, setting default name (%s)! (id: %u)\n", window_info.name, ret_id);
+        printf("[WARN] am_platform_window_create (id: %u): info.name is empty, setting default name (%s)!\n", ret_id, window_info.name);
     };
     if (!window_info.parent) {
         window_info.parent = AM_WINDOW_DEFAULT_PARENT;
-        printf("[WARN] am_platform_window_create: info.parent is 0, setting default parent (%lu)! (id: %u)\n", AM_WINDOW_DEFAULT_PARENT, ret_id);
+        printf("[WARN] am_platform_window_create (id: %u): info.parent is 0, setting default parent (%lu)!\n", ret_id, AM_WINDOW_DEFAULT_PARENT);
     };
     if (!window_info.is_fullscreen) {
         window_info.is_fullscreen = false;
@@ -1954,7 +2064,7 @@ am_id am_platform_window_create(am_window_info window_info) {
                                                 &window_attributes
                                                 );
     if (window == BadAlloc || window == BadColor || window == BadCursor || window == BadMatch || window == BadPixmap || window == BadValue || window == BadWindow) {
-        printf("[FAIL] am_platform_window_create: Could not create window! (id: %u)\n", ret_id);
+        printf("[FAIL] am_platform_window_create (id: %u): Could not create window!\n", ret_id);
         am_packed_array_erase(platform->windows, ret_id);
         return AM_PA_INVALID_ID;
     };
@@ -2053,7 +2163,7 @@ void am_platform_window_resize(am_id id, am_uint32 width, am_uint32 height) {
     am_platform *platform  = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
     if (!window) {
-        printf("[FAIL] am_platform_window_resize: Window id is invalid! (id: %u)\n", id);
+        printf("[FAIL] am_platform_window_resize (id: %u): Window id is invalid!\n", id);
         return;
     };
     window->cache.width = window->width;
@@ -2080,7 +2190,7 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
     if (!window) {
-        printf("[FAIL] am_platform_window_move: Window id is invalid (id: %u)\n", id);
+        printf("[FAIL] am_platform_window_move (id: %u): Window id is invalid!\n", id);
         return;
     };
     window->cache.x = window->x;
@@ -2109,7 +2219,7 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
     printf("at fs %d\n", window->width);
     if (!window) {
-        printf("[FAIL] am_platform_window_fullscreen: Window id is invalid! (id: %u)\n", id);
+        printf("[FAIL] am_platform_window_fullscreen (id: %u): Window id is invalid!\n", id);
         return;
     };
     if (window->is_fullscreen == state || window->parent != AM_WINDOW_DEFAULT_PARENT) return;
@@ -2175,7 +2285,7 @@ void am_platform_window_destroy(am_id id) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
     if (!window) {
-        printf("[FAIL] am_platform_window_destroy: Window id is invalid! (id: %u)\n", id);
+        printf("[FAIL] am_platform_window_destroy (id: %u): Window id is invalid!\n", id);
         return;
     };
     glXDestroyContext(platform->display, window->context);
@@ -2241,15 +2351,16 @@ am_uint64 am_platform_elapsed_time() {
 
 
 am_id amgl_shader_create(amgl_shader_info info) {
+    am_engine *engine = am_engine_get_instance();
+
     if (!info.num_sources || info.sources == NULL) {
-        printf("[FAIL] amgl_shader_create: No shader sources provided!\n");
+        printf("[FAIL] amgl_shader_create (id: %u): No shader sources provided!\n", engine->ctx_data.shaders->next_id);
         return AM_PA_INVALID_ID;
     };
 
-    am_engine *engine = am_engine_get_instance();
     amgl_shader *new_shader = (amgl_shader*)am_malloc(sizeof(amgl_shader));
     if (new_shader == NULL) {
-        printf("[FAIL] amgl_shader_create: Could not allocate memory for shader!\n");
+        printf("[FAIL] amgl_shader_create (id: %u): Could not allocate memory for shader!\n", engine->ctx_data.shaders->next_id);
         return AM_PA_INVALID_ID;
     };
 
@@ -2262,6 +2373,18 @@ am_id amgl_shader_create(amgl_shader_info info) {
     am_uint32 shader_list[info.num_sources]; 
     for (am_int32 i = 0; i < info.num_sources; i++) {
         am_uint32 shader = 0;
+
+        if (!info.sources[i].path) {
+            printf("[WARN] amgl_shader_create (id: %u): No path given for shader file for index %u, assuming info.sources[%u].source is given!\n", ret_id, i, i);
+        } else {
+            info.sources[i].source = am_util_read_file(info.sources[i].path);
+        };
+
+        if (!info.sources[i].type) {
+            printf("[FAIL] amgl_shader_create (id: %u): No shader type provided for index %d!\n", ret_id, i);
+            break;
+        }
+
         switch (info.sources[i].type) {
             case AMGL_SHADER_FRAGMENT: {
                 shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -2284,7 +2407,7 @@ am_id amgl_shader_create(amgl_shader_info info) {
             glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
             char err_log[length];
             glGetShaderInfoLog(shader, length, &length, err_log);
-            printf("[FAIL] amgl_shader_create: Shader compilation failed for index %u:\n%s\n", i, err_log);
+            printf("[FAIL] amgl_shader_create (id: %u): Shader compilation failed for index %u:\n%s\n", ret_id, i, err_log);
             glDeleteShader(shader);
         };
         glAttachShader(main_shader, shader);
@@ -2298,7 +2421,7 @@ am_id amgl_shader_create(amgl_shader_info info) {
         glGetProgramiv(main_shader, GL_INFO_LOG_LENGTH, &length);
         char err_log[length];
         glGetProgramInfoLog(main_shader, length, &length, err_log);
-        printf("[FAIL] amgl_shader_create: Failed to link shader (id: %u): \n%s\n", ret_id, err_log);
+        printf("[FAIL] amgl_shader_create (id: %u): Failed to link shader:\n%s\n", ret_id, err_log);
         am_packed_array_erase(engine->ctx_data.shaders, ret_id);
         glDeleteProgram(main_shader);
         return AM_PA_INVALID_ID;
@@ -2314,7 +2437,7 @@ am_id amgl_shader_create(amgl_shader_info info) {
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_SHADER_DEFAULT_NAME, ret_id);
-        printf("[WARN] amgl_shader_create: info.name is empty, choosing default name (%s)! (id: %u)\n", info.name, ret_id);
+        printf("[WARN] amgl_shader_create (id: %u): info.name is empty, choosing default name (%s)!\n", ret_id, info.name);
     };
     snprintf(new_shader->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     return ret_id;
@@ -2324,7 +2447,7 @@ void amgl_shader_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     amgl_shader *shader = am_packed_array_get_ptr(engine->ctx_data.shaders, id);
     if (!shader) {
-        printf("[FAIL] amgl_shader_destroy: Invalid shader id! (id: %u)\n", id);
+        printf("[FAIL] amgl_shader_destroy (id: %u): Invalid shader id!\n", id);
         return;
     };
     glDeleteProgram(shader->handle);
@@ -2334,12 +2457,12 @@ void amgl_shader_destroy(am_id id) {
 am_id amgl_vertex_buffer_create(amgl_vertex_buffer_info info) {
     am_engine *engine = am_engine_get_instance();
 
-    if (info.data == NULL) printf("[WARN] amgl_vertex_buffer_create: Data pointer is NULL!\n");
-    if (info.size == 0) printf("[WARN] amgl_vertex_buffer_create: Size is not specified!\n");
+    if (info.data == NULL) printf("[WARN] amgl_vertex_buffer_create (id: %u): Data pointer is NULL!\n", engine->ctx_data.vertex_buffers->next_id);
+    if (info.size == 0) printf("[WARN] amgl_vertex_buffer_create (id: %u): Size is not specified!\n", engine->ctx_data.vertex_buffers->next_id);
 
     amgl_vertex_buffer *v_buffer = (amgl_vertex_buffer*)am_malloc(sizeof(amgl_vertex_buffer));
     if (v_buffer == NULL) {
-        printf("[FAIL] amgl_vertex_buffer_create: Could not allocate memory for vertex buffer!\n");
+        printf("[FAIL] amgl_vertex_buffer_create (id: %u): Could not allocate memory for vertex buffer!\n", engine->ctx_data.vertex_buffers->next_id);
         return AM_PA_INVALID_ID;
     };
 
@@ -2348,13 +2471,18 @@ am_id amgl_vertex_buffer_create(amgl_vertex_buffer_info info) {
     v_buffer = am_packed_array_get_ptr(engine->ctx_data.vertex_buffers, ret_id);
     v_buffer->id = ret_id;
 
+    if (!info.usage) {
+        printf("[WARN] amgl_vertex_buffer_create (id: %u): No usage provided, choosing default!\n", ret_id);
+        info.usage = AMGL_BUFFER_USAGE_STATIC;
+    };
+
     am_int32 usage = 0;
     switch (info.usage) {
         case AMGL_BUFFER_USAGE_STATIC: usage = GL_STATIC_DRAW; break;
         case AMGL_BUFFER_USAGE_STREAM: usage = GL_STREAM_DRAW; break;
         case AMGL_BUFFER_USAGE_DYNAMIC: usage = GL_DYNAMIC_DRAW; break;
         default: {
-            printf("[FAIL] amgl_vertex_buffer_create: Invalid usage value!\n");
+            printf("[FAIL] amgl_vertex_buffer_create (id: %u): Invalid usage value!\n", ret_id);
             am_packed_array_erase(engine->ctx_data.vertex_buffers, ret_id);
             return AM_PA_INVALID_ID;
         };
@@ -2368,7 +2496,7 @@ am_id amgl_vertex_buffer_create(amgl_vertex_buffer_info info) {
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_VERTEX_BUFFER_DEFAULT_NAME, v_buffer->id);
-        printf("[WARN] amgl_vertex_buffer_create: Choosing default name! (id: %u)\n", v_buffer->id);
+        printf("[WARN] amgl_vertex_buffer_create (id: %u): Choosing default name!\n", v_buffer->id);
     };
     snprintf(v_buffer->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
@@ -2379,7 +2507,7 @@ void amgl_vertex_buffer_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     amgl_vertex_buffer *vbuffer = am_packed_array_get_ptr(engine->ctx_data.vertex_buffers, id);
     if (!vbuffer) {
-        printf("[FAIL] amgl_vertex_buffer_destroy: Invalid vertex buffer id! (id: %u)\n", id);
+        printf("[FAIL] amgl_vertex_buffer_destroy (id: %u): Invalid vertex buffer id!\n", id);
         return;
     }
     glDeleteBuffers(1, &vbuffer->handle);
@@ -2389,13 +2517,13 @@ void amgl_vertex_buffer_destroy(am_id id) {
 am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
     am_engine *engine = am_engine_get_instance();
 
-    if (info.data == NULL) printf("[WARN] amgl_vertex_index_create: Data pointer is NULL!\n");
-    if (info.size == 0) printf("[WARN] amgl_vertex_index_create: Size is not specified!\n");
+    if (info.data == NULL) printf("[WARN] amgl_index_buffer_create (id: %u): Data pointer is NULL!\n", engine->ctx_data.index_buffers->next_id);
+    if (info.size == 0) printf("[WARN] amgl_index_buffer_create (id: %u): Size is not specified!\n", engine->ctx_data.index_buffers->next_id);
     
     amgl_index_buffer *index_bfr = (amgl_index_buffer*)malloc(sizeof(amgl_index_buffer));
     if (index_bfr == NULL) {
-        printf("[FAIL] amgl_vertex_index_create: Could not allocate memory for index buffer!\n");
-        return -1;
+        printf("[FAIL] amgl_vertex_index_create (id: %u): Could not allocate memory for index buffer!\n", engine->ctx_data.index_buffers->next_id);
+        return AM_PA_INVALID_ID;
     };
 
     am_id ret_id = am_packed_array_add(engine->ctx_data.index_buffers, *index_bfr);
@@ -2405,6 +2533,12 @@ am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
 
     glGenBuffers(1, &index_bfr->handle);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_bfr->handle);
+
+    if (!info.usage) {
+        printf("[WARN] amgl_index_buffer_create (id: %u): No usage provided, choosing default!\n", ret_id);
+        info.usage = AMGL_BUFFER_USAGE_STATIC;
+    };
+
     switch (info.usage) {
         case AMGL_BUFFER_USAGE_STATIC: {
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)info.size, info.data, GL_STATIC_DRAW);
@@ -2419,7 +2553,7 @@ am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
             break;
         };
         default: {
-            printf("[FAIL] amgl_vertex_index_create: Invalid usage!\n");
+            printf("[FAIL] amgl_vertex_index_create (id: %u): Invalid usage!\n", ret_id);
             am_packed_array_erase(engine->ctx_data.index_buffers, ret_id);
             return AM_PA_INVALID_ID;
         };
@@ -2429,7 +2563,7 @@ am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_INDEX_BUFFER_DEFAULT_NAME, index_bfr->id);
-        printf("[WARN] amgl_index_buffer_create: Choosing default name! (id: %u)\n", index_bfr->id);
+        printf("[WARN] amgl_index_buffer_create  (id: %u): Choosing default name!\n", index_bfr->id);
     };
     snprintf(index_bfr->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
@@ -2440,7 +2574,7 @@ void amgl_index_buffer_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     amgl_index_buffer *index_buffer = am_packed_array_get_ptr(engine->ctx_data.index_buffers, id);
     if (!index_buffer) {
-        printf("[FAIL] amgl_index_buffer_destroy: Invalid index buffer id! (id: %u)\n", id);
+        printf("[FAIL] amgl_index_buffer_destroy (id: %u): Invalid index buffer id!\n", id);
         return;
     };
     glDeleteBuffers(1, &index_buffer->handle);
@@ -2453,17 +2587,23 @@ am_id amgl_uniform_create(amgl_uniform_info info) {
 
     amgl_uniform *uniform = (amgl_uniform*)malloc(sizeof(amgl_uniform));
     if (uniform == NULL) {
-        printf("[FAIL] amgl_uniform_create: Could not allocate memory for uniform!\n");
-        return -1;
+        printf("[FAIL] amgl_uniform_create (id: %u): Could not allocate memory for uniform!\n", engine->ctx_data.uniforms->next_id);
+        return AM_PA_INVALID_ID;
     };
 
     uniform->location = 0xFFFFFFFF;
     uniform->id = engine->ctx_data.uniforms->next_id;
+
+    if (!info.type) {
+        printf("[WARN] amgl_uniform_create (id: %u): No type given, choosing default!\n");
+        info.type = AMGL_UNIFORM_TYPE_FLOAT;
+    };
+
     uniform->type = info.type;
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_UNIFORM_DEFAULT_NAME, uniform->id);
-        printf("[WARN] amgl_uniform_create: Choosing default name! (id: %u)\n", uniform->id);
+        printf("[WARN] amgl_uniform_create (id: %u): Choosing default name!\n", uniform->id);
     };
     snprintf(uniform->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     am_int32 ret_id = am_packed_array_add(engine->ctx_data.uniforms, *uniform);
@@ -2490,7 +2630,7 @@ am_id amgl_texture_create(amgl_texture_info info) {
 
     amgl_texture *texture = (amgl_texture*)am_malloc(sizeof(amgl_texture));
     if (texture == NULL) {
-        printf("[FAIL] amgl_texture_create: Could not allocate memory for texture!\n");
+        printf("[FAIL] amgl_texture_create (id: %u): Could not allocate memory for texture!\n", engine->ctx_data.textures->next_id);
         return -1;
     };
 
@@ -2499,29 +2639,35 @@ am_id amgl_texture_create(amgl_texture_info info) {
     texture = am_packed_array_get_ptr(engine->ctx_data.textures, ret_id);
     texture->id = ret_id;
 
+    if (!info.path) {
+        printf("[WARN] amgl_texture_create: No image path given, assuming info.data is already filled!\n");
+    } else {
+        amgl_texture_load_from_file(info.path, &info, true);
+    };
     if (!info.wrap_s) {
         info.wrap_s = AMGL_TEXTURE_DEFAULT_WRAP;
-        printf("[WARN] amgl_texture_create: Choosing default wrap_s value!\n");
+        printf("[WARN] amgl_texture_create (id: %u): Choosing default wrap_s value!\n", ret_id);
     };
     if (!info.wrap_t) {
         info.wrap_t = AMGL_TEXTURE_DEFAULT_WRAP;
-        printf("[WARN] amgl_texture_create: Choosing default wrap_t value!\n");
+        printf("[WARN] amgl_texture_create (id: %u): Choosing default wrap_t value!\n", ret_id);
     };
     if (!info.height) {
         info.height = AMGL_TEXTURE_DEFAULT_HEIGHT;
-        printf("[WARN] amgl_texture_create: Choosing default height value!\n");
+        printf("[WARN] amgl_texture_create (id: %u): Choosing default height value!\n", ret_id);
     };
     if (!info.width) {
         info.width = AMGL_TEXTURE_DEFAULT_WIDTH;
-        printf("[WARN] amgl_texture_create: Choosing default width value!\n");
+        printf("[WARN] amgl_texture_create (id: %u): Choosing default width value!\n", ret_id);
     };
     if (!info.format) {
         info.format = AMGL_TEXTURE_DEFAULT_FORMAT;
-        printf("[WARN] amgl_texture_create: Choosing default format value!\n");
+        printf("[WARN] amgl_texture_create (id: %u): Choosing default format value!\n", ret_id);
     };
 
     glGenTextures(1, &texture->handle);
     glBindTexture(GL_TEXTURE_2D, texture->handle);
+
 
     switch (info.format) {
         case AMGL_TEXTURE_FORMAT_A8: glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, (am_int32)info.width, (am_int32)info.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, info.data); break;
@@ -2538,7 +2684,7 @@ am_id amgl_texture_create(amgl_texture_info info) {
         case AMGL_TEXTURE_FORMAT_DEPTH24_STENCIL8: glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (am_int32)info.width, (am_int32)info.height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, info.data); break;
         case AMGL_TEXTURE_FORMAT_DEPTH32F_STENCIL8: glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, (am_int32)info.width, (am_int32)info.height, 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, info.data); break;
         default: {
-            printf("[FAIL] amgl_texture_create: Invalid texture format!\n");
+            printf("[FAIL] amgl_texture_create (id: %u): Invalid texture format!\n", ret_id);
             am_packed_array_erase(engine->ctx_data.textures, ret_id);
             return AM_PA_INVALID_ID;
         };
@@ -2571,10 +2717,11 @@ am_id amgl_texture_create(amgl_texture_info info) {
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_TEXTURE_DEFAULT_NAME, texture->id);
-        printf("[WARN] amgl_texture_create: Choosing default name! (id: %u)\n", texture->id);
+        printf("[WARN] amgl_texture_create (id: %u): Choosing default name!\n", texture->id);
     };
     snprintf(texture->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
+    am_free(info.data);
     return ret_id;
 };
 
@@ -2594,7 +2741,7 @@ am_int32 amgl_texture_translate_format(amgl_texture_format format) {
         case AMGL_TEXTURE_FORMAT_DEPTH24_STENCIL8: return GL_DEPTH24_STENCIL8;
         case AMGL_TEXTURE_FORMAT_DEPTH32F_STENCIL8: return GL_DEPTH32F_STENCIL8;
         default: {
-            printf("[WARN] amgl_texture_translate_format: Unknown texture format!\n");
+            printf("[WARN] amgl_texture_translate_format (id: ?): Unknown texture format!\n");
             return GL_UNSIGNED_BYTE;
         };
     };
@@ -2607,7 +2754,7 @@ am_int32 amgl_texture_translate_wrap(amgl_texture_wrap wrap) {
         case AMGL_TEXTURE_WRAP_CLAMP_TO_EDGE: return GL_CLAMP_TO_EDGE;
         case AMGL_TEXTURE_WRAP_CLAMP_TO_BORDER: return GL_CLAMP_TO_BORDER;
         default: {
-            printf("[WARN] amgl_texture_translate_wrap: Unknown texture wrap!\n");
+            printf("[WARN] amgl_texture_translate_wrap (id: ?): Unknown texture wrap!\n");
             return GL_REPEAT;
         };
     };
@@ -2647,7 +2794,7 @@ void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, 
     info->data = NULL;
     info->data = (void*)stbi_load_from_memory((const stbi_uc*)memory, (am_int32)size, (am_int32*)&info->width, (am_int32*)&info->height, &num_comps, 4);
     if (info->data == NULL) {
-        printf("[FAIL] amgl_texture_load_from_memory: Unable to load texture!\n");
+        printf("[FAIL] amgl_texture_load_from_memory (id: ?): Unable to load texture!\n");
         return;
     };
 };
@@ -2656,7 +2803,7 @@ void amgl_texture_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, id);
     if (!texture) {
-        printf("[FAIL] amgl_texture_destroy: Invalid texture id! (id: %u)\n", id);
+        printf("[FAIL] amgl_texture_destroy (id: %u): Invalid texture id!\n", id);
         return;
     }
     glDeleteTextures(1, &texture->handle);
@@ -2669,7 +2816,7 @@ am_id amgl_frame_buffer_create(amgl_frame_buffer_info info) {
 
     amgl_frame_buffer *framebuffer = (amgl_frame_buffer*)am_malloc(sizeof(amgl_frame_buffer));
     if (framebuffer == NULL) {
-        printf("[FAIL] amgl_frame_buffer_create: Could not allocate memory for framebuffer!\n");
+        printf("[FAIL] amgl_frame_buffer_create (id: %u): Could not allocate memory for framebuffer!\n", engine->ctx_data.frame_buffers->next_id);
         return AM_PA_INVALID_ID;
     };
 
@@ -2678,7 +2825,7 @@ am_id amgl_frame_buffer_create(amgl_frame_buffer_info info) {
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_FRAME_BUFFER_DEFAULT_NAME, framebuffer->id);
-        printf("[WARN] amgl_frame_buffer_create: Choosing default name! (id: %u)\n", framebuffer->id);
+        printf("[WARN] amgl_frame_buffer_create (id: %u): Choosing default name!\n", framebuffer->id);
     };
     snprintf(framebuffer->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     am_id ret_id = am_packed_array_add(engine->ctx_data.frame_buffers, *framebuffer);
@@ -2690,7 +2837,7 @@ void amgl_frame_buffer_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     amgl_frame_buffer *framebuffer = am_packed_array_get_ptr(engine->ctx_data.frame_buffers, id);
     if (!framebuffer) {
-        printf("[FAIL] amgl_frame_buffer_destroy: Invalid frame buffer id! (id: %u)\n", framebuffer->id);
+        printf("[FAIL] amgl_frame_buffer_destroy (id: %u): Invalid frame buffer id!\n", framebuffer->id);
         return;
     };
     glDeleteFramebuffers(1, &framebuffer->handle);
@@ -2702,8 +2849,8 @@ am_id amgl_render_pass_create(amgl_render_pass_info info) {
 
     amgl_render_pass *render_pass = (amgl_render_pass*)am_malloc(sizeof(amgl_render_pass));
     if (render_pass == NULL) {
-        printf("[FAIL] amgl_render_pass_create: Could not allocate memory for render pass!\n");
-        return -1;
+        printf("[FAIL] amgl_render_pass_create (id: %u): Could not allocate memory for render pass!\n", engine->ctx_data.render_passes->next_id);
+        return AM_PA_INVALID_ID;
     };
 
     am_id ret_id = am_packed_array_add(engine->ctx_data.render_passes, *render_pass);
@@ -2712,25 +2859,27 @@ am_id amgl_render_pass_create(amgl_render_pass_info info) {
     render_pass->id = ret_id;
 
     //render_pass->info = info;
-    if (!info.depth_texture_id) printf("[WARN] amgl_render_pass_create: No depth texture specified!\n");
+    if (!info.depth_texture_id) printf("[WARN] amgl_render_pass_create (id: %u): No depth texture specified!\n", ret_id);
     render_pass->depth_texture_id = info.depth_texture_id;
     if (!info.framebuffer_id) {
-        printf("[WARN] amgl_render_pass_create: No framebuffer id specified, choosing id 1!\n");
+        printf("[WARN] amgl_render_pass_create (id: %u): No framebuffer id specified, choosing id 1!\n", ret_id);
         render_pass->framebuffer_id = 1;
     } else {
         render_pass->framebuffer_id = info.framebuffer_id;
     };
 
-    if (!info.stencil_texture_id) printf("[WARN] amgl_render_pass_create: No stencil texture id specified!\n");
+    if (!info.stencil_texture_id) printf("[WARN] amgl_render_pass_create (id: %u): No stencil texture id specified!\n", ret_id);
     render_pass->stencil_texture_id = info.stencil_texture_id;
-    if ((!info.num_colors) || info.color_texture_ids == NULL) printf("[WARN] amgl_render_pass_create: No color attachments passed!\n");
+    if ((!info.num_colors) || info.color_texture_ids == NULL) printf("[WARN] amgl_render_pass_create (id: %u): No color attachments passed!\n", ret_id);
     render_pass->num_colors = info.num_colors;
-    render_pass->color_texture_ids = info.color_texture_ids;
+    render_pass->color_texture_ids = am_malloc(sizeof(am_id)*info.num_colors);
+    memcpy(render_pass->color_texture_ids, info.color_texture_ids, sizeof(am_id)*info.num_colors);
+
 
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_RENDER_PASS_DEFAULT_NAME, render_pass->id);
-        printf("[WARN] amgl_render_pass_create: Choosing default name! (id: %u)\n", render_pass->id);
+        printf("[WARN] amgl_render_pass_create (id: %u): Choosing default name!\n", render_pass->id);
     };
     snprintf(render_pass->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     return ret_id;
@@ -2746,21 +2895,58 @@ am_id amgl_pipeline_create(amgl_pipeline_info info) {
 
     amgl_pipeline *pipeline = (amgl_pipeline*)am_malloc(sizeof(amgl_pipeline));
     if (pipeline == NULL) {
-        printf("[FAIL] Could not allocate memory for framebuffer!\n");
-        return -1;
+        printf("[FAIL] amgl_pipeline_create (id: %u): Could not allocate memory for pipeline!\n", engine->ctx_data.pipelines->next_id);
+        return AM_PA_INVALID_ID;
     };
 
+    if (info.blend.func) {
+        if (!info.blend.src) {
+            printf("[WARN] amgl_pipeline_create (id: %u): Blend func is defined, src is not!\n", engine->ctx_data.pipelines->next_id);
+            info.blend.src = AMGL_BLEND_MODE_ONE;
+        };
+        if (!info.blend.dst) {
+            printf("[WARN] amgl_pipeline_create (id: %u): Blend func is defined, dst is not!\n", engine->ctx_data.pipelines->next_id);
+            info.blend.dst = AMGL_BLEND_MODE_ZERO;
+        };
+    };
     pipeline->blend = info.blend;
+
     pipeline->depth = info.depth;
+
+    if (info.stencil.func) {
+        if (!info.stencil.dppass) {
+            printf("[WARN] amgl_pipeline_create (id: %u): Stencil func is defined, dppass is not. Choosing default!\n", engine->ctx_data.pipelines->next_id);
+            info.stencil.dppass = AMGL_STENCIL_OP_KEEP;
+        };
+        if (!info.stencil.dpfail) {
+            printf("[WARN] amgl_pipeline_create (id: %u): Stencil func is defined, dpfail is not. Choosing default!\n", engine->ctx_data.pipelines->next_id);
+            info.stencil.dpfail = AMGL_STENCIL_OP_KEEP;
+        };
+        if (!info.stencil.sfail) {
+            printf("[WARN] amgl_pipeline_create (id: %u): Stencil func is defined, sfail is not. Choosing default!\n", engine->ctx_data.pipelines->next_id);
+            info.stencil.sfail = AMGL_STENCIL_OP_KEEP;
+        };
+    };
     pipeline->stencil = info.stencil;
+    if (!info.raster.winding_order) {
+        printf("[WARN] amgl_pipeline_create (id: %u): Winding order not defined, choosing default!\n", engine->ctx_data.pipelines->next_id);
+        info.raster.winding_order = AMGL_WINDING_ORDER_CCW;
+    };
+    if (!info.raster.primitive) {
+        printf("[WARN] amgl_pipeline_create (id: %u): Primitive not defined, choosing default!\n", engine->ctx_data.pipelines->next_id);
+        info.raster.primitive = AMGL_PRIMITIVE_TRIANGLES;
+    };
     pipeline->raster = info.raster;
-    pipeline->layout = info.layout;
+
+    pipeline->layout.attributes = am_malloc(info.layout.num_attribs * sizeof(amgl_vertex_buffer_attribute));
+    memcpy(pipeline->layout.attributes, info.layout.attributes, info.layout.num_attribs * sizeof(amgl_vertex_buffer_attribute));
+    pipeline->layout.num_attribs = info.layout.num_attribs;
 
     pipeline->id = engine->ctx_data.pipelines->next_id;
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
         snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_PIPELINE_DEFAULT_NAME, pipeline->id);
-        printf("[WARN] amgl_pipeline_create: Choosing default name! (id: %u)\n", pipeline->id);
+        printf("[WARN] amgl_pipeline_create (id: %u): Choosing default name!\n", pipeline->id);
     };
     snprintf(pipeline->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     am_int32 ret_id = am_packed_array_add(engine->ctx_data.pipelines, *pipeline);
@@ -2768,7 +2954,142 @@ am_id amgl_pipeline_create(amgl_pipeline_info info) {
     return ret_id;  
 };
 
-void amgl_pipeline_destroy(am_int32 id) {
+am_int32 amgl_blend_translate_func(amgl_blend_func func) {
+    switch(func) {
+        case AMGL_BLEND_FUNC_ADD: return GL_FUNC_ADD;
+        case AMGL_BLEND_FUNC_SUBSTRACT: return GL_FUNC_SUBTRACT;
+        case AMGL_BLEND_FUNC_REVERSE_SUBSTRACT: return GL_FUNC_REVERSE_SUBTRACT;
+        case AMGL_BLEND_FUNC_MIN: return GL_MIN;
+        case AMGL_BLEND_FUNC_MAX: return GL_MAX;
+        default: {
+            printf("[WARN] amgl_blend_translate_func (id: ?): Unknown blend func!\n");
+            return GL_FUNC_ADD;
+        };
+    };
+};
+
+am_int32 amgl_blend_translate_mode(amgl_blend_mode mode) {
+    switch (mode) {
+        case AMGL_BLEND_MODE_ZERO: return GL_ZERO;
+        case AMGL_BLEND_MODE_ONE: return GL_ONE;
+        case AMGL_BLEND_MODE_SRC_COLOR: return GL_SRC_COLOR;
+        case AMGL_BLEND_MODE_ONE_MINUS_SRC_COLOR: return GL_ONE_MINUS_SRC_COLOR;
+        case AMGL_BLEND_MODE_DST_COLOR: return GL_DST_COLOR;
+        case AMGL_BLEND_MODE_ONE_MINUS_DST_COLOR: return GL_ONE_MINUS_DST_COLOR;
+        case AMGL_BLEND_MODE_SRC_ALPHA: return GL_SRC_ALPHA;
+        case AMGL_BLEND_MODE_ONE_MINUS_SRC_ALPHA: return GL_ONE_MINUS_SRC_ALPHA;
+        case AMGL_BLEND_MODE_DST_ALPHA: return GL_DST_ALPHA;
+        case AMGL_BLEND_MODE_ONE_MINUS_DST_ALPHA: return GL_ONE_MINUS_DST_ALPHA;
+        case AMGL_BLEND_MODE_CONSTANT_COLOR: return GL_CONSTANT_COLOR;
+        case AMGL_BLEND_MODE_ONE_MINUS_CONSTANT_COLOR: return GL_ONE_MINUS_CONSTANT_COLOR;
+        case AMGL_BLEND_MODE_CONSTANT_ALPHA: return GL_CONSTANT_ALPHA;
+        case AMGL_BLEND_MODE_ONE_MINUS_CONSTANT_ALPHA: return GL_ONE_MINUS_CONSTANT_ALPHA;
+        default: {
+            printf("[WARN] amgl_blend_translate_mode (id: ?): Unknown blend mode!\n");
+            return GL_ZERO;
+        };
+    };
+};
+
+am_int32 amgl_depth_translate_func(amgl_depth_func func) {
+    switch (func) {
+        case AMGL_DEPTH_FUNC_LESS: return GL_LESS;
+        case AMGL_DEPTH_FUNC_NEVER: return GL_NEVER;
+        case AMGL_DEPTH_FUNC_EQUAL: return GL_EQUAL;
+        case AMGL_DEPTH_FUNC_LEQUAL: return GL_LEQUAL;
+        case AMGL_DEPTH_FUNC_GREATER: return GL_GREATER;
+        case AMGL_DEPTH_FUNC_NOTEQUAL: return GL_NOTEQUAL;
+        case AMGL_DEPTH_FUNC_GEQUAL: return GL_GEQUAL;
+        case AMGL_DEPTH_FUNC_ALWAYS: return GL_ALWAYS;
+        default: {
+            printf("[WARN] amgl_depth_translate_func (id: ?): Unknown depth func!\n");
+            return GL_LESS;
+        };
+    };
+};
+
+am_int32 amgl_stencil_translate_func(amgl_stencil_func func) {
+    switch (func) {
+        case AMGL_STENCIL_FUNC_LESS: return GL_LESS;
+        case AMGL_STENCIL_FUNC_NEVER: return GL_NEVER;
+        case AMGL_STENCIL_FUNC_EQUAL: return GL_EQUAL;
+        case AMGL_STENCIL_FUNC_LEQUAL: return GL_LEQUAL;
+        case AMGL_STENCIL_FUNC_GREATER: return GL_GREATER;
+        case AMGL_STENCIL_FUNC_NOTEQUAL: return GL_NOTEQUAL;
+        case AMGL_STENCIL_FUNC_GEQUAL: return GL_GEQUAL;
+        case AMGL_STENCIL_FUNC_ALWAYS: return GL_ALWAYS;
+        default: {
+            printf("[WARN] amgl_stencil_translate_func (id: ?): Unknown stencil func!\n");
+            return GL_ALWAYS;
+        };
+    };
+};
+
+am_int32 amgl_stencil_translate_op(amgl_stencil_op op) {
+    switch (op) {
+        case AMGL_STENCIL_OP_KEEP: return GL_KEEP;
+        case AMGL_STENCIL_OP_ZERO: return GL_ZERO;
+        case AMGL_STENCIL_OP_REPLACE: return GL_REPLACE;
+        case AMGL_STENCIL_OP_INCR: return GL_INCR;
+        case AMGL_STENCIL_OP_INCR_WRAP: return GL_INCR_WRAP;
+        case AMGL_STENCIL_OP_DECR: return GL_DECR;
+        case AMGL_STENCIL_OP_DECR_WRAP: return GL_DECR_WRAP;
+        case AMGL_STENCIL_OP_INVERT: return GL_INVERT;
+        default: {
+            printf("[WARN] amgl_stencil_translate_op (id: ?): Unknown stencil op!\n");
+            return GL_KEEP;
+        };
+    };
+};
+
+am_int32 amgl_face_cull_translate(amgl_face_cull face_cull) {
+    switch (face_cull) {
+        case AMGL_FACE_CULL_BACK: return GL_BACK;
+        case AMGL_FACE_CULL_FRONT: return GL_FRONT;
+        case AMGL_FACE_CULL_FRONT_AND_BACK: return GL_FRONT_AND_BACK;
+        default: {
+            printf("[WARN] amgl_face_cull_translate (id: ?): Unknown face culling type!\n");
+            return GL_BACK;
+        };
+    };
+};
+
+am_int32 amgl_winding_order_translate(amgl_winding_order winding_order) {
+    switch (winding_order) {
+        case AMGL_WINDING_ORDER_CCW: return GL_CCW;
+        case AMGL_WINDING_ORDER_CW: return GL_CW;
+        default: {
+            printf("[WARN] amgl_winding_order_translate (id: ?): Unknown winding_order type!\n");
+            return GL_CCW;
+        };
+    };
+};
+
+am_int32 amgl_primitive_translate(amgl_primitive prim) {
+    switch (prim) {
+        case AMGL_PRIMITIVE_TRIANGLES: return GL_TRIANGLES;
+        case AMGL_PRIMITIVE_LINES: return GL_LINES;
+        case AMGL_PRIMITIVE_QUADS: return GL_QUADS;
+        default: {
+            printf("[WARN] amgl_primitive_translate (id: ?): Unknown primitive type!\n");
+            return GL_TRIANGLES;
+        };
+    };
+};
+
+am_int32 amgl_index_buffer_size_translate(size_t size) {
+    switch (size) {
+        case 4: return GL_UNSIGNED_INT;
+        case 2: return GL_UNSIGNED_SHORT;
+        case 1: return GL_UNSIGNED_BYTE;
+        default: {
+            printf("[WARN] index_buffer_size (id: ?): Unknown size!\n");
+            return GL_UNSIGNED_INT;
+        };
+    };
+};
+
+void amgl_pipeline_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     am_packed_array_erase(engine->ctx_data.pipelines, id);  
 };
@@ -2846,7 +3167,7 @@ void amgl_vsync(am_id window_id, am_bool state) {
     #endif
 };
 
-void amgl_start_render_pass(am_int32 render_pass_id) {
+void amgl_start_render_pass(am_id render_pass_id) {
     am_engine *engine = am_engine_get_instance();
     if (am_packed_array_has(engine->ctx_data.render_passes, render_pass_id)) {
         amgl_render_pass *render_pass = am_packed_array_get_ptr(engine->ctx_data.render_passes, render_pass_id);
@@ -2862,7 +3183,7 @@ void amgl_start_render_pass(am_int32 render_pass_id) {
     };
 };
 
-void amgl_end_render_pass(am_int32 render_pass_id) {
+void amgl_end_render_pass(am_id render_pass_id) {
     am_engine* engine = am_engine_get_instance();
 
     engine->ctx_data.frame_cache.index_buffer = (amgl_index_buffer){.id = AM_PA_INVALID_ID};
@@ -2879,7 +3200,7 @@ void amgl_end_render_pass(am_int32 render_pass_id) {
     glDisable(GL_BLEND);
 };
 
-void amgl_bind_pipeline(am_int32 pipeline_id) {
+void amgl_bind_pipeline(am_id pipeline_id) {
     am_engine* engine = am_engine_get_instance();
     if (am_packed_array_has(engine->ctx_data.pipelines, pipeline_id)) {
         
@@ -2899,18 +3220,17 @@ void amgl_bind_pipeline(am_int32 pipeline_id) {
             glDisable(GL_DEPTH_TEST);
         } else {
             glEnable(GL_DEPTH_TEST);
-            //TODO: Will have to change this if I add enums
-            glDepthFunc(pipeline->depth.func);
+            glDepthFunc(amgl_depth_translate_func(pipeline->depth.func));
         };
 
         if (!pipeline->stencil.func) {
             glDisable(GL_STENCIL_TEST);
         } else {
             glEnable(GL_STENCIL_TEST);
-            am_uint32 func = pipeline->stencil.func;
-            am_uint32 sfail = pipeline->stencil.sfail;
-            am_uint32 dpfail = pipeline->stencil.dpfail;
-            am_uint32 dppass = pipeline->stencil.dppass;
+            am_uint32 func = amgl_stencil_translate_func(pipeline->stencil.func);
+            am_uint32 sfail = amgl_stencil_translate_op(pipeline->stencil.sfail);
+            am_uint32 dpfail = amgl_stencil_translate_op(pipeline->stencil.dpfail);
+            am_uint32 dppass = amgl_stencil_translate_op(pipeline->stencil.dppass);
             glStencilFunc(func, pipeline->stencil.ref, pipeline->stencil.comp_mask);
             glStencilMask(pipeline->stencil.write_mask);
             glStencilOp(sfail, dpfail, dppass);
@@ -2920,20 +3240,18 @@ void amgl_bind_pipeline(am_int32 pipeline_id) {
             glDisable(GL_BLEND);
         } else {
             glEnable(GL_BLEND);
-            glBlendEquation(pipeline->blend.func);
-            glBlendFunc(pipeline->blend.src, pipeline->blend.dst);
+            glBlendEquation(amgl_blend_translate_func(pipeline->blend.func));
+            glBlendFunc(amgl_blend_translate_mode(pipeline->blend.src), amgl_blend_translate_mode(pipeline->blend.dst));
         };
 
         if (!pipeline->raster.face_culling) {
             glDisable(GL_CULL_FACE);
         } else {
             glEnable(GL_CULL_FACE);
-            glCullFace(pipeline->raster.face_culling);
+            glCullFace(amgl_face_cull_translate(pipeline->raster.face_culling));
         };
 
-        //TODO below fix
-        //FIX add enum and converter where default (0) is GL_CW
-        glFrontFace(pipeline->raster.winding_order == 0 ? GL_CW : GL_CCW);
+        glFrontFace(amgl_winding_order_translate(pipeline->raster.winding_order));
 
         if (am_packed_array_has(engine->ctx_data.shaders, pipeline->raster.shader_id)){
             glUseProgram(am_packed_array_get_ptr(engine->ctx_data.shaders, pipeline->raster.shader_id)->handle);
@@ -2955,9 +3273,9 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     };
 
     for (am_uint32 i = 0; i < vertex_count; i++) {
-        am_int32 id = info->vertex_buffers.info[i].vertex_buffer_id;
+        am_id id = info->vertex_buffers.info[i].vertex_buffer_id;
         if (!am_packed_array_has(engine->ctx_data.vertex_buffers, id)) {
-            printf("[FAIL] Vertex buffer %d could not be found!\n", id);
+            printf("[FAIL] amgl_set_bindings (id: %u): Vertex buffer could not be found!\n", id);
             break;
         };
         amgl_vertex_buffer vertex_buffer = am_packed_array_get_val(engine->ctx_data.vertex_buffers, id);
@@ -2965,9 +3283,9 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     };
 
     for (am_uint32 i = 0; i < index_count; i++) {
-        am_int32 id = info->index_buffers.info[i].index_buffer_id;;
+        am_id id = info->index_buffers.info[i].index_buffer_id;;
         if (!am_packed_array_has(engine->ctx_data.index_buffers, id)) {
-            printf("[FAIL] Index buffer %d could not be found!\n", id);
+            printf("[FAIL] amgl_set_bindings (id: %u): Index buffer could not be found!\n", id);
             break;
         };
         amgl_index_buffer index_buffer = am_packed_array_get_val(engine->ctx_data.index_buffers, id);
@@ -2975,33 +3293,33 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     };
 
     for (am_uint32 i = 0; i < uniform_count; i++) {
-        am_int32 id = info->uniforms.info[i].uniform_id;
+        am_id id = info->uniforms.info[i].uniform_id;
         size_t size = am_packed_array_get_ptr(engine->ctx_data.uniforms, id)->size;
         am_uint32 binding = info->uniforms.info[i].binding;
 
         if (!am_packed_array_has(engine->ctx_data.uniforms, id)) {
-            printf("[FAIL] Uniform %d could not be found!\n", id);
+            printf("[FAIL] amgl_set_bindings (id: %u): Uniform could not be found!\n", id);
             break;
         };
 
         if (!am_packed_array_has(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id)) {
-            printf("[FAIL] Cannot bind uniform %d since pipeline %d could not be found!\n", id, engine->ctx_data.frame_cache.pipeline.id);
+            printf("[FAIL] amgl_set_bindings (id: (1) %u, (2) %u): Cannot bind uniform (1) since pipeline (2) could not be found!\n", id, engine->ctx_data.frame_cache.pipeline.id);
             break;
         }
         amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
         amgl_uniform *uniform = am_packed_array_get_ptr(engine->ctx_data.uniforms, id);
 
-        am_int32 shader_id = pipeline->raster.shader_id;
+        am_id shader_id = pipeline->raster.shader_id;
 
         if (uniform->location == 0xFFFFFFFF || uniform->shader_id != pipeline->raster.shader_id) {
             if (!am_packed_array_has(engine->ctx_data.shaders, shader_id)) {
-                printf("[FAIL] Cannot bind uniform %d since shader %d could not be found!\n", id, shader_id);
+                printf("[FAIL] amgl_set_bindings (id: (1) %u, (2) %u): Cannot bind uniform (1) since shader (2) could not be found!\n", id, shader_id);
                 break;
             };
             amgl_shader shader = am_packed_array_get_val(engine->ctx_data.shaders, shader_id);
             uniform->location = glGetUniformLocation(shader.handle, strlen(uniform->name) ? uniform->name : "AM_UNIFORM_EMPTY_NAME");
             if (uniform->location >= 0xFFFFFFFF) {
-                printf("[FAIL] Uniform %d not found by win_name!\n", uniform->id);
+                printf("[FAIL] amgl_set_bindings (id: %u): Uniform not found by win_name!\n", uniform->id);
                 break;
             };
             uniform->shader_id = shader_id;
@@ -3025,7 +3343,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
                     break;
                 };
                 default: {
-                    printf("[FAIL] Invalid uniform type!\n");
+                    printf("[FAIL] amgl_set_bindings (id: %u): Invalid uniform type!\n", uniform->id);
                     exit(1);
                 };
             };
@@ -3033,10 +3351,10 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     };
 
     for (am_uint32 i = 0; i < texture_count; i++) {
-        am_int32 id = info->textures.info[i].texture_id;
+        am_id id = info->textures.info[i].texture_id;
 
         if (!am_packed_array_has(engine->ctx_data.textures, id)) {
-            printf("[FAIL] Texture %d could not be found!\n", id);
+            printf("[FAIL] amgl_set_bindings (id: %u): Texture could not be found!\n", id);
             break;       
         };
         amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, id);
@@ -3052,7 +3370,7 @@ void amgl_draw(amgl_draw_info *info) {
     amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
 
     if (am_dyn_array_get_count(engine->ctx_data.frame_cache.vertex_buffers) == 0) {
-        printf("[FAIL] No vertex buffer bound at draw time!\n");
+        printf("[FAIL] amgl_draw (id: ?): No vertex buffer bound at draw time!\n");
         exit(0);
     };
 
@@ -3064,6 +3382,12 @@ void amgl_draw(amgl_draw_info *info) {
         size_t stride = pipeline->layout.attributes[i].stride;
         size_t offset = pipeline->layout.attributes[i].offset;
         glEnableVertexAttribArray(i);
+
+        if (!pipeline->layout.attributes[i].format) {
+            printf("[WARN] amgl_draw (id: ?): No vertex attribute format given, choosing default!\n");
+            pipeline->layout.attributes[i].format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT;
+        };
+
         switch (pipeline->layout.attributes[i].format) {
                 
             case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4: glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
@@ -3079,7 +3403,7 @@ void amgl_draw(amgl_draw_info *info) {
             case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE3:  glVertexAttribPointer(i, 3, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
             case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE4:  glVertexAttribPointer(i, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
             default: {
-                printf("[FAIL] Invalid layout attribute format!\n");
+                printf("[FAIL] amgl_draw (id: ?): Invalid layout attribute format!\n");
                 exit(0);
             };
         };
@@ -3090,10 +3414,9 @@ void amgl_draw(amgl_draw_info *info) {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, engine->ctx_data.frame_cache.index_buffer.handle);
     };
 
-    //TODO below
-    //FIX SAME AS AMGL_PIPELINE_BIND WINDING PROBLEM
-    am_uint32 primitive = pipeline->raster.primitive == 0 ? GL_TRIANGLES : GL_LINES;
-    am_uint32 idx_buf_elem_size = pipeline->raster.index_buffer_element_size;
+    am_uint32 primitive = amgl_primitive_translate(pipeline->raster.primitive);
+    //TODO: glDrawElementsBaseVertex
+    //am_uint32 idx_buf_elem_size = amgl_index_buffer_size_translate(pipeline->raster.index_buffer_element_size);
 
     if (am_packed_array_has(engine->ctx_data.index_buffers, engine->ctx_data.frame_cache.index_buffer.id)) {
         glDrawElements(primitive, info->count, GL_UNSIGNED_INT, (void*)(intptr_t)info->start);
@@ -3119,9 +3442,19 @@ void am_engine_create(am_engine_info engine_info){
     am_engine *engine = am_engine_get_instance();
     engine->init = engine_info.init;
     engine->update = engine_info.update;
-    engine->shutdown = engine->shutdown;
+    engine->shutdown = engine_info.shutdown;
     //engine->is_running = true;
     engine->vsync_enabled = engine_info.vsync_enabled;
+    if (!engine_info.desired_fps && !engine_info.vsync_enabled) {
+        printf("[WARN] am_engine_create (id: ?): No desired fps stated, choosing 60.0f!\n");
+        engine_info.desired_fps = 60.0f;
+    };
+    if (engine_info.desired_fps && engine_info.vsync_enabled) {
+        printf("[WARN] am_engine_create (id: ?): Desired fps specified but vsync is on, choosing 60.0f!\n");
+        engine_info.desired_fps = 60.0f;
+    };
+    engine->desired_fps = engine_info.desired_fps;
+    //TODO: Set max fps
 
     engine->platform = am_platform_create();
     am_platform_timer_create();
@@ -3164,8 +3497,63 @@ void am_engine_create(am_engine_info engine_info){
     #endif
     amgl_init();
     amgl_set_viewport(0,0, (am_int32)main.width, (am_int32)main.height);
-    //HACK: Temporary
-    engine_info.is_running = true;
+
+    am_platform *platform = am_engine_get_subsystem(platform);
+    glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, am_packed_array_get_ptr(platform->windows, 1)->context);
+
+    engine->init();
+    engine->is_running = true;
+};
+
+void am_engine_frame() {
+    am_platform *platform = am_engine_get_subsystem(platform);
+    am_engine *engine = am_engine_get_instance();
+
+    platform->time.current = (am_float64)am_platform_elapsed_time() / 1000000000.0f;
+    platform->time.update = platform->time.current - platform->time.previous;
+    platform->time.previous = platform->time.current;
+
+    am_platform_update(platform);
+    if (!engine->is_running) {
+        engine->shutdown();
+        return;
+    };
+
+    engine->update();
+    if (!engine->is_running) {
+        engine->shutdown();
+        return;
+    };
+
+    for (am_int32 i =  1; i <= am_packed_array_get_count(platform->windows); i++) {
+        #if defined(AM_LINUX)
+        glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, i)->handle);
+        #else
+        //TODO
+        SwapBuffers();
+        #endif
+    };
+
+    printf("elapsed %f\n", platform->time.current);
+
+    platform->time.current  = (am_float64)am_platform_elapsed_time() / 1000000000.0f;
+    platform->time.render   = platform->time.current - platform->time.previous;
+    platform->time.previous = platform->time.current;
+    platform->time.frame    = platform->time.update + platform->time.render;            // Total frame time
+    platform->time.delta    = platform->time.frame / 1000.f;
+
+    float target = (1000.f / engine->desired_fps);
+
+    if (platform->time.frame < target)
+    {
+        am_platform_timer_sleep((float)(target - platform->time.frame));
+
+        platform->time.current = (am_float64)am_platform_elapsed_time() / 1000000000.0f;;
+        double wait_time = platform->time.current - platform->time.previous;
+        platform->time.previous = platform->time.current;
+        platform->time.frame += wait_time;
+        platform->time.delta = platform->time.frame / 1000.f;
+    }
 };
 
 void am_engine_terminate(){
@@ -3190,7 +3578,7 @@ void am_engine_terminate(){
 
 
     amgl_terminate();
-    //HACK: Temporary
+
     engine->is_running = false;
     am_free(engine);
 };
@@ -3233,51 +3621,39 @@ char* am_util_read_file(const char *path) {
 //                               END  UTIL IMPL                               //
 //----------------------------------------------------------------------------//
 
-int main() {
-    am_engine_create((am_engine_info){
-        .win_fullscreen = false,
-        .win_height = 500,
-        .win_width = 500,
-        .win_x = 50,
-        .win_y = 50,
-        .vsync_enabled = true,
-        .is_running = true
-        //.win_name = "Testing"
-    });
 
+am_id shader_id, tex_id, uni_id, vbo_id, idx_id, pipeline_id, rp_id;
+
+void init() {
     am_platform *platform = am_engine_get_subsystem(platform);
-    glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 0)->handle, am_packed_array_get_ptr(platform->windows, 0)->context);
-    XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 0)->handle, 0xFF0000);
+    XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, 0xFF0000);
 
-    am_id shader_id = amgl_shader_create((amgl_shader_info) {
+    shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .source = am_util_read_file("/home/truta/CLionProjects/ametrine/test_v.glsl") },
-            { .type = AMGL_SHADER_FRAGMENT, .source = am_util_read_file("/home/truta/CLionProjects/ametrine/test_f.glsl") }
+            { .type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test_v.glsl" },
+            { .type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test_f.glsl" }
         }
     });
-    
-    
-    amgl_texture_info tex_info = {
+
+    tex_id = amgl_texture_create((amgl_texture_info){
         .format = AMGL_TEXTURE_FORMAT_RGBA,
         .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
-        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT
-    };
-    amgl_texture_load_from_file("/home/truta/CLionProjects/ametrine/pics/t3.png", &tex_info, true);
-    am_id tex_id = amgl_texture_create(tex_info);
+        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
+        .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
+    });
 
-    
-    am_id uni_id = amgl_uniform_create((amgl_uniform_info){
+    uni_id = amgl_uniform_create((amgl_uniform_info){
         .name = "u_tex",
         .type = AMGL_UNIFORM_TYPE_SAMPLER2D
     });
 
-    am_id vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+    vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = (float[]) {
             -0.5f, -0.5f,  0.0f, 0.0f,  // Top Left
-            0.5f, -0.5f,  1.0f, 0.0f,  // Top Right 
+            0.5f, -0.5f,  1.0f, 0.0f,  // Top Right
             -0.5f,  0.5f,  0.0f, 1.0f,  // Bottom Left
             0.5f,  0.5f,  1.0f, 1.0f   // Bottom Right
         },
@@ -3285,18 +3661,17 @@ int main() {
         .usage = AMGL_BUFFER_USAGE_STATIC,
     });
 
-    
-    am_id idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
+    idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
         .data = (am_uint32[]){
-            0, 3, 2,    // First Triangle
-            0, 1, 3     // Second Triangle
+                0, 3, 2,    // First Triangle
+                0, 1, 3     // Second Triangle
         },
         .size = sizeof(am_uint32)*6,
         .offset = 0,
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
 
-    am_id pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
+    pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
         .raster = {
             .shader_id = shader_id,
         },
@@ -3309,34 +3684,70 @@ int main() {
         }
     });
 
-    am_id rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
+    rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
+};
+
+void update() {
+    am_bool run = true;
+    am_engine *engine = am_engine_get_instance();
+    am_platform *platform = am_engine_get_subsystem(platform);
+
+
+    amgl_bindings_info binds = {
+        .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
+        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = idx_id}},
+        .uniforms = {.info = &(amgl_uniform_bind_info){.uniform_id = uni_id, .data = &tex_id, .binding = 0}}
+    };
+    amgl_start_render_pass(rp_id);
+        glEnable(GL_BLEND);
+        glClearColor(0.0f, 1.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        amgl_bind_pipeline(pipeline_id);
+        amgl_set_bindings(&binds);
+        amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
+    amgl_end_render_pass(rp_id);
+
+    if (am_platform_key_pressed(AM_KEYCODE_X)) {
+        am_engine_terminate();
+    };
+
+};
+
+void shutdown() {
+    return;
+};
+
+int main() {
+    am_engine_create((am_engine_info){
+        .init = init,
+        .update = update,
+        .shutdown = shutdown,
+        .win_fullscreen = false,
+        .win_height = 500,
+        .win_width = 500,
+        .win_x = 50,
+        .win_y = 50,
+        .vsync_enabled = true,
+        .is_running = true
+        //.win_name = "Testing"
+    });
+
+    while (true) am_engine_frame();
+
+    /*
+    am_id shader_id = amgl_shader_create((amgl_shader_info) {
+        .num_sources = 2,
+        .sources = (amgl_shader_source_info[]) {
+            { .type = AMGL_SHADER_VERTEX, .source = am_util_read_file("/home/truta/CLionProjects/ametrine/test_v.glsl") },
+            { .type = AMGL_SHADER_FRAGMENT, .source = am_util_read_file("/home/truta/CLionProjects/ametrine/test_f.glsl") }
+        }
+    });
+     */
+
 
     printf("IDS: %u %u %u\n", rp_id, idx_id, pipeline_id);
 
-    am_bool run = true;
-    am_engine *engine = am_engine_get_instance();
-    while (run) {
-        am_platform_update(am_engine_get_subsystem(platform));
-        amgl_bindings_info binds = {
-            .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
-            .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = idx_id}},
-            .uniforms = {.info = &(amgl_uniform_bind_info){.uniform_id = uni_id, .data = &tex_id, .binding = 0}}
-        };
-        amgl_start_render_pass(rp_id);
-            glEnable(GL_BLEND);
-            glClearColor(0.0f, 1.0f, 0.0f, 0.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            amgl_bind_pipeline(pipeline_id);
-            amgl_set_bindings(&binds);
-            amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
-        amgl_end_render_pass(rp_id);
-        //TODO: Will have to swap buffers for all existing windows
-        glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, 1)->handle);
-        if (am_platform_key_pressed(AM_KEYCODE_X)) {
-            am_engine_terminate();
-            run = !run;
-        };
-    };
+
 
     return 0;
 };
