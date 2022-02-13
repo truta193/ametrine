@@ -9,7 +9,7 @@
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
 
-#include <GL/gl.h>
+//#include <GL/gl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -17,7 +17,8 @@
 #include <assert.h>
 #include <unistd.h>
 #include <time.h>
-//#include <math.h>
+#include <math.h>
+#include "glad/include/glad/glad.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #if (defined _WIN32 || defined _WIN64)
@@ -80,83 +81,8 @@ typedef void (AM_CALL PFNGLSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawa
 #else
 typedef BOOL (AM_CALL PFNGLSWAPINTERVALEXTPROC) (int interval);
 #endif
-typedef GLuint (AM_CALL PFNGLCREATESHADERPROC) (GLenum type);
-typedef void (AM_CALL PFNGLSHADERSOURCEPROC) (GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length);
-typedef void (AM_CALL PFNGLCOMPILESHADERPROC) (GLuint shader);
-typedef void (AM_CALL PFNGLGETSHADERIVPROC) (GLuint shader, GLenum pname, GLint *params);
-typedef void (AM_CALL PFNGLGETSHADERINFOLOGPROC) (GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
-typedef void (AM_CALL PFNGLDETACHSHADERPROC) (GLuint program, GLuint shader);
-typedef void (AM_CALL PFNGLDELETESHADERPROC) (GLuint shader);
-typedef GLuint (AM_CALL PFNGLCREATEPROGRAMPROC) (void);
-typedef void (AM_CALL PFNGLATTACHSHADERPROC) (GLuint program, GLuint shader);
-typedef void (AM_CALL PFNGLLINKPROGRAMPROC) (GLuint program);
-typedef void (AM_CALL PFNGLGETPROGRAMIVPROC) (GLuint program, GLenum pname, GLint *params);
-typedef void (AM_CALL PFNGLDELETEPROGRAMPROC) (GLuint program);
-typedef void (AM_CALL PFNGLGETPROGRAMINFOLOGPROC) (GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
-typedef void (AM_CALL PFNGLUSEPROGRAMPROC) (GLuint program);
-typedef void (AM_CALL PFNGLGENBUFFERSPROC) (GLsizei n, GLuint *buffers);
-typedef void (AM_CALL PFNGLDELETEBUFFERSPROC) (GLsizei n, const GLuint *buffers);
-typedef void (AM_CALL PFNGLBINDBUFFERPROC) (GLenum target, GLuint buffer);
-typedef void (AM_CALL PFNGLBUFFERDATAPROC) (GLenum target, GLsizeiptr size, const void *data, GLenum usage);
-typedef void (AM_CALL PFNGLGENVERTEXARRAYSPROC) (GLsizei n, GLuint *arrays);
-typedef void (AM_CALL PFNGLDELETEVERTEXARRAYSPROC) (GLsizei n, const GLuint *arrays);
-typedef void (AM_CALL PFNGLBINDVERTEXARRAYPROC) (GLuint array);
-typedef void (AM_CALL PFNGLVERTEXATTRIBPOINTERPROC) (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
-typedef void (AM_CALL PFNGLVERTEXATTRIBIPOINTERPROC) (GLuint index, GLint size, GLenum type, GLsizei stride, const void * pointer);
-typedef void (AM_CALL PFNGLENABLEVERTEXATTRIBARRAYPROC) (GLuint index);
-typedef GLint (AM_CALL PFNGLGETATTRIBLOCATIONPROC) (GLuint program, const GLchar *name);
-typedef void (AM_CALL PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
-typedef GLint (AM_CALL PFNGLGETUNIFORMLOCATIONPROC) (GLuint program, const GLchar *name);
-typedef void (AM_CALL PFNGLGENERATEMIPMAPPROC) (GLenum target);
-typedef void (AM_CALL PFNGLBUFFERSUBDATAPROC) (GLenum target, GLintptr offset, GLsizeiptr size, const void* data);
-typedef void (AM_CALL PFNGLGENFRAMEBUFFERSPROC) (GLsizei n, GLuint *ids);
-//FIX: Fix this, conflicting types
-//typedef void (AM_CALL PFNGLDELETEFRAMEBUFFERSPROC) (GLsizei n, GLuint *framebuffers);
-typedef void (AM_CALL PFNGLBINDFRAMEBUFFERPROC) (GLenum target, GLuint framebuffer);
-typedef void (AM_CALL PFNGLFRAMEBUFFERTEXTURE2DPROC) (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
-typedef void (AM_CALL PFNGLUNIFORM1FVPROC) (GLint location, GLsizei count, const GLfloat *value);
-typedef void (AM_CALL PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
-typedef void (AM_CALL PFNGLGETUNIFORMFVPROC) (GLuint program, GLint location, GLfloat *params);
-typedef void (AM_CALL PFNGLBINDIMAGETEXTUREPROC) (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
-
 PFNGLSWAPINTERVALEXTPROC glSwapInterval = NULL;
-PFNGLCREATESHADERPROC glCreateShader = NULL;
-PFNGLSHADERSOURCEPROC glShaderSource = NULL;
-PFNGLCOMPILESHADERPROC glCompileShader = NULL;
-PFNGLGETSHADERIVPROC glGetShaderiv = NULL;
-PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog = NULL;
-PFNGLDETACHSHADERPROC glDetachShader = NULL;
-PFNGLDELETESHADERPROC glDeleteShader = NULL;
-PFNGLCREATEPROGRAMPROC glCreateProgram = NULL;
-PFNGLATTACHSHADERPROC glAttachShader = NULL;
-PFNGLLINKPROGRAMPROC glLinkProgram = NULL;
-PFNGLGETPROGRAMIVPROC glGetProgramiv = NULL;
-PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog = NULL;
-PFNGLDELETEPROGRAMPROC glDeleteProgram = NULL;
-PFNGLUSEPROGRAMPROC glUseProgram = NULL;
-PFNGLGENBUFFERSPROC glGenBuffers = NULL;
-PFNGLDELETEBUFFERSPROC glDeleteBuffers = NULL;
-PFNGLBINDBUFFERPROC glBindBuffer = NULL;
-PFNGLBUFFERDATAPROC glBufferData = NULL;
-PFNGLGENVERTEXARRAYSPROC glGenVertexArrays = NULL;
-PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays = NULL;
-PFNGLBINDVERTEXARRAYPROC glBindVertexArray = NULL;
-PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer = NULL;
-PFNGLVERTEXATTRIBIPOINTERPROC glVertexAttribIPointer = NULL;
-PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray = NULL;
-PFNGLGETATTRIBLOCATIONPROC glGetAttribLocation = NULL;
-PFNGLUNIFORM1IPROC glUniform1i = NULL;
-PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = NULL;
-PFNGLGENERATEMIPMAPPROC glGenerateMipmap = NULL;
-PFNGLBUFFERSUBDATAPROC glBufferSubData = NULL;
-PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers = NULL;
-PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers = NULL;
-PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer = NULL;
-PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D = NULL;
-PFNGLUNIFORM1FVPROC glUniform1fv = NULL;
-PFNGLUNIFORM1FPROC glUniform1f = NULL;
-PFNGLGETUNIFORMFVPROC glGetUniformfv = NULL;
-PFNGLBINDIMAGETEXTUREPROC glBindImageTexture = NULL;
+
 
 //----------------------------------------------------------------------------//
 //                             END TYPES AND DEFS                             //
@@ -1239,7 +1165,6 @@ am_int32 amgl_index_buffer_size_translate(size_t size);
 void amgl_pipeline_destroy(am_id id);
 
 //Various OGL
-void amgl_init(); //Create arrays for shaders, vertex b, index b, frame b etc., init gl addresses
 void amgl_terminate();
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
 void amgl_vsync(am_id window_id, am_bool state);
@@ -3224,6 +3149,10 @@ am_id am_platform_window_create(am_window_info window_info) {
     wglShareLists(new_window->context, main_window->context);
     #endif
 
+    //Have to do this here unfortunately
+    if (am_packed_array_get_count(platform->windows) <= 1)
+        if (!gladLoadGL()) printf("[FAIL] am_platform_window_create (id: %u): Could not load OpenGL functions!\n", new_window->id);
+
     amgl_vsync(new_window->id, am_engine_get_instance()->vsync_enabled);
 
     #if defined(AM_LINUX)
@@ -4169,54 +4098,7 @@ void amgl_pipeline_destroy(am_id id) {
     am_packed_array_erase(engine->ctx_data.pipelines, id);  
 };
 
-void amgl_init() {
-    //TODO: Init all gl procedures and functions
-    glEnable(GL_TEXTURE_2D);
-    glCreateShader = (PFNGLCREATESHADERPROC)amgl_get_proc_address("glCreateShader");
-    glShaderSource = (PFNGLSHADERSOURCEPROC)amgl_get_proc_address("glShaderSource");
-    glCompileShader = (PFNGLCOMPILESHADERPROC)amgl_get_proc_address("glCompileShader");
-    glGetShaderiv = (PFNGLGETSHADERIVPROC)amgl_get_proc_address("glGetShaderiv");
-    glGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)amgl_get_proc_address("glGetShaderInfoLog");
-    glDetachShader = (PFNGLDETACHSHADERPROC)amgl_get_proc_address("glDetachShader");
-    glDeleteShader = (PFNGLDELETESHADERPROC)amgl_get_proc_address("glDeleteShader");
-    glCreateProgram = (PFNGLCREATEPROGRAMPROC)amgl_get_proc_address("glCreateProgram");
-    glAttachShader = (PFNGLATTACHSHADERPROC)amgl_get_proc_address("glAttachShader");
-    glLinkProgram = (PFNGLLINKPROGRAMPROC)amgl_get_proc_address("glLinkProgram");
-    glGetProgramiv = (PFNGLGETPROGRAMIVPROC)amgl_get_proc_address("glGetProgramiv");
-    glGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC)amgl_get_proc_address("glGetProgramInfoLog");
-    glDeleteProgram = (PFNGLDELETEPROGRAMPROC)amgl_get_proc_address("glDeleteProgram");
-    glUseProgram = (PFNGLUSEPROGRAMPROC)amgl_get_proc_address("glUseProgram");
-    glGenBuffers = (PFNGLGENBUFFERSPROC)amgl_get_proc_address("glGenBuffers");
-    glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)amgl_get_proc_address("glDeleteBuffers");
-    glBindBuffer = (PFNGLBINDBUFFERPROC)amgl_get_proc_address("glBindBuffer");
-    glBufferData = (PFNGLBUFFERDATAPROC)amgl_get_proc_address("glBufferData");
-    glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)amgl_get_proc_address("glGenVertexArrays");
-    glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)amgl_get_proc_address("glDeleteVertexArrays");
-    glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)amgl_get_proc_address("glBindVertexArray");
-    glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)amgl_get_proc_address("glVertexAttribPointer");
-    glVertexAttribIPointer = (PFNGLVERTEXATTRIBIPOINTERPROC)amgl_get_proc_address("glVertexAttribIPointer");
-    glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)amgl_get_proc_address("glEnableVertexAttribArray");
-    glGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC)amgl_get_proc_address("glGetAttribLocation");
-    glUniform1i = (PFNGLUNIFORM1IPROC)amgl_get_proc_address("glUniform1i");
-    glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)amgl_get_proc_address("glGetUniformLocation");
-    glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)amgl_get_proc_address("glGenerateMipmap");
-    glBufferSubData = (PFNGLBUFFERSUBDATAPROC)amgl_get_proc_address("glBufferSubData");
-    glGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC)amgl_get_proc_address("glGenFramebuffers");
-    glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSPROC)amgl_get_proc_address("glDeleteFramebuffers");
-    glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)amgl_get_proc_address("glBindFramebuffer");
-    glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)amgl_get_proc_address("glFramebufferTexture2D");
-    glUniform1fv = (PFNGLUNIFORM1FVPROC)amgl_get_proc_address("glUniform1fv");
-    glUniform1f = (PFNGLUNIFORM1FPROC)amgl_get_proc_address("glUniform1f");
-    glGetUniformfv = (PFNGLGETUNIFORMFVPROC)amgl_get_proc_address("glGetUniformfv");
-    glBindImageTexture = (PFNGLBINDIMAGETEXTUREPROC)amgl_get_proc_address("glBindImageTexture");
 
-    am_engine *engine = am_engine_get_instance();
-    amgl_frame_buffer base_fbo = {
-        .handle = 0, //OpenGL default
-        .id = 1
-    };
-    am_packed_array_add(engine->ctx_data.frame_buffers, base_fbo);
-};
 
 //TODO: Windows impl if necessary
 void amgl_terminate() {
@@ -4230,7 +4112,7 @@ void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height) 
 void amgl_vsync(am_id window_id, am_bool state) {
     //REVIEW: Not sure if glFlush() is needed but I read it can help
     glFlush();
-    //Have to load SwapInterval here because this is called for each window on creation, so before amgl_init()
+    //Have to load SwapInterval here because this is called for each window on creation
     #if defined(AM_LINUX)
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
@@ -4436,6 +4318,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
         am_int32 format = amgl_texture_translate_format(texture->format);
 
         //TODO: READ_WRITE for now, will have to implement some kind of image layer on top of a texture
+
         glBindImageTexture(0, texture->handle, 0, GL_FALSE, 0, GL_READ_WRITE, format);
     };
 };
@@ -4635,7 +4518,7 @@ void am_camera_offset_orientation(am_camera* cam, am_float32 yaw, am_float32 pit
 //                              START ENGINE IMPL                             //
 //----------------------------------------------------------------------------//
 
-void am_engine_create(am_engine_info engine_info){
+void am_engine_create(am_engine_info engine_info) {
     am_engine_get_instance() = (am_engine*)am_malloc(sizeof(am_engine));
     am_engine *engine = am_engine_get_instance();
     engine->init = engine_info.init;
@@ -4693,7 +4576,14 @@ void am_engine_create(am_engine_info engine_info){
     #if defined(AM_LINUX)
     //XSetWindowBackground(am_engine_get_subsystem(platform)->display, main_wind->handle, 0x0000FF);
     #endif
-    amgl_init();
+
+    //Base framebuffer
+    amgl_frame_buffer base_fbo = {
+        .handle = 0, //OpenGL default
+        .id = 1
+    };
+    am_packed_array_add(engine->ctx_data.frame_buffers, base_fbo);
+
     amgl_set_viewport(0,0, (am_int32)main.width, (am_int32)main.height);
 
     am_platform *platform = am_engine_get_subsystem(platform);
@@ -4823,6 +4713,10 @@ char* am_util_read_file(const char *path) {
 am_id shader_id, tex_id, uni_id, vbo_id, idx_id, pipeline_id, rp_id;
 
 void init() {
+    int maj,min;
+    glGetIntegerv(GL_MAJOR_VERSION, &maj);
+    glGetIntegerv(GL_MINOR_VERSION, &min);
+    printf("major %d minor %d\n", maj, min);
     am_platform *platform = am_engine_get_subsystem(platform);
     XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, 0xFF0000);
 
