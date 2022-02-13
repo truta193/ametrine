@@ -275,9 +275,9 @@ static inline am_mat4 am_mat4_transpose(am_mat4 m);
 static inline am_mat4 am_mat4_inverse(am_mat4 m);
 static inline am_mat4 am_mat4_ortho(am_float32 left, am_float32 right, am_float32 bottom, am_float32 top, am_float32 near, am_float32 far);
 static inline am_mat4 am_mat4_perspective(am_float32 fov, am_float32 aspect_ratio, am_float32 near, am_float32 far);
-static inline am_mat4 am_mat4_translatev(const am_vec3 v);
+static inline am_mat4 am_mat4_translatev(am_vec3 v);
 static inline am_mat4 am_mat4_translate(am_float32 x, am_float32 y, am_float32 z);
-static inline am_mat4 am_mat4_scalev(const am_vec3 v);
+static inline am_mat4 am_mat4_scalev(am_vec3 v);
 static inline am_mat4 am_mat4_scale(am_float32 x, am_float32 y, am_float32 z);
 static inline am_mat4 am_mat4_rotatev(am_float32 angle, am_vec3 axis);
 static inline am_mat4 am_mat4_rotate(am_float32 angle, am_float32 x, am_float32 y, am_float32 z);
@@ -1175,7 +1175,7 @@ void amgl_set_bindings(amgl_bindings_info *info);
 void amgl_draw(amgl_draw_info *info);
 
 //Camera
-am_cameram();
+am_camera am_camera_default();
 am_camera am_camera_perspective();
 am_mat4 am_camera_get_view(am_camera* cam);
 am_mat4 am_camera_get_proj(am_camera* cam, am_int32 view_width, am_int32 view_height);
@@ -1187,7 +1187,7 @@ am_vec3 am_camera_down(am_camera* cam);
 am_vec3 am_camera_right(am_camera* cam);
 am_vec3 am_camera_left(am_camera* cam);
 am_vec3 am_camera_screen_to_world(am_camera* cam, am_vec3 coords, am_int32 view_width, am_int32 view_height);
-void am_camera_offset_orientation(am_camera* cam, am_float32 yaw, am_float32 picth);
+void am_camera_offset_orientation(am_camera* cam, am_float32 yaw, am_float32 pitch);
 
 
 //----------------------------------------------------------------------------//
@@ -1406,7 +1406,7 @@ static inline am_vec2 am_vec2_norm(am_vec2 a) {
 static inline am_float32 am_vec2_dist(am_vec2 a, am_vec2 b) {
     am_float32 dx = a.x - b.x;
     am_float32  dy = a.y = b.y;
-    return (am_float32)sqrt(dx * dx + dy * dy);
+    return (am_float32)sqrt((double)(dx * dx + dy * dy));
 };
 
 static inline am_float32 am_vec2_cross(am_vec2 a, am_vec2 b) {
@@ -1533,7 +1533,7 @@ static inline am_float32 am_vec4_dist(am_vec4 a, am_vec4 b) {
     am_float32 dy = (a.y - b.y);
     am_float32 dz = (a.z - b.z);
     am_float32 dw = (a.w - b.w);
-    return (am_float32)(sqrt(dx * dx + dy * dy + dz * dz + dw * dw));
+    return (am_float32)(sqrt((double)(dx * dx + dy * dy + dz * dz + dw * dw)));
 };
 
 static inline am_vec4 am_vec4_norm(am_vec4 a) {
@@ -2164,12 +2164,12 @@ static inline am_quat am_quat_from_euler(am_float32 yaw_deg, am_float32 pitch_de
     am_float32 roll = am_deg2rad(roll_deg);
 
     am_quat q;
-    am_float32 cy = (am_float32)cos(yaw * 0.5f);
-    am_float32 sy = (am_float32)sin(yaw * 0.5f);
-    am_float32 cr = (am_float32)cos(roll * 0.5f);
-    am_float32 sr = (am_float32)sin(roll * 0.5f);
-    am_float32 cp = (am_float32)cos(pitch * 0.5f);
-    am_float32 sp = (am_float32)sin(pitch * 0.5f);
+    am_float32 cy = (am_float32)cos((double)(yaw * 0.5f));
+    am_float32 sy = (am_float32)sin((double)(yaw * 0.5f));
+    am_float32 cr = (am_float32)cos((double)(roll * 0.5f));
+    am_float32 sr = (am_float32)sin((double)(roll * 0.5f));
+    am_float32 cp = (am_float32)cos((double)(pitch * 0.5f));
+    am_float32 sp = (am_float32)sin((double)(pitch * 0.5f));
 
     q.x = cy * sr * cp - sy * cr * sp;
     q.y = cy * cr * sp + sy * sr * cp;
@@ -3599,7 +3599,7 @@ am_id amgl_uniform_create(amgl_uniform_info info) {
     uniform->id = engine->ctx_data.uniforms->next_id;
 
     if (!info.type) {
-        printf("[WARN] amgl_uniform_create (id: %u): No type given, choosing default!\n");
+        printf("[WARN] amgl_uniform_create (id: %u): No type given, choosing default!\n", uniform->id);
         info.type = AMGL_UNIFORM_TYPE_FLOAT;
     };
 
@@ -4347,18 +4347,18 @@ void amgl_draw(amgl_draw_info *info) {
         };
 
         switch (pipeline->layout.attributes[i].format) {
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4: glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3: glVertexAttribPointer(i, 3, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2: glVertexAttribPointer(i, 2, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT:  glVertexAttribPointer(i, 1, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT4:  glVertexAttribIPointer(i, 4, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT3:  glVertexAttribIPointer(i, 3, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT2:  glVertexAttribIPointer(i, 2, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT:   glVertexAttribIPointer(i, 1, GL_UNSIGNED_INT, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE:   glVertexAttribPointer(i, 1, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE2:  glVertexAttribPointer(i, 2, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE3:  glVertexAttribPointer(i, 3, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
-            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE4:  glVertexAttribPointer(i, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4: glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3: glVertexAttribPointer(i, 3, GL_FLOAT, GL_FALSE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2: glVertexAttribPointer(i, 2, GL_FLOAT, GL_FALSE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT:  glVertexAttribPointer(i, 1, GL_FLOAT, GL_FALSE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT4:  glVertexAttribIPointer(i, 4, GL_UNSIGNED_INT, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT3:  glVertexAttribIPointer(i, 3, GL_UNSIGNED_INT, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT2:  glVertexAttribIPointer(i, 2, GL_UNSIGNED_INT, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_UINT:   glVertexAttribIPointer(i, 1, GL_UNSIGNED_INT, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE:   glVertexAttribPointer(i, 1, GL_UNSIGNED_BYTE, GL_TRUE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE2:  glVertexAttribPointer(i, 2, GL_UNSIGNED_BYTE, GL_TRUE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE3:  glVertexAttribPointer(i, 3, GL_UNSIGNED_BYTE, GL_TRUE, (am_int32)stride, (void*)(uintptr_t)offset); break;
+            case AMGL_VERTEX_BUFFER_ATTRIBUTE_BYTE4:  glVertexAttribPointer(i, 4, GL_UNSIGNED_BYTE, GL_TRUE, (am_int32)stride, (void*)(uintptr_t)offset); break;
             default: {
                 printf("[FAIL] amgl_draw (id: ?): Invalid layout attribute format!\n");
                 exit(0);
@@ -4376,9 +4376,9 @@ void amgl_draw(amgl_draw_info *info) {
     //am_uint32 idx_buf_elem_size = amgl_index_buffer_size_translate(pipeline->raster.index_buffer_element_size);
 
     if (am_packed_array_has(engine->ctx_data.index_buffers, engine->ctx_data.frame_cache.index_buffer.id)) {
-        glDrawElements(primitive, info->count, GL_UNSIGNED_INT, (void*)(intptr_t)info->start);
+        glDrawElements(primitive, (am_int32)info->count, GL_UNSIGNED_INT, (void*)(intptr_t)info->start);
     } else {
-        glDrawArrays(primitive, info->start, info->count);
+        glDrawArrays(primitive, (am_int32)info->start, (am_int32)info->count);
     };
 
 };
@@ -4689,7 +4689,7 @@ char* am_util_read_file(const char *path) {
         #if defined(AM_LINUX)
         struct stat st;
         stat(path, &st);
-        rd_size = st.st_size;
+        rd_size = (am_int32)st.st_size;
         #else
         HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         LARGE_INTEGER size;
