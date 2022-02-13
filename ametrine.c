@@ -1,7 +1,9 @@
 //REVIEW: Could change int num_* property of some structs to size_t size, so it matches with the other ones
 
+//TODO: Compute shaders, instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
-//TODO: 3D camera
+//TODO: Math, 3D camera
+//TODO: More defined default values perhaps?
 
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
@@ -225,6 +227,13 @@ void am_dyn_array_destroy(void *array);
 //                                    MATH                                    //
 //----------------------------------------------------------------------------//
 
+// COMMON MATH STUFF
+
+#define AM_PI 3.1415926535897932
+#define am_rad2deg(rad) (am_float32)(((rad) * 180.0f) / AM_PI)
+#define am_deg2rad(deg) (am_float32)(((deg) * AM_PI) / 180.0f)
+
+// VEC2
 
 typedef struct am_vec2 {
     union {
@@ -235,11 +244,175 @@ typedef struct am_vec2 {
     };
 } am_vec2;
 
-static inline am_vec2 am_vec2_add(am_vec2 vec0, am_vec2 vec1);
-static inline am_vec2 am_vec2_sub(am_vec2 vec0, am_vec2 vec1);
-static inline am_vec2 am_vec2_mul(am_vec2 vec0, am_vec2 vec1);
-static inline am_vec2 am_vec2_div(am_vec2 vec0, am_vec2 vec1);
-static inline am_vec2 am_vec2_scale(am_float32 scalar, am_vec2 vec);
+static inline am_vec2 am_vec2_create(am_float32 x, am_float32 y);
+static inline am_vec2 am_vec2_add(am_vec2 a, am_vec2 b);
+static inline am_vec2 am_vec2_sub(am_vec2 a, am_vec2 b);
+static inline am_vec2 am_vec2_mul(am_vec2 a, am_vec2 b);
+static inline am_vec2 am_vec2_div(am_vec2 a, am_vec2 b);
+static inline am_vec2 am_vec2_scale(am_float32 scalar, am_vec2 a);
+static inline am_float32 am_vec2_dot(am_vec2 a, am_vec2 b);
+static inline am_float32 am_vec2_len(am_vec2 a);
+static inline am_vec2 am_vec2_norm(am_vec2 a);
+static inline am_float32 am_vec2_dist(am_vec2 a, am_vec2 b);
+static inline am_float32 am_vec2_cross(am_vec2 a, am_vec2 b);
+static inline am_float32 am_vec2_angle(am_vec2 a, am_vec2 b);
+
+//VEC3
+
+typedef struct am_vec3 {
+    union {
+        am_float32 xyz[3];
+        struct {
+            am_float32 x, y, z;
+        };
+    };
+} am_vec3;
+
+static inline am_vec3 am_vec3_create(am_float32 x, am_float32 y, am_float32 z);
+static inline am_vec3 am_vec3_add(am_vec3 a, am_vec3 b);
+static inline am_vec3 am_vec3_sub(am_vec3 a, am_vec3 b);
+static inline am_vec3 am_vec3_mul(am_vec3 a, am_vec3 b);
+static inline am_vec3 am_vec3_div(am_vec3 a, am_vec3 b);
+static inline am_vec3 am_vec3_scale(am_float32 scalar, am_vec3 a);
+static inline am_float32 am_vec3_dot(am_vec3 a, am_vec3 b);
+static inline am_float32 am_vec3_len(am_vec3 a);
+static inline am_float32 am_vec3_len_sqr(am_vec3 a);
+static inline am_float32 am_vec3_dist(am_vec3 a, am_vec3 b);
+static inline am_vec3 am_vec3_norm(am_vec3 a);
+static inline am_vec3 am_vec3_cross(am_vec3 a, am_vec3 b);
+static inline am_float32 am_vec3_angle_unsigned(am_vec3 a, am_vec3 b);
+static inline am_float32 am_vec3_angle_signed(am_vec3 a, am_vec3 b);
+static inline am_vec3 am_vec3_triple_cross(am_vec3 a, am_vec3 b, am_vec3 c);
+
+// VEC4
+
+typedef struct am_vec4 {
+    union {
+        am_float32 xyzw[4];
+        struct {
+            am_float32 x, y, z, w;
+        };
+    };
+} am_vec4;
+
+static inline am_vec4 am_vec4_create(am_float32 x, am_float32 y, am_float32 z, am_float32 w);
+static inline am_vec4 am_vec4_add(am_vec4 a, am_vec4 b);
+static inline am_vec4 am_vec4_sub(am_vec4 a, am_vec4 b);
+static inline am_vec4 am_vec4_mul(am_vec4 a, am_vec4 b);
+static inline am_vec4 am_vec4_div(am_vec4 a, am_vec4 b);
+static inline am_vec4 am_vec4_scale(am_float32 scalar, am_vec4 a);
+static inline am_float32 am_vec4_dot(am_vec4 a, am_vec4 b);
+static inline am_float32 am_vec4_len(am_vec4 a);
+static inline am_float32 am_vec4_dist(am_vec4 a, am_vec4 b);
+static inline am_vec4 am_vec4_norm(am_vec4 a);
+
+// GENERAL VECTORS
+
+static inline am_vec3 am_vec4_to_vec3(am_vec4 a);
+static inline am_vec2 am_vec3_to_vec2(am_vec4 a);
+
+// MAT 3x3
+
+typedef struct am_mat3 {
+    am_float32 m[9];
+} am_mat3;
+
+static inline am_mat3 am_mat3_create();
+static inline am_mat3 am_mat3_diag(am_float32 val);
+#define am_mat3_identity() am_mat3_diag(1.0f)
+static inline am_mat3 am_mat3_mul(am_mat3 m0, am_mat3 m1);
+static inline am_vec3 am_mat3_mul_vec3(am_mat3 m, am_vec3 v);
+static inline am_mat3 am_mat3_scale(am_float32 x, am_float32 y, am_float32 z);
+static inline am_mat3 am_mat3_rotate(am_float32 radians, am_float32 x, am_float32 y, am_float32 z);
+static inline am_mat3 am_mat3_rotatev(am_float32 radians, am_vec3 axis);
+static inline am_mat3 am_mat3_rotateq(am_vec4 q);
+static inline am_mat3 am_mat3_rsq(am_vec4 q, am_vec3 s);
+static inline am_mat3 am_mat3_inverse(am_mat3 m);
+
+// MAT4
+
+typedef struct am_mat4 {
+    union {
+        am_vec4 rows[4];
+        am_float32 elements[16];
+    };
+} am_mat4;
+
+static inline am_mat4 am_mat4_create();
+static inline am_mat4 am_mat4_diag(am_float32 val);
+#define am_mat4_identity() am_mat4_diag(1.0f)
+static inline am_mat4 am_mat4_elem(const am_float32* elements);
+static inline am_mat4 am_mat4_mul(am_mat4 m0, am_mat4 m1);
+static inline am_mat4 am_mat4_mul_list(am_uint32 count, ...);
+static inline void am_mat4_set_elements(am_mat4* m, const am_float32* elements, am_uint32 count);
+static inline am_mat4 am_mat4_transpose(am_mat4 m);
+static inline am_mat4 am_mat4_inverse(am_mat4 m);
+static inline am_mat4 am_mat4_ortho(am_float32 left, am_float32 right, am_float32 bottom, am_float32 top, am_float32 near, am_float32 far);
+static inline am_mat4 am_mat4_perspective(am_float32 fov, am_float32 aspect_ratio, am_float32 near, am_float32 far);
+static inline am_mat4 am_mat4_translatev(const am_vec3 v);
+static inline am_mat4 am_mat4_translate(am_float32 x, am_float32 y, am_float32 z);
+static inline am_mat4 am_mat4_scalev(const am_vec3 v);
+static inline am_mat4 am_mat4_scale(am_float32 x, am_float32 y, am_float32 z);
+static inline am_mat4 am_mat4_rotatev(am_float32 angle, am_vec3 axis);
+static inline am_mat4 am_mat4_rotate(am_float32 angle, am_float32 x, am_float32 y, am_float32 z);
+static inline am_mat4 am_mat4_look_at(am_vec3 position, am_vec3 target, am_vec3 up);
+static inline am_vec4 am_mat4_mul_vec4(am_mat4 m, am_vec4 v);
+static inline am_vec3 am_mat4_mul_vec3(am_mat4 m, am_vec3 v);
+
+// Quaternion
+
+typedef struct am_quat{
+    union {
+        am_vec4 v;
+        am_float32 xyzw[4];
+        struct {
+            am_float32 x, y, z, w;
+        };
+    };
+} am_quat;
+
+static inline am_quat am_quat_default();
+static inline am_quat am_quat_create(am_float32 _x, am_float32 _y, am_float32 _z, am_float32 _w);
+static inline am_quat am_quat_add(am_quat q0, am_quat q1);
+static inline am_quat am_quat_sub(am_quat q0, am_quat q1);
+static inline am_quat am_quat_mul(am_quat q0, am_quat q1);
+static inline am_quat am_quat_mul_list(am_uint32 count, ...);
+static inline am_quat am_quat_mul_quat(am_quat q0, am_quat q1);
+static inline am_quat am_quat_scale(am_quat q, am_float32 s);
+static inline am_float32 am_quat_dot(am_quat q0, am_quat q1);
+static inline am_quat am_quat_conjugate(am_quat q);
+static inline am_float32 am_quat_len(am_quat q);
+static inline am_quat am_quat_norm(am_quat q);
+static inline am_quat am_quat_cross(am_quat q0, am_quat q1);
+static inline am_quat am_quat_inverse(am_quat q);
+static inline am_vec3 am_quat_rotate(am_quat q, am_vec3 v);
+static inline am_quat am_quat_angle_axis(am_float32 rad, am_vec3 axis);
+static inline am_quat am_quat_slerp(am_quat a, am_quat b, am_float32 t);
+#define quat_axis_angle(axis, angle) am_quat_angle_axis(angle, axis)
+static inline am_mat4 am_quat_to_mat4(am_quat _q);
+static inline am_quat am_quat_from_euler(am_float32 yaw_deg, am_float32 pitch_deg, am_float32 roll_deg);
+static inline am_float32 am_quat_pitch(am_quat* q);
+static inline am_float32 am_quat_yaw(am_quat* q);
+static inline am_float32 am_quat_roll(am_quat* q);
+static inline am_vec3 am_quat_to_euler(am_quat* q);
+
+// TRANSFORM
+// Thank you to MrFrenik
+
+typedef struct am_vqs {
+    union {
+        am_vec3 position;
+        am_vec3 translation;
+    };
+    am_quat rotation;
+    am_vec3 scale;
+} am_vqs;
+
+static inline am_vqs am_vqs_create(am_vec3 translation, am_quat rotation, am_vec3 scale);
+static inline am_vqs am_vqs_default();
+static inline am_vqs am_vqs_absolute_transform(const am_vqs* local, const am_vqs* parent);
+static inline am_vqs am_vqs_relative_transform(const am_vqs* absolute, const am_vqs* parent);
+static inline am_mat4 am_vqs_to_mat4(const am_vqs* transform);
 
 //----------------------------------------------------------------------------//
 //                                  END MATH                                  //
@@ -491,7 +664,7 @@ typedef struct am_platform {
 
 //Platform 
 #if defined(AM_LINUX)
-am_key_map am_platform_translate_keysym(KeySym *key_syms, am_int32 width);
+am_key_map am_platform_translate_keysym(const KeySym *key_syms, am_int32 width);
 #endif
 am_mouse_map am_platform_translate_button(am_uint32 button);
 am_platform *am_platform_create();
@@ -996,6 +1169,23 @@ typedef struct amgl_draw_info {
     am_uint32 count;
 } amgl_draw_info;
 
+typedef enum am_projection_type
+{
+    AM_PROJECTION_TYPE_ORTHOGRAPHIC,
+    AM_PROJECTION_TYPE_PERSPECTIVE
+} am_projection_type;
+
+typedef struct am_camera {
+    am_vqs transform;
+    am_float32 fov;
+    am_float32 aspect_ratio;
+    am_float32 near_plane;
+    am_float32 far_plane;
+    am_float32 ortho_scale;
+    am_projection_type proj_type;
+} am_camera;
+
+
 //Shaders
 am_id amgl_shader_create(amgl_shader_info info);
 void amgl_shader_destroy(am_id id);
@@ -1058,6 +1248,22 @@ void amgl_end_render_pass(am_id render_pass_id);
 void amgl_bind_pipeline(am_id pipeline_id);
 void amgl_set_bindings(amgl_bindings_info *info);
 void amgl_draw(amgl_draw_info *info);
+
+//Camera
+am_cameram();
+am_camera am_camera_perspective();
+am_mat4 am_camera_get_view(am_camera* cam);
+am_mat4 am_camera_get_proj(am_camera* cam, am_int32 view_width, am_int32 view_height);
+am_mat4 am_camera_get_view_projection(am_camera* cam, am_int32 view_width, am_int32 view_height);
+am_vec3 am_camera_forward(am_camera* cam);
+am_vec3 am_camera_backward(am_camera* cam);
+am_vec3 am_camera_up(am_camera* cam);
+am_vec3 am_camera_down(am_camera* cam);
+am_vec3 am_camera_right(am_camera* cam);
+am_vec3 am_camera_left(am_camera* cam);
+am_vec3 am_camera_screen_to_world(am_camera* cam, am_vec3 coords, am_int32 view_width, am_int32 view_height);
+void am_camera_offset_orientation(am_camera* cam, am_float32 yaw, am_float32 picth);
+
 
 //----------------------------------------------------------------------------//
 //                                   END GL                                   //
@@ -1230,39 +1436,908 @@ void am_packed_array_alloc(void **array, size_t size) {
 //                                  MATH IMPL                                 //
 //----------------------------------------------------------------------------//
 
-static inline am_vec2 am_vec2_add(am_vec2 vec0, am_vec2 vec1) {
+// VEC2
+
+static inline am_vec2 am_vec2_create(am_float32 x, am_float32 y) {
     am_vec2 v;
-    v.x = vec0.x + vec1.x;
-    v.y = vec0.y + vec1.y;
+    v.x = x;
+    v.y = y;
     return v;
 };
 
-static inline am_vec2 am_vec2_sub(am_vec2 vec0, am_vec2 vec1) {
-    am_vec2 v;
-    v.x = vec0.x - vec1.x;
-    v.y = vec0.y - vec1.y;
+static inline am_vec2 am_vec2_add(am_vec2 a, am_vec2 b) {
+    return am_vec2_create(a.x + b.x, a.y + b.y);
+};
+
+static inline am_vec2 am_vec2_sub(am_vec2 a, am_vec2 b) {
+    return am_vec2_create(a.x - b.x, a.y - b.y);
+};
+
+static inline am_vec2 am_vec2_mul(am_vec2 a, am_vec2 b) {
+    return am_vec2_create(a.x * b.x, a.y * b.y);
+};
+
+static inline am_vec2 am_vec2_div(am_vec2 a, am_vec2 b){
+    return am_vec2_create(a.x / b.x, a.y / b.y);
+};
+
+static inline am_vec2 am_vec2_scale(am_float32 scalar, am_vec2 a){
+    return am_vec2_create(a.x * scalar, a.y * scalar);
+};
+
+static inline am_float32 am_vec2_dot(am_vec2 a, am_vec2 b) {
+    return (am_float32)(a.x * b.x + a.y * b.y);
+};
+
+static inline am_float32 am_vec2_len(am_vec2 a) {
+    return (am_float32)sqrt(am_vec2_dot(a,a));
+};
+
+static inline am_vec2 am_vec2_norm(am_vec2 a) {
+    am_float32 len = am_vec2_len(a);
+    return am_vec2_scale(len != 0 ? 1.0f / am_vec2_len(a) : 1.0f, a);
+};
+
+static inline am_float32 am_vec2_dist(am_vec2 a, am_vec2 b) {
+    am_float32 dx = a.x - b.x;
+    am_float32  dy = a.y = b.y;
+    return (am_float32)sqrt(dx * dx + dy * dy);
+};
+
+static inline am_float32 am_vec2_cross(am_vec2 a, am_vec2 b) {
+    return a.x * b.y - a.y * b.x;
+};
+
+static inline am_float32 am_vec2_angle(am_vec2 a, am_vec2 b) {
+    return (am_float32)acos((double)(am_vec2_dot(a, b) / (am_vec2_len(a) * am_vec2_len(b))));
+};
+
+
+//VEC3
+
+static inline am_vec3 am_vec3_create(am_float32 x, am_float32 y, am_float32 z) {
+    am_vec3 v;
+    v.x = x;
+    v.y = y;
+    v.z = z;
     return v;
 };
 
-static inline am_vec2 am_vec2_mul(am_vec2 vec0, am_vec2 vec1) {
-    am_vec2 v;
-    v.x = vec0.x * vec1.x;
-    v.y = vec0.y * vec1.y;
+static inline am_vec3 am_vec3_add(am_vec3 a, am_vec3 b) {
+    return am_vec3_create(a.x + b.x, a.y + b.y, a.z + b.z);
+};
+
+static inline am_vec3 am_vec3_sub(am_vec3 a, am_vec3 b) {
+    return am_vec3_create(a.x - b.x, a.y - b.y, a.z - b.z);
+};
+
+static inline am_vec3 am_vec3_mul(am_vec3 a, am_vec3 b) {
+    return am_vec3_create(a.x * b.x, a.y * b.y, a.z * b.z);
+};
+
+static inline am_vec3 am_vec3_div(am_vec3 a, am_vec3 b) {
+    return am_vec3_create(a.x / b.x, a.y / b.y, a.z / b.z);
+};
+
+static inline am_vec3 am_vec3_scale(am_float32 scalar, am_vec3 a) {
+    return am_vec3_create(a.x * scalar, a.y * scalar, a.z * scalar);
+};
+
+static inline am_float32 am_vec3_dot(am_vec3 a, am_vec3 b) {
+    return (am_float32)((a.x * b.x) + (a.y * b.y) + a.z * b.z);
+};
+
+static inline am_float32 am_vec3_len(am_vec3 a) {
+    return (am_float32)sqrt(am_vec3_dot(a,a));
+};
+
+static inline am_float32 am_vec3_len_sqr(am_vec3 a) {
+    return (am_float32)am_vec3_dot(a,a);
+};
+
+static inline am_float32 am_vec3_dist(am_vec3 a, am_vec3 b) {
+    am_float32 dx = (a.x - b.x);
+    am_float32 dy = (a.y - b.y);
+    am_float32 dz = (a.z - b.z);
+    return (am_float32)(sqrt((am_float64)(dx * dx + dy * dy + dz * dz)));
+};
+
+static inline am_vec3 am_vec3_norm(am_vec3 a) {
+    am_float32 len = am_vec3_len(a);
+    return len == 0.f ? a : am_vec3_scale(1.f / len, a);
+};
+
+static inline am_vec3 am_vec3_cross(am_vec3 a, am_vec3 b) {
+    return am_vec3_create(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+};
+
+static inline am_float32 am_vec3_angle_unsigned(am_vec3 a, am_vec3 b) {
+    return acosf(am_vec3_dot(a,b));
+};
+
+static inline am_float32 am_vec3_angle_signed(am_vec3 a, am_vec3 b) {
+    return asinf(am_vec3_len(am_vec3_cross(a, b)));
+};
+
+static inline am_vec3 am_vec3_triple_cross(am_vec3 a, am_vec3 b, am_vec3 c) {
+    return am_vec3_sub((am_vec3_scale( am_vec3_dot(c, a), b)), (am_vec3_scale(am_vec3_dot(c, b), a)));
+
+};
+
+// VEC4
+
+static inline am_vec4 am_vec4_create(am_float32 x, am_float32 y, am_float32 z, am_float32 w) {
+    am_vec4 v;
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    v.w = w;
     return v;
 };
 
-static inline am_vec2 am_vec2_div(am_vec2 vec0, am_vec2 vec1){
-    am_vec2 v;
-    v.x = vec0.x / vec1.x;
-    v.y = vec0.y / vec1.y;
-    return v;
+static inline am_vec4 am_vec4_add(am_vec4 a, am_vec4 b) {
+    return am_vec4_create(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
 };
 
-static inline am_vec2 am_vec2_scale(am_float32 scalar, am_vec2 vec){
-    am_vec2 v;
-    v.x = scalar * vec.x;
-    v.y = scalar * vec.y;
-    return v;
+static inline am_vec4 am_vec4_sub(am_vec4 a, am_vec4 b) {
+    return am_vec4_create(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+};
+
+static inline am_vec4 am_vec4_mul(am_vec4 a, am_vec4 b) {
+    return am_vec4_create(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+};
+
+static inline am_vec4 am_vec4_div(am_vec4 a, am_vec4 b) {
+    return am_vec4_create(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
+};
+
+static inline am_vec4 am_vec4_scale(am_float32 scalar, am_vec4 a) {
+    return am_vec4_create(a.x * scalar, a.y * scalar, a.z * scalar, a.w * scalar);
+};
+
+static inline am_float32 am_vec4_dot(am_vec4 a, am_vec4 b) {
+    return (am_float32)(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);
+};
+
+static inline am_float32 am_vec4_len(am_vec4 a) {
+    return (am_float32)sqrt(am_vec4_dot(a, a));
+};
+
+static inline am_float32 am_vec4_dist(am_vec4 a, am_vec4 b) {
+    am_float32 dx = (a.x - b.x);
+    am_float32 dy = (a.y - b.y);
+    am_float32 dz = (a.z - b.z);
+    am_float32 dw = (a.w - b.w);
+    return (am_float32)(sqrt(dx * dx + dy * dy + dz * dz + dw * dw));
+};
+
+static inline am_vec4 am_vec4_norm(am_vec4 a) {
+    return am_vec4_scale(1.0f / am_vec4_len(a), a);
+};
+
+// GENERAL VECTORS
+
+static inline am_vec3 am_vec4_to_vec3(am_vec4 a) {
+    return am_vec3_create(a.x, a.y, a.z);
+};
+
+static inline am_vec2 am_vec3_to_vec2(am_vec4 a) {
+    return am_vec2_create(a.x, a.y);
+};
+
+// MAT 3x3
+
+static inline am_mat3 am_mat3_create() {
+    am_mat3 mat = {0};
+    return mat;
+};
+
+static inline am_mat3 am_mat3_diag(am_float32 val) {
+    am_mat3 m = {0};
+    m.m[0 + 0 * 3] = val;
+    m.m[1 + 1 * 3] = val;
+    m.m[2 + 2 * 3] = val;
+    return m;
+};
+
+static inline am_mat3 am_mat3_mul(am_mat3 m0, am_mat3 m1) {
+    am_mat3 m = {0};
+    for (am_uint32 y = 0; y < 3; ++y) {
+        for (am_uint32 x = 0; x < 3; ++x) {
+            am_float32 sum = 0.0f;
+            for (am_uint32 e = 0; e < 3; ++e) {
+                sum += m0.m[x + e * 3] * m1.m[e + y * 3];
+            };
+            m.m[x + y * 3] = sum;
+        };
+    };
+    return m;
+};
+
+static inline am_vec3 am_mat3_mul_vec3(am_mat3 m, am_vec3 v) {
+return am_vec3_create(
+    m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
+    m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
+    m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z
+    );
+};
+
+static inline am_mat3 am_mat3_scale(am_float32 x, am_float32 y, am_float32 z) {
+    am_mat3 m = {0};
+    m.m[0] = x;
+    m.m[4] = y;
+    m.m[8] = z;
+    return m;
+}
+
+static inline am_mat3 am_mat3_rotate(am_float32 radians, am_float32 x, am_float32 y, am_float32 z) {
+    am_mat3 m = {0};
+    am_float32 s = sinf(radians), c = cosf(radians), c1 = 1.f - c;
+    am_float32 xy = x * y;
+    am_float32 yz = y * z;
+    am_float32 zx = z * x;
+    am_float32 xs = x * s;
+    am_float32 ys = y * s;
+    am_float32 zs = z * s;
+    m.m[0] = c1 * x * x + c; m.m[1] = c1 * xy - zs;   m.m[2] = c1 * zx + ys;
+    m.m[3] = c1 * xy + zs;   m.m[4] = c1 * y * y + c; m.m[5] = c1 * yz - xs;
+    m.m[6] = c1 * zx - ys;   m.m[7] = c1 * yz + xs;   m.m[8] = c1 * z * z + c;
+    return m;
+};
+
+static inline am_mat3 am_mat3_rotatev(am_float32 radians, am_vec3 axis) {
+    return am_mat3_rotate(radians, axis.x, axis.y, axis.z);
+};
+
+// Turn quaternion into mat3
+static inline am_mat3 am_mat3_rotateq(am_vec4 q) {
+    am_mat3 m = {0};
+    am_float32 x2 = q.x * q.x, y2 = q.y * q.y, z2 = q.z * q.z, w2 = q.w * q.w;
+    am_float32 xz = q.x  *q.z, xy = q.x * q.y, yz = q.y * q.z, wz = q.w * q.z, wy = q.w * q.y, wx = q.w * q.x;
+    m.m[0] = 1 - 2 * (y2 + z2); m.m[1] = 2 * (xy + wz);     m.m[2] = 2 * (xz - wy);
+    m.m[3] = 2 * (xy - wz);     m.m[4] = 1 - 2 * (x2 + z2); m.m[5] = 2 * (yz + wx);
+    m.m[6] = 2 * (xz + wy);     m.m[7] = 2 * (yz - wx);     m.m[8] = 1 - 2 * (x2 + y2);
+    return m;
+}
+
+static inline am_mat3 am_mat3_rsq(am_vec4 q, am_vec3 s) {
+    am_mat3 mr = am_mat3_rotateq(q);
+    am_mat3 ms = am_mat3_scale(s.x, s.y, s.z);
+    return am_mat3_mul(mr, ms);
+};
+
+static inline am_mat3 am_mat3_inverse(am_mat3 m) {
+    am_mat3 r = {0};
+
+    am_float64 det = (am_float64)(m.m[0 * 3 + 0] * (m.m[1 * 3 + 1] * m.m[2 * 3 + 2] - m.m[2 * 3 + 1] * m.m[1 * 3 + 2]) -
+                                  m.m[0 * 3 + 1] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 2] - m.m[1 * 3 + 2] * m.m[2 * 3 + 0]) +
+                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0]));
+
+    am_float64 inv_det = det ? 1.0 / det : 0.0;
+
+    r.m[0 * 3 + 0] = (am_float32)((m.m[1 * 3 + 1] * m.m[2 * 3 + 2] - m.m[2 * 3 + 1] * m.m[1 * 3 + 2]) * inv_det);
+    r.m[0 * 3 + 1] = (am_float32)((m.m[0 * 3 + 2] * m.m[2 * 3 + 1] - m.m[0 * 3 + 1] * m.m[2 * 3 + 2]) * inv_det);
+    r.m[0 * 3 + 2] = (am_float32)((m.m[0 * 3 + 1] * m.m[1 * 3 + 2] - m.m[0 * 3 + 2] * m.m[1 * 3 + 1]) * inv_det);
+    r.m[1 * 3 + 0] = (am_float32)((m.m[1 * 3 + 2] * m.m[2 * 3 + 0] - m.m[1 * 3 + 0] * m.m[2 * 3 + 2]) * inv_det);
+    r.m[1 * 3 + 1] = (am_float32)((m.m[0 * 3 + 0] * m.m[2 * 3 + 2] - m.m[0 * 3 + 2] * m.m[2 * 3 + 0]) * inv_det);
+    r.m[1 * 3 + 2] = (am_float32)((m.m[1 * 3 + 0] * m.m[0 * 3 + 2] - m.m[0 * 3 + 0] * m.m[1 * 3 + 2]) * inv_det);
+    r.m[2 * 3 + 0] = (am_float32)((m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[2 * 3 + 0] * m.m[1 * 3 + 1]) * inv_det);
+    r.m[2 * 3 + 1] = (am_float32)((m.m[2 * 3 + 0] * m.m[0 * 3 + 1] - m.m[0 * 3 + 0] * m.m[2 * 3 + 1]) * inv_det);
+    r.m[2 * 3 + 2] = (am_float32)((m.m[0 * 3 + 0] * m.m[1 * 3 + 1] - m.m[1 * 3 + 0] * m.m[0 * 3 + 1]) * inv_det);
+
+    return r;
+};
+
+// MAT4
+
+static inline am_mat4 am_mat4_create() {
+    am_mat4 mat = {0};
+    return mat;
+};
+
+static inline am_mat4 am_mat4_diag(am_float32 val) {
+    am_mat4 m;
+    memset(m.elements, 0, sizeof(m.elements));
+    m.elements[0 + 0 * 4] = val;
+    m.elements[1 + 1 * 4] = val;
+    m.elements[2 + 2 * 4] = val;
+    m.elements[3 + 3 * 4] = val;
+    return m;
+};
+
+static inline am_mat4 am_mat4_elem(const am_float32* elements) {
+    am_mat4 mat = am_mat4_create();
+    memcpy(mat.elements, elements, sizeof(am_float32) * 16);
+    return mat;
+};
+
+static inline am_mat4 am_mat4_mul(am_mat4 m0, am_mat4 m1) {
+    am_mat4 m_res = am_mat4_create();
+    for (am_uint32 y = 0; y < 4; ++y) {
+        for (am_uint32 x = 0; x < 4; ++x) {
+            am_float32 sum = 0.0f;
+            for (am_uint32 e = 0; e < 4; ++e) sum += m0.elements[x + e * 4] * m1.elements[e + y * 4];
+            m_res.elements[x + y * 4] = sum;
+        };
+    };
+    return m_res;
+};
+
+static inline am_mat4 am_mat4_mul_list(am_uint32 count, ...) {
+    va_list ap;
+    am_mat4 m = am_mat4_identity();
+    va_start(ap, count);
+    for (am_uint32 i = 0; i < count; ++i) m = am_mat4_mul(m, va_arg(ap, am_mat4));
+    va_end(ap);
+    return m;
+}
+
+static inline void am_mat4_set_elements(am_mat4* m, const am_float32* elements, am_uint32 count) {
+    for (am_uint32 i = 0; i < count; ++i) m->elements[i] = elements[i];
+};
+
+static inline am_mat4 am_mat4_transpose(am_mat4 m) {
+    am_mat4 t = am_mat4_identity();
+
+    // First row
+    t.elements[0 * 4 + 0] = m.elements[0 * 4 + 0];
+    t.elements[1 * 4 + 0] = m.elements[0 * 4 + 1];
+    t.elements[2 * 4 + 0] = m.elements[0 * 4 + 2];
+    t.elements[3 * 4 + 0] = m.elements[0 * 4 + 3];
+
+    // Second row
+    t.elements[0 * 4 + 1] = m.elements[1 * 4 + 0];
+    t.elements[1 * 4 + 1] = m.elements[1 * 4 + 1];
+    t.elements[2 * 4 + 1] = m.elements[1 * 4 + 2];
+    t.elements[3 * 4 + 1] = m.elements[1 * 4 + 3];
+
+    // Third row
+    t.elements[0 * 4 + 2] = m.elements[2 * 4 + 0];
+    t.elements[1 * 4 + 2] = m.elements[2 * 4 + 1];
+    t.elements[2 * 4 + 2] = m.elements[2 * 4 + 2];
+    t.elements[3 * 4 + 2] = m.elements[2 * 4 + 3];
+
+    // Fourth row
+    t.elements[0 * 4 + 3] = m.elements[3 * 4 + 0];
+    t.elements[1 * 4 + 3] = m.elements[3 * 4 + 1];
+    t.elements[2 * 4 + 3] = m.elements[3 * 4 + 2];
+    t.elements[3 * 4 + 3] = m.elements[3 * 4 + 3];
+
+    return t;
+};
+
+static inline am_mat4 am_mat4_inverse(am_mat4 m) {
+    am_mat4 res = am_mat4_identity();
+
+    am_float32 temp[16];
+
+    temp[0] = m.elements[5] * m.elements[10] * m.elements[15] -
+    m.elements[5] * m.elements[11] * m.elements[14] -
+    m.elements[9] * m.elements[6] * m.elements[15] +
+    m.elements[9] * m.elements[7] * m.elements[14] +
+    m.elements[13] * m.elements[6] * m.elements[11] -
+    m.elements[13] * m.elements[7] * m.elements[10];
+
+    temp[4] = -m.elements[4] * m.elements[10] * m.elements[15] +
+    m.elements[4] * m.elements[11] * m.elements[14] +
+    m.elements[8] * m.elements[6] * m.elements[15] -
+    m.elements[8] * m.elements[7] * m.elements[14] -
+    m.elements[12] * m.elements[6] * m.elements[11] +
+    m.elements[12] * m.elements[7] * m.elements[10];
+
+    temp[8] = m.elements[4] * m.elements[9] * m.elements[15] -
+    m.elements[4] * m.elements[11] * m.elements[13] -
+    m.elements[8] * m.elements[5] * m.elements[15] +
+    m.elements[8] * m.elements[7] * m.elements[13] +
+    m.elements[12] * m.elements[5] * m.elements[11] -
+    m.elements[12] * m.elements[7] * m.elements[9];
+
+    temp[12] = -m.elements[4] * m.elements[9] * m.elements[14] +
+    m.elements[4] * m.elements[10] * m.elements[13] +
+    m.elements[8] * m.elements[5] * m.elements[14] -
+    m.elements[8] * m.elements[6] * m.elements[13] -
+    m.elements[12] * m.elements[5] * m.elements[10] +
+    m.elements[12] * m.elements[6] * m.elements[9];
+
+    temp[1] = -m.elements[1] * m.elements[10] * m.elements[15] +
+    m.elements[1] * m.elements[11] * m.elements[14] +
+    m.elements[9] * m.elements[2] * m.elements[15] -
+    m.elements[9] * m.elements[3] * m.elements[14] -
+    m.elements[13] * m.elements[2] * m.elements[11] +
+    m.elements[13] * m.elements[3] * m.elements[10];
+
+    temp[5] = m.elements[0] * m.elements[10] * m.elements[15] -
+    m.elements[0] * m.elements[11] * m.elements[14] -
+    m.elements[8] * m.elements[2] * m.elements[15] +
+    m.elements[8] * m.elements[3] * m.elements[14] +
+    m.elements[12] * m.elements[2] * m.elements[11] -
+    m.elements[12] * m.elements[3] * m.elements[10];
+
+    temp[9] = -m.elements[0] * m.elements[9] * m.elements[15] +
+    m.elements[0] * m.elements[11] * m.elements[13] +
+    m.elements[8] * m.elements[1] * m.elements[15] -
+    m.elements[8] * m.elements[3] * m.elements[13] -
+    m.elements[12] * m.elements[1] * m.elements[11] +
+    m.elements[12] * m.elements[3] * m.elements[9];
+
+    temp[13] = m.elements[0] * m.elements[9] * m.elements[14] -
+    m.elements[0] * m.elements[10] * m.elements[13] -
+    m.elements[8] * m.elements[1] * m.elements[14] +
+    m.elements[8] * m.elements[2] * m.elements[13] +
+    m.elements[12] * m.elements[1] * m.elements[10] -
+    m.elements[12] * m.elements[2] * m.elements[9];
+
+    temp[2] = m.elements[1] * m.elements[6] * m.elements[15] -
+    m.elements[1] * m.elements[7] * m.elements[14] -
+    m.elements[5] * m.elements[2] * m.elements[15] +
+    m.elements[5] * m.elements[3] * m.elements[14] +
+    m.elements[13] * m.elements[2] * m.elements[7] -
+    m.elements[13] * m.elements[3] * m.elements[6];
+
+    temp[6] = -m.elements[0] * m.elements[6] * m.elements[15] +
+    m.elements[0] * m.elements[7] * m.elements[14] +
+    m.elements[4] * m.elements[2] * m.elements[15] -
+    m.elements[4] * m.elements[3] * m.elements[14] -
+    m.elements[12] * m.elements[2] * m.elements[7] +
+    m.elements[12] * m.elements[3] * m.elements[6];
+
+    temp[10] = m.elements[0] * m.elements[5] * m.elements[15] -
+    m.elements[0] * m.elements[7] * m.elements[13] -
+    m.elements[4] * m.elements[1] * m.elements[15] +
+    m.elements[4] * m.elements[3] * m.elements[13] +
+    m.elements[12] * m.elements[1] * m.elements[7] -
+    m.elements[12] * m.elements[3] * m.elements[5];
+
+    temp[14] = -m.elements[0] * m.elements[5] * m.elements[14] +
+    m.elements[0] * m.elements[6] * m.elements[13] +
+    m.elements[4] * m.elements[1] * m.elements[14] -
+    m.elements[4] * m.elements[2] * m.elements[13] -
+    m.elements[12] * m.elements[1] * m.elements[6] +
+    m.elements[12] * m.elements[2] * m.elements[5];
+
+    temp[3] = -m.elements[1] * m.elements[6] * m.elements[11] +
+    m.elements[1] * m.elements[7] * m.elements[10] +
+    m.elements[5] * m.elements[2] * m.elements[11] -
+    m.elements[5] * m.elements[3] * m.elements[10] -
+    m.elements[9] * m.elements[2] * m.elements[7] +
+    m.elements[9] * m.elements[3] * m.elements[6];
+
+    temp[7] = m.elements[0] * m.elements[6] * m.elements[11] -
+    m.elements[0] * m.elements[7] * m.elements[10] -
+    m.elements[4] * m.elements[2] * m.elements[11] +
+    m.elements[4] * m.elements[3] * m.elements[10] +
+    m.elements[8] * m.elements[2] * m.elements[7] -
+    m.elements[8] * m.elements[3] * m.elements[6];
+
+    temp[11] = -m.elements[0] * m.elements[5] * m.elements[11] +
+    m.elements[0] * m.elements[7] * m.elements[9] +
+    m.elements[4] * m.elements[1] * m.elements[11] -
+    m.elements[4] * m.elements[3] * m.elements[9] -
+    m.elements[8] * m.elements[1] * m.elements[7] +
+    m.elements[8] * m.elements[3] * m.elements[5];
+
+    temp[15] = m.elements[0] * m.elements[5] * m.elements[10] -
+    m.elements[0] * m.elements[6] * m.elements[9] -
+    m.elements[4] * m.elements[1] * m.elements[10] +
+    m.elements[4] * m.elements[2] * m.elements[9] +
+    m.elements[8] * m.elements[1] * m.elements[6] -
+    m.elements[8] * m.elements[2] * m.elements[5];
+
+    am_float32 determinant = m.elements[0] * temp[0] + m.elements[1] * temp[4] + m.elements[2] * temp[8] + m.elements[3] * temp[12];
+    determinant = 1.0f / determinant;
+
+    for (am_int32 i = 0; i < 4 * 4; i++) res.elements[i] = (am_float32)(temp[i] * (am_float32)determinant);
+
+    return res;
+};
+
+static inline am_mat4 am_mat4_ortho(am_float32 left, am_float32 right, am_float32 bottom, am_float32 top, am_float32 near, am_float32 far) {
+    am_mat4 m_res = am_mat4_identity();
+
+    // Main diagonal
+    m_res.elements[0 + 0 * 4] = 2.0f / (right - left);
+    m_res.elements[1 + 1 * 4] = 2.0f / (top - bottom);
+    m_res.elements[2 + 2 * 4] = -2.0f / (far - near);
+
+    // Last column
+    m_res.elements[0 + 3 * 4] = -(right + left) / (right - left);
+    m_res.elements[1 + 3 * 4] = -(top + bottom) / (top - bottom);
+    m_res.elements[2 + 3 * 4] = -(far + near) / (far - near);
+
+    return m_res;
+};
+
+static inline am_mat4 am_mat4_perspective(am_float32 fov, am_float32 aspect_ratio, am_float32 near, am_float32 far) {
+    // Zero matrix
+    am_mat4 m_res = am_mat4_create();
+
+    am_float32 q = 1.0f / (am_float32)tan(am_deg2rad(0.5f * fov));
+    am_float32 a = q / aspect_ratio;
+    am_float32 b = (near + far) / (near - far);
+    am_float32 c = (2.0f * near * far) / (near - far);
+
+    m_res.elements[0 + 0 * 4] = a;
+    m_res.elements[1 + 1 * 4] = q;
+    m_res.elements[2 + 2 * 4] = b;
+    m_res.elements[2 + 3 * 4] = c;
+    m_res.elements[3 + 2 * 4] = -1.0f;
+
+    return m_res;
+};
+
+static inline am_mat4 am_mat4_translatev(const am_vec3 v) {
+    am_mat4 m_res = am_mat4_identity();
+
+    m_res.elements[0 + 4 * 3] = v.x;
+    m_res.elements[1 + 4 * 3] = v.y;
+    m_res.elements[2 + 4 * 3] = v.z;
+
+    return m_res;
+};
+
+static inline am_mat4 am_mat4_translate(am_float32 x, am_float32 y, am_float32 z) {
+    return am_mat4_translatev(am_vec3_create(x, y, z));
+};
+
+static inline am_mat4 am_mat4_scalev(const am_vec3 v) {
+    am_mat4 m_res = am_mat4_identity();
+    m_res.elements[0 + 0 * 4] = v.x;
+    m_res.elements[1 + 1 * 4] = v.y;
+    m_res.elements[2 + 2 * 4] = v.z;
+    return m_res;
+};
+
+static inline am_mat4 am_mat4_scale(am_float32 x, am_float32 y, am_float32 z) {
+    return (am_mat4_scalev(am_vec3_create(x, y, z)));
+};
+
+// Assumes normalized axis
+static inline am_mat4 am_mat4_rotatev(am_float32 angle, am_vec3 axis) {
+    am_mat4 m_res = am_mat4_identity();
+
+    am_float32 a = angle;
+    am_float32 c = (am_float32)cos(a);
+    am_float32 s = (am_float32)sin(a);
+
+    am_vec3 naxis = am_vec3_norm(axis);
+    am_float32 x = naxis.x;
+    am_float32 y = naxis.y;
+    am_float32 z = naxis.z;
+
+    //First column
+    m_res.elements[0 + 0 * 4] = x * x * (1 - c) + c;
+    m_res.elements[1 + 0 * 4] = x * y * (1 - c) + z * s;
+    m_res.elements[2 + 0 * 4] = x * z * (1 - c) - y * s;
+
+    //Second column
+    m_res.elements[0 + 1 * 4] = x * y * (1 - c) - z * s;
+    m_res.elements[1 + 1 * 4] = y * y * (1 - c) + c;
+    m_res.elements[2 + 1 * 4] = y * z * (1 - c) + x * s;
+
+    //Third column
+    m_res.elements[0 + 2 * 4] = x * z * (1 - c) + y * s;
+    m_res.elements[1 + 2 * 4] = y * z * (1 - c) - x * s;
+    m_res.elements[2 + 2 * 4] = z * z * (1 - c) + c;
+
+    return m_res;
+};
+
+static inline am_mat4 am_mat4_rotate(am_float32 angle, am_float32 x, am_float32 y, am_float32 z) {
+    return am_mat4_rotatev(angle, am_vec3_create(x, y, z));
+};
+
+static inline am_mat4 am_mat4_look_at(am_vec3 position, am_vec3 target, am_vec3 up) {
+    am_vec3 f = am_vec3_norm(am_vec3_sub(target, position));
+    am_vec3 s = am_vec3_norm(am_vec3_cross(f, up));
+    am_vec3 u = am_vec3_cross(s, f);
+
+    am_mat4 m_res = am_mat4_identity();
+    m_res.elements[0 * 4 + 0] = s.x;
+    m_res.elements[1 * 4 + 0] = s.y;
+    m_res.elements[2 * 4 + 0] = s.z;
+
+    m_res.elements[0 * 4 + 1] = u.x;
+    m_res.elements[1 * 4 + 1] = u.y;
+    m_res.elements[2 * 4 + 1] = u.z;
+
+    m_res.elements[0 * 4 + 2] = -f.x;
+    m_res.elements[1 * 4 + 2] = -f.y;
+    m_res.elements[2 * 4 + 2] = -f.z;
+
+    m_res.elements[3 * 4 + 0] = -am_vec3_dot(s, position);;
+    m_res.elements[3 * 4 + 1] = -am_vec3_dot(u, position);
+    m_res.elements[3 * 4 + 2] = am_vec3_dot(f, position);
+
+    return m_res;
+};
+
+static inline am_vec4 am_mat4_mul_vec4(am_mat4 m, am_vec4 v) {
+return am_vec4_create(m.elements[0 + 4 * 0] * v.x + m.elements[0 + 4 * 1] * v.y + m.elements[0 + 4 * 2] * v.z + m.elements[0 + 4 * 3] * v.w,
+                      m.elements[1 + 4 * 0] * v.x + m.elements[1 + 4 * 1] * v.y + m.elements[1 + 4 * 2] * v.z + m.elements[1 + 4 * 3] * v.w,
+                      m.elements[2 + 4 * 0] * v.x + m.elements[2 + 4 * 1] * v.y + m.elements[2 + 4 * 2] * v.z + m.elements[2 + 4 * 3] * v.w,
+                      m.elements[3 + 4 * 0] * v.x + m.elements[3 + 4 * 1] * v.y + m.elements[3 + 4 * 2] * v.z + m.elements[3 + 4 * 3] * v.w
+                      );
+};
+
+static inline am_vec3 am_mat4_mul_vec3(am_mat4 m, am_vec3 v) {
+    return am_vec4_to_vec3(am_mat4_mul_vec4(m, am_vec4_create(v.x, v.y, v.z, 1.0f)));
+};
+
+// Quaternion
+
+static inline am_quat am_quat_default() {
+    am_quat q;
+    q.x = 0.f;
+    q.y = 0.f;
+    q.z = 0.f;
+    q.w = 1.f;
+    return q;
+};
+
+static inline am_quat am_quat_create(am_float32 _x, am_float32 _y, am_float32 _z, am_float32 _w) {
+    am_quat q;
+    q.x = _x;
+    q.y = _y;
+    q.z = _z;
+    q.w = _w;
+    return q;
+};
+
+static inline am_quat am_quat_add(am_quat q0, am_quat q1) {
+    return am_quat_create(q0.x + q1.x, q0.y + q1.y, q0.z + q1.z, q0.w + q1.w);
+};
+
+static inline am_quat am_quat_sub(am_quat q0, am_quat q1) {
+    return am_quat_create(q0.x - q1.x, q0.y - q1.y, q0.z - q1.z, q0.w - q1.w);
+};
+
+static inline am_quat am_quat_mul(am_quat q0, am_quat q1) {
+    return am_quat_create(q0.w * q1.x + q1.w * q0.x + q0.y * q1.z - q1.y * q0.z,
+                          q0.w * q1.y + q1.w * q0.y + q0.z * q1.x - q1.z * q0.x,
+                          q0.w * q1.z + q1.w * q0.z + q0.x * q1.y - q1.x * q0.y,
+                          q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
+                          );
+};
+
+static inline am_quat am_quat_mul_list(am_uint32 count, ...) {
+    va_list ap;
+    am_quat q = am_quat_default();
+    va_start(ap, count);
+    for (am_uint32 i = 0; i < count; ++i) q = am_quat_mul(q, va_arg(ap, am_quat));
+    va_end(ap);
+    return q;
+}
+
+static inline am_quat am_quat_mul_quat(am_quat q0, am_quat q1) {
+    return am_quat_create(q0.w * q1.x + q1.w * q0.x + q0.y * q1.z - q1.y * q0.z,
+                          q0.w * q1.y + q1.w * q0.y + q0.z * q1.x - q1.z * q0.x,
+                          q0.w * q1.z + q1.w * q0.z + q0.x * q1.y - q1.x * q0.y,
+                          q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
+                          );
+};
+
+static inline am_quat am_quat_scale(am_quat q, am_float32 s) {
+    return am_quat_create(q.x * s, q.y * s, q.z * s, q.w * s);
+};
+
+static inline am_float32 am_quat_dot(am_quat q0, am_quat q1) {
+    return (am_float32)(q0.x * q1.x + q0.y * q1.y + q0.z * q1.z + q0.w * q1.w);
+};
+
+static inline am_quat am_quat_conjugate(am_quat q) {
+    return (am_quat_create(-q.x, -q.y, -q.z, q.w));
+};
+
+static inline am_float32 am_quat_len(am_quat q) {
+    return (am_float32)sqrt(am_quat_dot(q, q));
+};
+
+static inline am_quat am_quat_norm(am_quat q) {
+    return am_quat_scale(q, 1.0f / am_quat_len(q));
+};
+
+static inline am_quat am_quat_cross(am_quat q0, am_quat q1) {
+    return am_quat_create (q0.x * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y,
+                          q0.w * q1.y + q0.y * q1.w + q0.z * q1.x - q0.x * q1.z,
+                          q0.w * q1.z + q0.z * q1.w + q0.x * q1.y - q0.y * q1.x,
+                          q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
+                          );
+};
+
+// Inverse := Conjugate / Dot;
+static inline am_quat am_quat_inverse(am_quat q) {
+    return (am_quat_scale(am_quat_conjugate(q), 1.0f / am_quat_dot(q, q)));
+};
+
+static inline am_vec3 am_quat_rotate(am_quat q, am_vec3 v) {
+    am_vec3 qvec = am_vec3_create(q.x, q.y, q.z);
+    am_vec3 uv = am_vec3_cross(qvec, v);
+    am_vec3 uuv = am_vec3_cross(qvec, uv);
+    uv = am_vec3_scale(2.f * q.w, uv);
+    uuv = am_vec3_scale(2.f, uuv);
+    return (am_vec3_add(v, am_vec3_add(uv, uuv)));
+};
+
+static inline am_quat am_quat_angle_axis(am_float32 rad, am_vec3 axis) {
+    // Normalize axis
+    am_vec3 a = am_vec3_norm(axis);
+    // Get scalar
+    am_float32 half_angle = 0.5f * rad;
+    am_float32 s = (am_float32)sin(half_angle);
+
+    return am_quat_create(a.x * s, a.y * s, a.z * s, (am_float32)cos(half_angle));
+};
+
+static inline am_quat am_quat_slerp(am_quat a, am_quat b, am_float32 t) {
+    am_float32 c = am_quat_dot(a, b);
+    am_quat end = b;
+
+    if (c < 0.0f) {
+        // Reverse all signs
+        c *= -1.0f;
+        end.x *= -1.0f;
+        end.y *= -1.0f;
+        end.z *= -1.0f;
+        end.w *= -1.0f;
+    };
+
+    // Calculate coefficients
+    am_float32 sclp, sclq;
+    if ((1.0f - c) > 0.0001f) {
+        am_float32 omega = (float)acosf(c);
+        am_float32 s = (float)sinf(omega);
+        sclp = (float)sinf((1.0f - t) * omega) / s;
+        sclq = (float)sinf(t * omega) / s;
+    } else {
+    sclp = 1.0f - t;
+    sclq = t;
+    };
+
+    am_quat q;
+    q.x = sclp * a.x + sclq * end.x;
+    q.y = sclp * a.y + sclq * end.y;
+    q.z = sclp * a.z + sclq * end.z;
+    q.w = sclp * a.w + sclq * end.w;
+
+    return q;
+};
+
+//http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/index.htm
+
+static inline am_mat4 am_quat_to_mat4(am_quat _q) {
+    am_mat4 mat = am_mat4_identity();
+    am_quat q = am_quat_norm(_q);
+
+    am_float32 xx = q.x * q.x;
+    am_float32 yy = q.y * q.y;
+    am_float32 zz = q.z * q.z;
+    am_float32 xy = q.x * q.y;
+    am_float32 xz = q.x * q.z;
+    am_float32 yz = q.y * q.z;
+    am_float32 wx = q.w * q.x;
+    am_float32 wy = q.w * q.y;
+    am_float32 wz = q.w * q.z;
+
+    mat.elements[0 * 4 + 0] = 1.0f - 2.0f * (yy + zz);
+    mat.elements[1 * 4 + 0] = 2.0f * (xy - wz);
+    mat.elements[2 * 4 + 0] = 2.0f * (xz + wy);
+
+    mat.elements[0 * 4 + 1] = 2.0f * (xy + wz);
+    mat.elements[1 * 4 + 1] = 1.0f - 2.0f * (xx + zz);
+    mat.elements[2 * 4 + 1] = 2.0f * (yz - wx);
+
+    mat.elements[0 * 4 + 2] = 2.0f * (xz - wy);
+    mat.elements[1 * 4 + 2] = 2.0f * (yz + wx);
+    mat.elements[2 * 4 + 2] = 1.0f - 2.0f * (xx + yy);
+
+    return mat;
+};
+
+static inline am_quat am_quat_from_euler(am_float32 yaw_deg, am_float32 pitch_deg, am_float32 roll_deg) {
+    am_float32 yaw = am_deg2rad(yaw_deg);
+    am_float32 pitch = am_deg2rad(pitch_deg);
+    am_float32 roll = am_deg2rad(roll_deg);
+
+    am_quat q;
+    am_float32 cy = (am_float32)cos(yaw * 0.5f);
+    am_float32 sy = (am_float32)sin(yaw * 0.5f);
+    am_float32 cr = (am_float32)cos(roll * 0.5f);
+    am_float32 sr = (am_float32)sin(roll * 0.5f);
+    am_float32 cp = (am_float32)cos(pitch * 0.5f);
+    am_float32 sp = (am_float32)sin(pitch * 0.5f);
+
+    q.x = cy * sr * cp - sy * cr * sp;
+    q.y = cy * cr * sp + sy * sr * cp;
+    q.z = sy * cr * cp - cy * sr * sp;
+    q.w = cy * cr * cp + sy * sr * sp;
+
+    return q;
+};
+
+static inline am_float32 am_quat_pitch(am_quat* q) {
+    return (am_float32)atan2((double)(2.0f * q->y * q->z + q->w * q->x), (double)(q->w * q->w - q->x * q->x - q->y * q->y + q->z * q->z));
+};
+
+static inline am_float32 am_quat_yaw(am_quat* q) {
+    return (am_float32)asin((double)(-2.0f * (q->x * q->z - q->w * q->y)));
+};
+
+static inline am_float32 am_quat_roll(am_quat* q) {
+    return (am_float32)atan2((double)(2.0f * q->x * q->y +  q->z * q->w),  (double)(q->x * q->x + q->w * q->w - q->y * q->y - q->z * q->z));
+};
+
+static inline am_vec3 am_quat_to_euler(am_quat* q) {
+    return am_vec3_create(am_quat_yaw(q), am_quat_pitch(q), am_quat_roll(q));
+};
+
+// TRANSFORMS
+
+static inline am_vqs am_vqs_create(am_vec3 translation, am_quat rotation, am_vec3 scale) {
+    am_vqs t;
+    t.position = translation;
+    t.rotation = rotation;
+    t.scale = scale;
+    return t;
+};
+
+static inline am_vqs am_vqs_default() {
+    am_vqs t = am_vqs_create(am_vec3_create(0.0f, 0.0f, 0.0f),
+                               am_quat_create(0.0f, 0.0f, 0.0f, 1.0f),
+                                  am_vec3_create(1.0f, 1.0f, 1.0f)
+                            );
+    return t;
+};
+
+// AbsScale = ParentScale * LocalScale
+// AbsRot   = LocalRot * ParentRot
+// AbsTrans = ParentPos + [ParentRot * (ParentScale * LocalPos)]
+static inline am_vqs am_vqs_absolute_transform(const am_vqs* local, const am_vqs* parent) {
+    if (!local || !parent) return am_vqs_default();
+
+    // Normalized rotations
+    am_quat p_rot_norm = am_quat_norm(parent->rotation);
+    am_quat l_rot_norm = am_quat_norm(local->rotation);
+
+    // Scale
+    am_vec3 scl = am_vec3_mul(local->scale, parent->scale);
+    // Rotation
+    am_quat rot = am_quat_norm(am_quat_mul(p_rot_norm, l_rot_norm));
+    // position
+    am_vec3 tns = am_vec3_add(parent->position, am_quat_rotate(p_rot_norm, am_vec3_mul(parent->scale, local->position)));
+
+    return am_vqs_create(tns, rot, scl);
+};
+
+// RelScale = AbsScale / ParentScale
+// RelRot   = Inverse(ParentRot) * AbsRot
+// RelTrans = [Inverse(ParentRot) * (AbsPos - ParentPosition)] / ParentScale;
+static inline am_vqs am_vqs_relative_transform(const am_vqs* absolute, const am_vqs* parent) {
+    if (!absolute || !parent) return am_vqs_default();
+
+    // Get inverse rotation normalized
+    am_quat p_rot_inv = am_quat_norm(am_quat_inverse(parent->rotation));
+    // Normalized abs rotation
+    am_quat a_rot_norm = am_quat_norm(absolute->rotation);
+
+    // Scale
+    am_vec3 scl = am_vec3_div(absolute->scale, parent->scale);
+    // Rotation
+    am_quat rot = am_quat_norm(am_quat_mul(p_rot_inv, a_rot_norm));
+    // position
+    am_vec3 tns = am_vec3_div(am_quat_rotate(p_rot_inv, am_vec3_sub(absolute->position, parent->position)), parent->scale);
+
+    return am_vqs_create(tns, rot, scl);
+};
+
+static inline am_mat4 am_vqs_to_mat4(const am_vqs* transform) {
+    am_mat4 mat = am_mat4_identity();
+    am_mat4 trans = am_mat4_translatev(transform->position);
+    am_mat4 rot = am_quat_to_mat4(transform->rotation);
+    am_mat4 scl = am_mat4_scalev(transform->scale);
+    mat = am_mat4_mul(mat, trans);
+    mat = am_mat4_mul(mat, rot);
+    mat = am_mat4_mul(mat, scl);
+    return mat;
 };
 
 //----------------------------------------------------------------------------//
@@ -1276,7 +2351,7 @@ static inline am_vec2 am_vec2_scale(am_float32 scalar, am_vec2 vec){
 
 
 #if defined(AM_LINUX)
-am_key_map am_platform_translate_keysym(KeySym *key_syms, am_int32 width) {
+am_key_map am_platform_translate_keysym(const KeySym *key_syms, am_int32 width) {
     if (width > 1) {
         switch (key_syms[1]) {
             case XK_KP_0:           return AM_KEYCODE_NUMPAD_0;
@@ -3389,7 +4464,6 @@ void amgl_draw(amgl_draw_info *info) {
         };
 
         switch (pipeline->layout.attributes[i].format) {
-                
             case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT4: glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
             case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3: glVertexAttribPointer(i, 3, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
             case AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2: glVertexAttribPointer(i, 2, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)offset); break;
@@ -3424,6 +4498,130 @@ void amgl_draw(amgl_draw_info *info) {
         glDrawArrays(primitive, info->start, info->count);
     };
 
+};
+
+
+//Camera
+//Thank you to MrFrenik
+
+am_camera am_camera_default() {
+    am_camera cam = {0};
+    cam.transform = am_vqs_default();
+    cam.transform.position.z = 1.f;
+    cam.fov = 60.f;
+    cam.near_plane = 0.1f;
+    cam.far_plane = 1000.f;
+    cam.ortho_scale = 1.f;
+    cam.proj_type = AM_PROJECTION_TYPE_ORTHOGRAPHIC;
+    return cam;
+};
+
+am_camera am_camera_perspective() {
+    am_camera cam = am_camera_default();
+    cam.proj_type = AM_PROJECTION_TYPE_PERSPECTIVE;
+    cam.transform.position.z = 1.f;
+    return cam;
+};
+
+am_vec3 am_camera_forward(am_camera* cam) {
+    return (am_quat_rotate(cam->transform.rotation, am_vec3_create(0.0f, 0.0f, -1.0f)));
+};
+
+am_vec3 am_camera_backward(am_camera* cam) {
+    return (am_quat_rotate(cam->transform.rotation, am_vec3_create(0.0f, 0.0f, 1.0f)));
+};
+
+am_vec3 am_camera_up(am_camera* cam) {
+    return (am_quat_rotate(cam->transform.rotation, am_vec3_create(0.0f, 1.0f, 0.0f)));
+};
+
+am_vec3 am_camera_down(am_camera* cam) {
+    return (am_quat_rotate(cam->transform.rotation, am_vec3_create(0.0f, -1.0f, 0.0f)));
+};
+
+am_vec3 am_camera_right(am_camera* cam) {
+    return (am_quat_rotate(cam->transform.rotation, am_vec3_create(1.0f, 0.0f, 0.0f)));
+};
+
+am_vec3 am_camera_left(am_camera* cam) {
+    return (am_quat_rotate(cam->transform.rotation, am_vec3_create(-1.0f, 0.0f, 0.0f)));
+};
+
+am_vec3 am_camera_screen_to_world(am_camera* cam, am_vec3 coords, am_int32 view_width, am_int32 view_height) {
+    am_vec3 wc = {0};
+
+    // Get inverse of view projection from camera
+    am_mat4 inverse_vp = am_mat4_inverse(am_camera_get_view_projection(cam, view_width, view_height));
+
+    am_float32 w_x = (am_float32)coords.x;
+    am_float32 w_y = (am_float32)coords.y;
+    am_float32 w_z = (am_float32)coords.z;
+
+    // Transform from ndc
+    am_vec4 in;
+    in.x = (w_x / (am_float32)view_width) * 2.f - 1.f;
+    in.y = 1.f - (w_y / (am_float32)view_height) * 2.f;
+    in.z = 2.f * w_z - 1.f;
+    in.w = 1.f;
+
+    // To world coords
+    am_vec4 out = am_mat4_mul_vec4(inverse_vp, in);
+    if (out.w == 0.f) return wc;
+
+    out.w = 1.f / out.w;
+    wc = am_vec3_create(
+        out.x * out.w,
+        out.y * out.w,
+        out.z * out.w
+    );
+
+    return wc;
+};
+
+am_mat4 am_camera_get_view_projection(am_camera* cam, am_int32 view_width, am_int32 view_height) {
+    am_mat4 view = am_camera_get_view(cam);
+    am_mat4 proj = am_camera_get_proj(cam, view_width, view_height);
+    return am_mat4_mul(proj, view);
+};
+
+am_mat4 am_camera_get_view(am_camera* cam) {
+    am_vec3 up = am_camera_up(cam);
+    am_vec3 forward = am_camera_forward(cam);
+    am_vec3 target = am_vec3_add(forward, cam->transform.position);
+    return am_mat4_look_at(cam->transform.position, target, up);
+};
+
+am_mat4 am_camera_get_proj(am_camera* cam, am_int32 view_width, am_int32 view_height) {
+    am_mat4 proj_mat = am_mat4_identity();
+
+    switch(cam->proj_type)
+    {
+        case AM_PROJECTION_TYPE_PERSPECTIVE: {
+            proj_mat = am_mat4_perspective(cam->fov, (am_float32)view_width / (am_float32)view_height, cam->near_plane, cam->far_plane);
+        } break;
+
+        case AM_PROJECTION_TYPE_ORTHOGRAPHIC: {
+            am_float32 _ar = (am_float32)view_width / (am_float32)view_height;
+            am_float32 distance = 0.5f * (cam->far_plane - cam->near_plane);
+            const am_float32 ortho_scale = cam->ortho_scale;
+            const am_float32 aspect_ratio = _ar;
+            proj_mat = am_mat4_ortho(
+                -ortho_scale * aspect_ratio,
+                ortho_scale * aspect_ratio,
+                -ortho_scale,
+                ortho_scale,
+                -distance,
+                distance
+                );
+        } break;
+    };
+    return proj_mat;
+};
+
+void am_camera_offset_orientation(am_camera* cam, am_float32 yaw, am_float32 pitch) {
+    am_quat x = am_quat_angle_axis(am_deg2rad(yaw), am_vec3_create(0.f, 1.f, 0.f));   // Absolute up
+    am_quat y = am_quat_angle_axis(am_deg2rad(pitch), am_camera_right(cam));                    // Relative right
+    cam->transform.rotation = am_quat_mul(am_quat_mul(x, y), cam->transform.rotation);
 };
 
 
@@ -3534,7 +4732,7 @@ void am_engine_frame() {
         #endif
     };
 
-    printf("elapsed %f\n", platform->time.current);
+    //TODO: Windows counterpart since it has a smaller precision
 
     platform->time.current  = (am_float64)am_platform_elapsed_time() / 1000000000.0f;
     platform->time.render   = platform->time.current - platform->time.previous;
@@ -3645,6 +4843,15 @@ void init() {
         .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
     });
 
+    tex_id = amgl_texture_create((amgl_texture_info){
+        .format = AMGL_TEXTURE_FORMAT_RGBA,
+        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
+        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
+        .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
+    });
+
     uni_id = amgl_uniform_create((amgl_uniform_info){
         .name = "u_tex",
         .type = AMGL_UNIFORM_TYPE_SAMPLER2D
@@ -3733,21 +4940,6 @@ int main() {
     });
 
     while (true) am_engine_frame();
-
-    /*
-    am_id shader_id = amgl_shader_create((amgl_shader_info) {
-        .num_sources = 2,
-        .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .source = am_util_read_file("/home/truta/CLionProjects/ametrine/test_v.glsl") },
-            { .type = AMGL_SHADER_FRAGMENT, .source = am_util_read_file("/home/truta/CLionProjects/ametrine/test_f.glsl") }
-        }
-    });
-     */
-
-
-    printf("IDS: %u %u %u\n", rp_id, idx_id, pipeline_id);
-
-
 
     return 0;
 };
