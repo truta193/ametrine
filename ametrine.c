@@ -2,7 +2,6 @@
 
 //TODO: Compute shaders, instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
-//TODO: Math, 3D camera
 //TODO: More defined default values perhaps?
 
 //----------------------------------------------------------------------------//
@@ -789,6 +788,11 @@ typedef enum amgl_uniform_type {
     AMGL_UNIFORM_TYPE_INVALID,
     AMGL_UNIFORM_TYPE_FLOAT,
     AMGL_UNIFORM_TYPE_INT,
+    AMGL_UNIFORM_TYPE_VEC2,
+    AMGL_UNIFORM_TYPE_VEC3,
+    AMGL_UNIFORM_TYPE_VEC4,
+    AMGL_UNIFORM_TYPE_MAT3,
+    AMGL_UNIFORM_TYPE_MAT4,
     AMGL_UNIFORM_TYPE_SAMPLER2D
 } amgl_uniform_type;
 
@@ -4276,33 +4280,51 @@ void amgl_set_bindings(amgl_bindings_info *info) {
             amgl_shader shader = am_packed_array_get_val(engine->ctx_data.shaders, shader_id);
             uniform->location = glGetUniformLocation(shader.handle, strlen(uniform->name) ? uniform->name : "AM_UNIFORM_EMPTY_NAME");
             if (uniform->location >= 0xFFFFFFFF) {
-                printf("[FAIL] amgl_set_bindings (id: %u): Uniform not found by win_name!\n", uniform->id);
+                printf("[FAIL] amgl_set_bindings (id: %u): Uniform not found by name: %s!\n", uniform->id, uniform->name);
                 break;
             };
             uniform->shader_id = shader_id;
-            uniform->data = info->uniforms.info->data;
-
-            //TODO: Expand
-            switch (uniform->type) {
-                case AMGL_UNIFORM_TYPE_FLOAT: {
-                    glUniform1f((am_int32)uniform->location, *((float*)uniform->data));
-                    break;
-                };
-                case AMGL_UNIFORM_TYPE_INT: {
-                    glUniform1i((am_int32)uniform->location, *((int*)uniform->data));
-                    break;
-                };
-                case AMGL_UNIFORM_TYPE_SAMPLER2D: {
-                    amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, *((am_int32*)(uniform->data)));
-                    glActiveTexture(GL_TEXTURE0 + binding);
-                    glBindTexture(GL_TEXTURE_2D, texture->handle);
-                    glUniform1i((am_int32)uniform->location, (am_int32)binding); //binding++ for when I add uniform list here
-                    break;
-                };
-                default: {
-                    printf("[FAIL] amgl_set_bindings (id: %u): Invalid uniform type!\n", uniform->id);
-                    exit(1);
-                };
+            uniform->data = info->uniforms.info[i].data;
+        }
+        switch (uniform->type) {
+            case AMGL_UNIFORM_TYPE_FLOAT: {
+                glUniform1f((am_int32)uniform->location, *((float*)uniform->data));
+                break;
+            };
+            case AMGL_UNIFORM_TYPE_INT: {
+                glUniform1i((am_int32)uniform->location, *((int*)uniform->data));
+                break;
+            };
+            case AMGL_UNIFORM_TYPE_VEC2: {
+                glUniform2f((am_int32)uniform->location, ((float*)(uniform->data))[0], ((float*)(uniform->data))[1]);
+                break;
+            };
+            case AMGL_UNIFORM_TYPE_VEC3: {
+                glUniform3f((am_int32)uniform->location, ((float*)(uniform->data))[0], ((float*)(uniform->data))[1], ((float*)(uniform->data))[2]);
+                break;
+            };
+            case AMGL_UNIFORM_TYPE_VEC4: {
+                glUniform4f((am_int32)uniform->location, ((float*)(uniform->data))[0], ((float*)(uniform->data))[1], ((float*)(uniform->data))[2], ((float*)(uniform->data))[3]);
+                break;
+            }
+            case AMGL_UNIFORM_TYPE_MAT3: {
+                glUniformMatrix3fv((am_int32)uniform->location, 1, false, (float*)(uniform->data));
+              break;
+            };
+            case AMGL_UNIFORM_TYPE_MAT4: {
+                glUniformMatrix4fv((am_int32)uniform->location, 1, false, (float*)(uniform->data));
+                break;
+            };
+            case AMGL_UNIFORM_TYPE_SAMPLER2D: {
+                amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, *((am_int32*)(uniform->data)));
+                glActiveTexture(GL_TEXTURE0 + binding);
+                glBindTexture(GL_TEXTURE_2D, texture->handle);
+                glUniform1i((am_int32)uniform->location, (am_int32)binding); //binding++ for when I add uniform list here
+                break;
+            };
+            default: {
+                printf("[FAIL] amgl_set_bindings (id: %u): Invalid uniform type!\n", uniform->id);
+                exit(1);
             };
         };
     };
@@ -4382,7 +4404,6 @@ void amgl_draw(amgl_draw_info *info) {
     };
 
 };
-
 
 //Camera
 //Thank you to MrFrenik
@@ -4710,9 +4731,22 @@ char* am_util_read_file(const char *path) {
 //----------------------------------------------------------------------------//
 
 
-am_id shader_id, tex_id, uni_id, vbo_id, idx_id, pipeline_id, rp_id;
+am_id shader_id, tex1_id, tex2_id, uni1_id, uni2_id, uni3_id, view_mat, vbo_id, idx_id, pipeline_id, rp_id;
+am_mat4 rot_mat, view;
+
+typedef struct test_camera {
+    am_float32 pitch;
+    am_camera cam;
+} test_camera;
+
+test_camera test_cam = {0};
+
+void update_cam(test_camera *test_cam);
 
 void init() {
+    test_cam.cam = am_camera_perspective();
+    test_cam.cam.transform.position = am_vec3_create(4.0f, 2.0f, 4.0f);
+
     int maj,min;
     glGetIntegerv(GL_MAJOR_VERSION, &maj);
     glGetIntegerv(GL_MINOR_VERSION, &min);
@@ -4723,12 +4757,12 @@ void init() {
     shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test_v.glsl" },
-            { .type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test_f.glsl" }
+            { .type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_v.glsl" },
+            { .type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_f.glsl" }
         }
     });
 
-    tex_id = amgl_texture_create((amgl_texture_info){
+    tex1_id = amgl_texture_create((amgl_texture_info){
         .format = AMGL_TEXTURE_FORMAT_RGBA,
         .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
@@ -4737,37 +4771,61 @@ void init() {
         .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
     });
 
-    tex_id = amgl_texture_create((amgl_texture_info){
+    tex2_id = amgl_texture_create((amgl_texture_info){
         .format = AMGL_TEXTURE_FORMAT_RGBA,
         .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
+        .path = "/home/truta/CLionProjects/ametrine/pics/t2.png"
     });
 
-    uni_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_tex",
+    uni1_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_tex1",
         .type = AMGL_UNIFORM_TYPE_SAMPLER2D
+    });
+
+    uni2_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_tex2",
+        .type = AMGL_UNIFORM_TYPE_SAMPLER2D
+    });
+
+    rot_mat = am_mat4_rotatev(am_deg2rad(45.0f), am_vec3_create(0.7f, 0.0f, 1.0f));
+    uni3_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_rot",
+        .type = AMGL_UNIFORM_TYPE_MAT4
+    });
+
+    view_mat = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_view",
+        .type = AMGL_UNIFORM_TYPE_MAT4
     });
 
     vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = (float[]) {
-            -0.5f, -0.5f,  0.0f, 0.0f,  // Top Left
-            0.5f, -0.5f,  1.0f, 0.0f,  // Top Right
-            -0.5f,  0.5f,  0.0f, 1.0f,  // Bottom Left
-            0.5f,  0.5f,  1.0f, 1.0f   // Bottom Right
+            -0.3f, -0.3f, -0.3f, 0.0f,
+             0.3f, -0.3f, -0.3f, 1.0f,
+             0.3f,  0.3f, -0.3f, 0.0f,
+            -0.3f, 0.3f, -0.3f, 1.0f,
+            -0.3f, -0.3f, 0.3f, 0.0f,
+            0.3f, -0.3f, 0.3f, 1.0f,
+            0.3f, 0.3f, 0.3f, 0.0f,
+            -0.3f, 0.3f, 0.3f, 1.0f,
         },
-        .size = sizeof(float)*16,
+        .size = sizeof(float)*8*3,
         .usage = AMGL_BUFFER_USAGE_STATIC,
     });
 
     idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
         .data = (am_uint32[]){
-                0, 3, 2,    // First Triangle
-                0, 1, 3     // Second Triangle
+            0, 1, 3, 3, 1, 2,
+            1, 5, 2, 2, 5, 6,
+            5, 4, 6, 6, 4, 7,
+            4, 0, 7, 7, 0, 3,
+            3, 2, 7, 7, 2, 6,
+            4, 5, 0, 0, 5, 1
         },
-        .size = sizeof(am_uint32)*6,
+        .size = sizeof(am_uint32)*36,
         .offset = 0,
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
@@ -4775,12 +4833,14 @@ void init() {
     pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
         .raster = {
             .shader_id = shader_id,
+            //.face_culling = AMGL_FACE_CULL_FRONT
         },
+        .depth = {.func = AMGL_DEPTH_FUNC_LESS},
         .layout = {
             .num_attribs = 2,
             .attributes = (amgl_vertex_buffer_attribute[]){
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 0, .stride = 2*sizeof(float)},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 2*sizeof(float), .stride = 2*sizeof(float)}
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 4*sizeof(float)},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT, .offset = 3*sizeof(float), .stride = 4*sizeof(float)}
             }
         }
     });
@@ -4792,20 +4852,32 @@ void update() {
     am_bool run = true;
     am_engine *engine = am_engine_get_instance();
     am_platform *platform = am_engine_get_subsystem(platform);
+    am_window *main = am_packed_array_get_ptr(platform->windows, 1);
 
+    update_cam(&test_cam);
+
+    view = am_camera_get_view_projection(&test_cam.cam, main->width, main->height);
 
     amgl_bindings_info binds = {
         .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
         .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = idx_id}},
-        .uniforms = {.info = &(amgl_uniform_bind_info){.uniform_id = uni_id, .data = &tex_id, .binding = 0}}
+        .uniforms = {
+            .size = 2*sizeof(amgl_uniform_bind_info),
+            .info = (amgl_uniform_bind_info[]) {
+                {.uniform_id = uni3_id, .data = rot_mat.elements},
+                {.uniform_id = view_mat, .data = view.elements}
+            }
+        }
     };
+
     amgl_start_render_pass(rp_id);
         glEnable(GL_BLEND);
-        glClearColor(0.0f, 1.0f, 0.0f, 0.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_DEPTH_BUFFER_BIT);
         amgl_bind_pipeline(pipeline_id);
         amgl_set_bindings(&binds);
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
+        amgl_draw(&(amgl_draw_info){.start = 0, .count = 12});
     amgl_end_render_pass(rp_id);
 
     if (am_platform_key_pressed(AM_KEYCODE_X)) {
@@ -4818,14 +4890,34 @@ void shutdown() {
     return;
 };
 
+void update_cam(test_camera *test_cam) {
+    am_platform *platform = am_engine_get_subsystem(platform);
+    am_float64 dt = platform->time.delta;
+    am_int32 dp = am_platform_mouse_wheel_delta();
+
+    if(am_platform_key_pressed(AM_KEYCODE_T)) am_camera_offset_orientation(&test_cam->cam, -5.0f, 0.1f);
+
+    am_vec3 vel = {0};
+    if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_R)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_F)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
+
+    test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale(5000.0f*dt, am_vec3_norm(vel)));
+
+
+};
+
 int main() {
     am_engine_create((am_engine_info){
         .init = init,
         .update = update,
         .shutdown = shutdown,
         .win_fullscreen = false,
-        .win_height = 500,
-        .win_width = 500,
+        .win_height = 1000,
+        .win_width = 1000,
         .win_x = 50,
         .win_y = 50,
         .vsync_enabled = true,
