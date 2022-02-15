@@ -169,6 +169,15 @@ typedef struct am_vec2 {
     };
 } am_vec2;
 
+typedef struct am_vec2u {
+    union {
+        am_uint32 xy[2];
+        struct {
+            am_uint32 x, y;
+        };
+    };
+} am_vec2u;
+
 static inline am_vec2 am_vec2_create(am_float32 x, am_float32 y);
 static inline am_vec2 am_vec2_add(am_vec2 a, am_vec2 b);
 static inline am_vec2 am_vec2_sub(am_vec2 a, am_vec2 b);
@@ -553,15 +562,21 @@ typedef struct am_platform_callbacks {
 } am_platform_callbacks;
 
 typedef struct am_platform_input {
-    am_key_map keycodes[AM_MAX_KEYCODE_COUNT]; //LUT
-    am_bool keyboard_map[AM_KEYCODE_COUNT]; 
-    am_bool prev_keyboard_map[AM_KEYCODE_COUNT];
-    am_bool mouse_map[AM_MOUSE_BUTTON_COUNT];
-    am_bool prev_mouse_map[AM_MOUSE_BUTTON_COUNT];
-    am_int32 wheel_delta;
-    am_uint32 mouse_x;
-    am_uint32 mouse_y;
-    am_bool mouse_moved;
+    struct {
+        am_key_map keycodes[AM_MAX_KEYCODE_COUNT]; //LUT
+        am_bool map[AM_KEYCODE_COUNT];
+        am_bool prev_map[AM_KEYCODE_COUNT];
+    } keyboard;
+    struct {
+        am_bool map[AM_MOUSE_BUTTON_COUNT];
+        am_bool prev_map[AM_MOUSE_BUTTON_COUNT];
+        am_int32 wheel_delta;
+        am_vec2u position;
+        am_vec2u cached_position;
+        am_vec2 delta;
+        am_bool locked;
+        am_bool moved;
+    } mouse;
 } am_platform_input;
 
 typedef struct am_platform_time {
@@ -618,10 +633,15 @@ am_bool am_platform_mouse_button_pressed(am_mouse_map button);
 am_bool am_platform_mouse_button_down(am_mouse_map button); 
 am_bool am_platform_mouse_button_released(am_mouse_map button); 
 am_bool am_platform_mouse_button_up(am_mouse_map button);
-void am_platform_mouse_position(am_uint32 *x, am_uint32 *y);
-am_vec2 am_platform_mouse_positionv();
-am_int32 am_platform_mouse_wheel_delta();
+void am_platform_mouse_get_position(am_uint32 *x, am_uint32 *y);
+am_vec2 am_platform_mouse_get_positionv();
+void am_platform_mouse_set_position(am_uint32 x, am_uint32 y);
+am_vec2 am_platform_mouse_get_delta();
+am_int32 am_platform_mouse_get_wheel_delta();
 am_bool am_platform_mouse_moved();
+//TODO: Corrently limited to main window, need to add some kind of currently focused window cache
+void am_platform_mouse_lock(am_bool lock);
+
 
 //Platform default callbacks
 void am_platform_key_callback_default(am_id id, am_key_map key, am_platform_events event);
@@ -2459,12 +2479,12 @@ am_platform *am_platform_create() {
 
     #if defined(AM_LINUX)
     platform->display = XOpenDisplay(NULL);
-    memset(platform->input.keycodes, -1, sizeof(platform->input.keycodes));
+    memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
     am_int32 min, max;
     XDisplayKeycodes(platform->display, &min, &max);
     am_int32 width;
     KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
-    for (am_int32 i = min; i < max; i++) platform->input.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
+    for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
     XFree(key_syms);
     #else
     platform->input.keycodes[0x00B] = AM_KEYCODE_0;
@@ -2614,14 +2634,14 @@ am_platform *am_platform_create() {
     };
     #endif
 
-    platform->input.wheel_delta = 0;
-    platform->input.mouse_x = 0;
-    platform->input.mouse_y = 0;
+    platform->input.mouse.wheel_delta = 0;
+    platform->input.mouse.position.x = 0;
+    platform->input.mouse.position.y = 0;
 
-    memset(platform->input.keyboard_map, 0, sizeof(platform->input.keyboard_map));
-    memset(platform->input.prev_keyboard_map, 0, sizeof(platform->input.prev_keyboard_map));
-    memset(platform->input.mouse_map, 0, sizeof(platform->input.mouse_map));
-    memset(platform->input.mouse_map, 0, sizeof(platform->input.prev_mouse_map));
+    memset(platform->input.keyboard.map, 0, sizeof(platform->input.keyboard.map));
+    memset(platform->input.keyboard.prev_map, 0, sizeof(platform->input.keyboard.prev_map));
+    memset(platform->input.mouse.map, 0, sizeof(platform->input.mouse.map));
+    memset(platform->input.mouse.map, 0, sizeof(platform->input.mouse.prev_map));
 
     am_platform_set_key_callback(platform, am_platform_key_callback_default);
     am_platform_set_mouse_button_callback(platform, am_platform_mouse_button_callback_default);
@@ -2641,6 +2661,9 @@ void am_platform_poll_events() {
         XNextEvent(platform->display, &xevent);
         am_platform_event_handler(&xevent);  
     };
+    //REVIEW: Ok to leave here?
+    //HACK: Coords are bound to main window
+    if (platform->input.mouse.locked) am_platform_mouse_set_position(am_packed_array_get_ptr(platform->windows, 1)->width/2, am_packed_array_get_ptr(platform->windows, 1)->height/2);
     #else
     MSG msg;
     while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -2663,12 +2686,12 @@ void am_platform_event_handler(XEvent *xevent) {
 
     switch (xevent->type) {
         case KeyPress: {
-            am_key_map key = platform->input.keycodes[xevent->xkey.keycode];
+            am_key_map key = platform->input.keyboard.keycodes[xevent->xkey.keycode];
             platform->callbacks.am_platform_key_callback(id, key, AM_EVENT_KEY_PRESS);  
             break;
         };
         case KeyRelease: {
-            am_key_map key = platform->input.keycodes[xevent->xkey.keycode];
+            am_key_map key = platform->input.keyboard.keycodes[xevent->xkey.keycode];
             platform->callbacks.am_platform_key_callback(id, key, AM_EVENT_KEY_RELEASE);  
             break;
         };
@@ -2822,11 +2845,12 @@ LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM 
 #endif
 
 void am_platform_update(am_platform *platform) {
-    memcpy(platform->input.prev_mouse_map, platform->input.mouse_map, sizeof(platform->input.mouse_map));
-    memcpy(platform->input.prev_keyboard_map, platform->input.keyboard_map, sizeof(platform->input.keyboard_map));
-    platform->input.wheel_delta = 0;
-    platform->input.mouse_moved = false;
-
+    memcpy(platform->input.mouse.prev_map, platform->input.mouse.map, sizeof(platform->input.mouse.map));
+    memcpy(platform->input.keyboard.prev_map, platform->input.keyboard.map, sizeof(platform->input.keyboard.map));
+    platform->input.mouse.wheel_delta = 0;
+    platform->input.mouse.moved = false;
+    platform->input.mouse.delta.x = 0.0f;
+    platform->input.mouse.delta.y = 0.0f;
     am_platform_poll_events();
 };
 
@@ -2848,109 +2872,142 @@ void am_platform_terminate(am_platform *platform) {
 void am_platform_key_press(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return;
     am_platform *platform = am_engine_get_subsystem(platform);
-    platform->input.keyboard_map[key] = true;
+    platform->input.keyboard.map[key] = true;
 };
 
 void am_platform_key_release(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return;
     am_platform *platform = am_engine_get_subsystem(platform);
-    platform->input.keyboard_map[key] = false; 
+    platform->input.keyboard.map[key] = false;
 }; 
 
 am_bool am_platform_key_pressed(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return platform->input.keyboard_map[key] && !platform->input.prev_keyboard_map[key]; 
+    return platform->input.keyboard.map[key] && !platform->input.keyboard.prev_map[key];
 }; 
 
 am_bool am_platform_key_down(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return platform->input.keyboard_map[key] && platform->input.prev_keyboard_map[key];
+    return platform->input.keyboard.map[key] && platform->input.keyboard.prev_map[key];
 }; 
 
 am_bool am_platform_key_released(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return !platform->input.keyboard_map[key] && platform->input.prev_keyboard_map[key]; 
+    return !platform->input.keyboard.map[key] && platform->input.keyboard.prev_map[key];
 }; 
 
 am_bool am_platform_key_up(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return !platform->input.keyboard_map[key];
+    return !platform->input.keyboard.map[key];
 };
 
 void am_platform_mouse_button_press(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return;
     am_platform *platform = am_engine_get_subsystem(platform);
-    platform->input.mouse_map[button] = true;
+    platform->input.mouse.map[button] = true;
 }; 
 
 void am_platform_mouse_button_release(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return;
     am_platform *platform = am_engine_get_subsystem(platform);
-    platform->input.mouse_map[button] = false;
+    platform->input.mouse.map[button] = false;
 
 };
 
 am_bool am_platform_mouse_button_pressed(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return platform->input.mouse_map[button] && !platform->input.prev_mouse_map[button];
+    return platform->input.mouse.map[button] && !platform->input.mouse.prev_map[button];
 };
 
 am_bool am_platform_mouse_button_down(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return platform->input.mouse_map[button] && platform->input.prev_mouse_map[button];
+    return platform->input.mouse.map[button] && platform->input.mouse.prev_map[button];
 };
 
 am_bool am_platform_mouse_button_released(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return !platform->input.mouse_map[button] && platform->input.prev_mouse_map[button];
+    return !platform->input.mouse.map[button] && platform->input.mouse.prev_map[button];
 };
 
 am_bool am_platform_mouse_button_up(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
-    return !platform->input.mouse_map[button];  
+    return !platform->input.mouse.map[button];
 };
 
-void am_platform_mouse_position(am_uint32 *x, am_uint32 *y) {
+void am_platform_mouse_get_position(am_uint32 *x, am_uint32 *y) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    *x = platform->input.mouse_x;
-    *y = platform->input.mouse_y;
+    *x = platform->input.mouse.position.x;
+    *y = platform->input.mouse.position.y;
 };
 
-am_vec2 am_platform_mouse_positionv() {
+am_vec2 am_platform_mouse_get_positionv() {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_vec2 posv;
-    posv.x = (am_float32)platform->input.mouse_x;
-    posv.y = (am_float32)platform->input.mouse_y;
+    posv.x = (am_float32)platform->input.mouse.position.x;
+    posv.y = (am_float32)platform->input.mouse.position.y;
     return posv;
 };
 
-am_int32 am_platform_mouse_wheel_delta() {
+void am_platform_mouse_set_position(am_uint32 x, am_uint32 y) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    return platform->input.wheel_delta;
+    platform->input.mouse.position.x = x;
+    platform->input.mouse.position.y = y;
+    XWarpPointer(platform->display, None, am_packed_array_get_ptr(platform->windows, 1)->handle, 0, 0, 0, 0, (am_int32)x, (am_int32)y);
+    XFlush(platform->display);
+};
+
+am_vec2 am_platform_mouse_get_delta() {
+    return am_engine_get_subsystem(platform)->input.mouse.delta;
+};
+
+am_int32 am_platform_mouse_get_wheel_delta() {
+    am_platform *platform = am_engine_get_subsystem(platform);
+    return platform->input.mouse.wheel_delta;
 };
 
 am_bool am_platform_mouse_moved() {
     am_platform *platform = am_engine_get_subsystem(platform);
-    return platform->input.mouse_moved;
+    return platform->input.mouse.moved;
+};
+
+void am_platform_mouse_lock(am_bool lock) {
+    am_platform *platform = am_engine_get_subsystem(platform);
+
+    if (platform->input.mouse.locked == lock) return;
+    //HACK: Grabs main window but you should be able to specify this
+    am_window *window_to_lock = am_packed_array_get_ptr(platform->windows, 1);
+    if (lock) {
+        platform->input.mouse.locked = lock;
+        am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
+        XGrabPointer(platform->display, window_to_lock->handle, true,
+                     ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                     GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
+        );
+    } else {
+       platform->input.mouse.locked = lock;
+       XUngrabPointer(platform->display, 0);
+       am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
+    };
+
 };
 
 void am_platform_key_callback_default(am_id id, am_key_map key, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_KEY_PRESS: {
-            platform->input.keyboard_map[key] = true;
+            platform->input.keyboard.map[key] = true;
             break;
         };
         case AM_EVENT_KEY_RELEASE: {
-            platform->input.keyboard_map[key] = false;
+            platform->input.keyboard.map[key] = false;
             break;
         };
         default: break;
@@ -2961,11 +3018,11 @@ void am_platform_mouse_button_callback_default(am_id id, am_mouse_map button, am
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_MOUSE_BUTTON_PRESS: {
-            platform->input.mouse_map[button] = true;
+            platform->input.mouse.map[button] = true;
             break;
         };
         case AM_EVENT_MOUSE_BUTTON_RELEASE: {
-            platform->input.mouse_map[button] = false;
+            platform->input.mouse.map[button] = false;
             break;
         };
         default: break;
@@ -2974,20 +3031,31 @@ void am_platform_mouse_button_callback_default(am_id id, am_mouse_map button, am
 
 void am_platform_mouse_motion_callback_default(am_id id, am_int32 x, am_int32 y, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
-    platform->input.mouse_moved = true;
-    platform->input.mouse_x = x;
-    platform->input.mouse_y = y;
+    if (!platform->input.mouse.locked) {
+        platform->input.mouse.moved = true;
+        platform->input.mouse.delta.x = (am_float32)(x - platform->input.mouse.position.x);
+        platform->input.mouse.delta.y = (am_float32)(y - platform->input.mouse.position.y);
+        platform->input.mouse.position.x = x;
+        platform->input.mouse.position.y = y;
+    } else {
+        //REVIEW: For some reason switching to (am_float32)(x - platform->input.mouse.position.x) breaks stuff?
+        am_float32 dx = (am_float32)x - (am_float32)platform->input.mouse.position.x;
+        am_float32 dy = (am_float32)y - (am_float32)platform->input.mouse.position.y;
+        platform->input.mouse.position.x = x;
+        platform->input.mouse.position.y = y;
+        platform->input.mouse.delta = am_vec2_add(platform->input.mouse.delta, am_vec2_create(dx, dy));
+    };
 };
 
 void am_platform_mouse_scroll_callback_default(am_id id, am_platform_events event) {
     am_platform *platform = am_engine_get_subsystem(platform);
     switch (event) {
         case AM_EVENT_MOUSE_SCROLL_UP: {
-            ++platform->input.wheel_delta;
+            ++platform->input.mouse.wheel_delta;
             break;
         };
         case AM_EVENT_MOUSE_SCROLL_DOWN: {
-            --platform->input.wheel_delta;
+            --platform->input.mouse.wheel_delta;
             break;
         };
         default: break;
@@ -4785,7 +4853,7 @@ void update_cam(test_camera *test_cam);
 void init() {
     test_cam.cam = am_camera_perspective();
     test_cam.cam.transform.position = am_vec3_create(4.0f, 2.0f, 4.0f);
-
+    am_platform_mouse_lock(true);
     int maj,min;
     glGetIntegerv(GL_MAJOR_VERSION, &maj);
     glGetIntegerv(GL_MINOR_VERSION, &min);
@@ -4886,9 +4954,10 @@ void init() {
 
     rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
 };
-
+am_bool tt = false;
 void update() {
     am_bool run = true;
+
     am_engine *engine = am_engine_get_instance();
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *main = am_packed_array_get_ptr(platform->windows, 1);
@@ -4932,17 +5001,18 @@ void shutdown() {
 void update_cam(test_camera *test_cam) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_float64 dt = platform->time.delta;
-    am_int32 dp = am_platform_mouse_wheel_delta();
+    am_vec2 dm = am_platform_mouse_get_delta();
+    am_int32 dp = am_platform_mouse_get_wheel_delta();
 
-    if(am_platform_key_pressed(AM_KEYCODE_T)) am_camera_offset_orientation(&test_cam->cam, -5.0f, 0.0f);
+    am_camera_offset_orientation(&test_cam->cam, -0.1f*dm.x, -0.1f*dm.y);
 
     am_vec3 vel = {0};
     if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
     if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
     if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
     if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_R)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_F)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
 
     test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale(5000.0f*dt, am_vec3_norm(vel)));
 };
