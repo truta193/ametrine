@@ -1099,8 +1099,7 @@ typedef struct amgl_draw_info {
     am_uint32 count;
 } amgl_draw_info;
 
-typedef enum am_projection_type
-{
+typedef enum am_projection_type {
     AM_PROJECTION_TYPE_ORTHOGRAPHIC,
     AM_PROJECTION_TYPE_PERSPECTIVE
 } am_projection_type;
@@ -1115,6 +1114,22 @@ typedef struct am_camera {
     am_projection_type proj_type;
 } am_camera;
 
+typedef enum amgl_clear_type {
+    AMGL_CLEAR_INVALID,
+    AMGL_CLEAR_COLOR,
+    AMGL_CLEAR_DEPTH,
+    AMGL_CLEAR_STENCIL,
+    AMGL_CLEAR_ALL
+} amgl_clear_type;
+
+typedef struct amgl_clear_desc {
+    union {
+        am_float32 color[4];
+        am_float32 r, g, b, a;
+    };
+    amgl_clear_type *types;
+    am_uint32 num;
+} amgl_clear_desc;
 
 //Shaders
 am_id amgl_shader_create(amgl_shader_info info);
@@ -1169,6 +1184,7 @@ am_int32 amgl_index_buffer_size_translate(size_t size);
 void amgl_pipeline_destroy(am_id id);
 
 //Various OGL
+void amgl_clear(amgl_clear_desc info);
 void amgl_terminate();
 void amgl_set_viewport(am_int32 x, am_int32 y, am_int32 width, am_int32 height);
 void amgl_vsync(am_id window_id, am_bool state);
@@ -2130,8 +2146,6 @@ static inline am_quat am_quat_slerp(am_quat a, am_quat b, am_float32 t) {
 
     return q;
 };
-
-//http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/index.htm
 
 static inline am_mat4 am_quat_to_mat4(am_quat _q) {
     am_mat4 mat = am_mat4_identity();
@@ -4104,6 +4118,31 @@ void amgl_pipeline_destroy(am_id id) {
 
 
 
+void amgl_clear(amgl_clear_desc info) {
+    for (am_int32 i = 0; i < info.num; i++) {
+        switch (info.types[i]) {
+            case AMGL_CLEAR_COLOR: {
+                glClearColor(info.r, info.g, info.b, info.a);
+                glClear(GL_COLOR_BUFFER_BIT);
+                break;
+            };
+            case AMGL_CLEAR_DEPTH: {
+                glClear(GL_DEPTH_BUFFER_BIT);
+                break;
+            };
+            case AMGL_CLEAR_STENCIL: {
+                glClear(GL_STENCIL_BUFFER_BIT);
+                break;
+            };
+            case AMGL_CLEAR_ALL: {
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+                break;
+            };
+            default: break;
+        }
+    }
+};
+
 //TODO: Windows impl if necessary
 void amgl_terminate() {
 
@@ -4855,7 +4894,6 @@ void update() {
     am_window *main = am_packed_array_get_ptr(platform->windows, 1);
 
     update_cam(&test_cam);
-
     view = am_camera_get_view_projection(&test_cam.cam, main->width, main->height);
 
     amgl_bindings_info binds = {
@@ -4871,10 +4909,11 @@ void update() {
     };
 
     amgl_start_render_pass(rp_id);
-        glEnable(GL_BLEND);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glClear(GL_DEPTH_BUFFER_BIT);
+        amgl_clear((amgl_clear_desc) {
+            .color = {0.0f, 0.0f, 0.0f, 0.0f},
+            .num = 2,
+            .types = (amgl_clear_type[]){AMGL_CLEAR_COLOR, AMGL_CLEAR_DEPTH}
+        });
         amgl_bind_pipeline(pipeline_id);
         amgl_set_bindings(&binds);
         amgl_draw(&(amgl_draw_info){.start = 0, .count = 12});
@@ -4895,7 +4934,7 @@ void update_cam(test_camera *test_cam) {
     am_float64 dt = platform->time.delta;
     am_int32 dp = am_platform_mouse_wheel_delta();
 
-    if(am_platform_key_pressed(AM_KEYCODE_T)) am_camera_offset_orientation(&test_cam->cam, -5.0f, 0.1f);
+    if(am_platform_key_pressed(AM_KEYCODE_T)) am_camera_offset_orientation(&test_cam->cam, -5.0f, 0.0f);
 
     am_vec3 vel = {0};
     if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
@@ -4906,8 +4945,6 @@ void update_cam(test_camera *test_cam) {
     if (am_platform_key_down(AM_KEYCODE_F)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
 
     test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale(5000.0f*dt, am_vec3_norm(vel)));
-
-
 };
 
 int main() {
