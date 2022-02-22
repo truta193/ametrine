@@ -2,14 +2,13 @@
 
 //TODO: Compute shaders, instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
-//TODO: More defined default values perhaps?
+//REVIEW: More defined default values perhaps?
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
 
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
 //----------------------------------------------------------------------------//
 
-//#include <GL/gl.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <errno.h>
@@ -1289,6 +1288,7 @@ am_engine *_am_engine_instance;
 
 void am_engine_create(am_engine_info engine_info);
 void am_engine_frame();
+void am_engine_quit();
 void am_engine_terminate();
 
 
@@ -2667,7 +2667,7 @@ void am_platform_poll_events() {
             DispatchMessageW(&msg);
     };
     #endif
-    //REVIEW: Ok to leave here?
+
     //HACK: Coords are bound to main window
     if (platform->input.mouse.locked) {
         #if defined(AM_LINUX)
@@ -2860,8 +2860,8 @@ void am_platform_update(am_platform *platform) {
 };
 
 void am_platform_terminate(am_platform *platform) {
+    if (platform->input.mouse.locked) am_platform_mouse_lock(false);
     for (am_int32 i = 0; i < am_packed_array_get_count(platform->windows); i++) am_platform_window_destroy(platform->windows->elements[i].id);
-
     #if defined(AM_LINUX)
     //This sends the proper closing xevents
     am_platform_update(am_engine_get_subsystem(platform));
@@ -3506,7 +3506,7 @@ am_id amgl_shader_create(amgl_shader_info info) {
             printf("[WARN] amgl_shader_create (id: %u): No path given for shader file for index %u, assuming info.sources[%u].source is given!\n", ret_id, i, i);
         } else {
             if (access(info.sources[i].path, F_OK)) {
-                printf("[FAIL] amgl_shader_create (id: %u): Path given for shader file (%s) does not exist for index %u!\n", ret_id, info.sources[i].path, i, i);
+                printf("[FAIL] amgl_shader_create (id: %u): Path given for shader file (%s) does not exist for index %u!\n", ret_id, info.sources[i].path, i);
                 break;
             };
             info.sources[i].source = am_util_read_file(info.sources[i].path);
@@ -3754,7 +3754,7 @@ void amgl_uniform_update(am_int32 id, amgl_uniform_info info) {
 
 void amgl_uniform_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
-    am_packed_array_erase(engine->ctx_data.index_buffers, id);
+    am_packed_array_erase(engine->ctx_data.uniforms, id);
 };
 
 am_id amgl_texture_create(amgl_texture_info info) {
@@ -4824,10 +4824,17 @@ void am_engine_frame() {
     }
 };
 
+void am_engine_quit() {
+    am_engine_get_instance()->is_running = false;
+};
+
 void am_engine_terminate(){
     am_engine *engine = am_engine_get_instance();
+    XFlush(am_engine_get_subsystem(platform)->display);
     am_platform_terminate(am_engine_get_subsystem(platform));
 
+    for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.pipelines); i++) amgl_pipeline_destroy(engine->ctx_data.pipelines->elements[i].id);
+    am_packed_array_destroy(engine->ctx_data.pipelines);
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.textures); i++) amgl_texture_destroy(engine->ctx_data.textures->elements[i].id);
     am_packed_array_destroy(engine->ctx_data.textures);
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.vertex_buffers); i++) amgl_vertex_buffer_destroy(engine->ctx_data.vertex_buffers->elements[i].id);
@@ -4840,12 +4847,8 @@ void am_engine_terminate(){
     am_packed_array_destroy(engine->ctx_data.uniforms);
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.render_passes); i++) amgl_render_pass_destroy(engine->ctx_data.render_passes->elements[i].id);
     am_packed_array_destroy(engine->ctx_data.render_passes);
-    for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.pipelines); i++) amgl_pipeline_destroy(engine->ctx_data.pipelines->elements[i].id);
-    am_packed_array_destroy(engine->ctx_data.pipelines);
+
     am_dyn_array_destroy(engine->ctx_data.frame_cache.vertex_buffers);
-
-
-    amgl_terminate();
 
     engine->is_running = false;
     am_free(engine);
@@ -5037,15 +5040,14 @@ void init() {
 
 am_bool tt = false;
 void update() {
-
-    if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_terminate();
+    if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_quit();
 
     am_engine *engine = am_engine_get_instance();
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *main = am_packed_array_get_ptr(platform->windows, 1);
 
     update_cam(&test_cam);
-    view = am_camera_get_view_projection(&test_cam.cam, main->width, main->height);
+    view = am_camera_get_view_projection(&test_cam.cam, (am_int32)main->width, (am_int32)main->height);
 
     amgl_bindings_info binds = {
         .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
@@ -5068,33 +5070,29 @@ void update() {
         amgl_draw(&(amgl_draw_info){.start = 0, .count = 36});
     amgl_end_render_pass(rp_id);
 
-    if (am_platform_key_pressed(AM_KEYCODE_X)) {
-        am_engine_terminate();
-    };
-
 };
 
 void am_shutdown() {
-return;
+    return;
 };
 
 void update_cam(test_camera *test_cam) {
-am_platform *platform = am_engine_get_subsystem(platform);
-am_float64 dt = platform->time.delta;
-am_vec2 dm = am_platform_mouse_get_delta();
-am_int32 dp = am_platform_mouse_get_wheel_delta();
+    am_platform *platform = am_engine_get_subsystem(platform);
+    am_float64 dt = platform->time.delta;
+    am_vec2 dm = am_platform_mouse_get_delta();
+    am_int32 dp = am_platform_mouse_get_wheel_delta();
 
-am_camera_offset_orientation(&test_cam->cam, -0.1f*dm.x, -0.1f*dm.y);
+    am_camera_offset_orientation(&test_cam->cam, -0.1f*dm.x, -0.1f*dm.y);
 
-am_vec3 vel = {0};
-if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
-if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
-if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
-if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
-if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
-if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
+    am_vec3 vel = {0};
+    if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
 
-test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale(5000.0f*dt, am_vec3_norm(vel)));
+    test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale((am_float32)(5000.0f*dt), am_vec3_norm(vel)));
 };
 
 int main() {
@@ -5112,7 +5110,7 @@ am_engine_create((am_engine_info) {
         //.win_name = "Testing"
 });
 
-while (true) am_engine_frame();
+while (am_engine_get_instance()->is_running) am_engine_frame();
 
 return 0;
 };
