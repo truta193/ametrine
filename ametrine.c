@@ -3,7 +3,6 @@
 //TODO: Compute shaders, instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
 //TODO: More defined default values perhaps?
-//TODO: Check if files exist when given a path on LINUX
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
 
 //----------------------------------------------------------------------------//
@@ -12,6 +11,8 @@
 
 //#include <GL/gl.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -805,7 +806,6 @@ typedef struct amgl_index_buffer {
     am_uint32 handle;
 } amgl_index_buffer;
 
-//TODO: Support for more uniform types
 typedef enum amgl_uniform_type {
     AMGL_UNIFORM_TYPE_INVALID,
     AMGL_UNIFORM_TYPE_FLOAT,
@@ -833,7 +833,6 @@ typedef struct amgl_uniform {
     am_id shader_id;
 } amgl_uniform;
 
-//TODO: Textures: Change loading style, delete after upload to GPU
 //Textures
 /*
 typedef enum amgl_texture_update_type {
@@ -874,7 +873,6 @@ typedef enum amgl_texture_filter {
     AMGL_TEXTURE_FILTER_LINEAR
 } amgl_texture_filter;
 
-//TODO: Specify formats in another enum
 typedef struct amgl_texture_info {
     char name[AM_MAX_NAME_LENGTH];
     void *data;
@@ -1286,7 +1284,6 @@ typedef struct am_engine {
 //The only one that should exist
 am_engine *_am_engine_instance;
 
-//TODO: Implement engine part
 #define am_engine_get_instance() _am_engine_instance
 #define am_engine_get_subsystem(sys) am_engine_get_instance()->sys
 
@@ -2994,7 +2991,6 @@ am_bool am_platform_mouse_moved() {
     return platform->input.mouse.moved;
 };
 
-//TODO: Windows
 void am_platform_mouse_lock(am_bool lock) {
     am_platform *platform = am_engine_get_subsystem(platform);
 
@@ -3482,7 +3478,6 @@ am_uint64 am_platform_elapsed_time() {
 //                                START GL IMPL                               //
 //----------------------------------------------------------------------------//
 
-//TODO: Check if file exists LINUX
 am_id amgl_shader_create(amgl_shader_info info) {
     am_engine *engine = am_engine_get_instance();
 
@@ -3510,13 +3505,10 @@ am_id amgl_shader_create(amgl_shader_info info) {
         if (!info.sources[i].path) {
             printf("[WARN] amgl_shader_create (id: %u): No path given for shader file for index %u, assuming info.sources[%u].source is given!\n", ret_id, i, i);
         } else {
-            #if defined(AM_LINUX)
-            #else
             if (access(info.sources[i].path, F_OK)) {
                 printf("[FAIL] amgl_shader_create (id: %u): Path given for shader file (%s) does not exist for index %u!\n", ret_id, info.sources[i].path, i, i);
                 break;
             };
-            #endif
             info.sources[i].source = am_util_read_file(info.sources[i].path);
         };
 
@@ -3765,7 +3757,6 @@ void amgl_uniform_destroy(am_id id) {
     am_packed_array_erase(engine->ctx_data.index_buffers, id);
 };
 
-//TODO: Check if file exists LINUX
 am_id amgl_texture_create(amgl_texture_info info) {
     am_engine *engine = am_engine_get_instance();
 
@@ -3783,13 +3774,10 @@ am_id amgl_texture_create(amgl_texture_info info) {
     if (!info.path) {
         printf("[WARN] amgl_texture_create: No image path given, assuming info.data is already filled!\n");
     } else {
-        #if defined(AM_LINUX)
-        #else
         if (access(info.path, F_OK)) {
             printf("[FAIL] amgl_texture_create (id: %u): Path given (%s) does not exist!\n", engine->ctx_data.textures->next_id, info.path);
             return AM_PA_INVALID_ID;
         };
-        #endif
         amgl_texture_load_from_file(info.path, &info, true);
     };
     if (!info.wrap_s) {
@@ -4722,7 +4710,6 @@ void am_engine_create(am_engine_info engine_info) {
         engine_info.desired_fps = 60.0f;
     };
     engine->desired_fps = engine_info.desired_fps;
-    //TODO: Set max fps
 
     engine->platform = am_platform_create();
     am_platform_timer_create();
@@ -4813,12 +4800,9 @@ void am_engine_frame() {
         #if defined(AM_LINUX)
         glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, i)->handle);
         #else
-        //TODO
         SwapBuffers(am_packed_array_get_ptr(platform->windows, i)->hdc);
         #endif
     };
-
-    //TODO: Windows counterpart since it has a smaller precision
 
     platform->time.current  = (am_float64)am_platform_elapsed_time() / coef;
     platform->time.render   = platform->time.current - platform->time.previous;
@@ -4908,7 +4892,7 @@ char* am_util_read_file(const char *path) {
 
 
 am_id shader_id, tex1_id, tex2_id, uni1_id, uni2_id, uni3_id, view_mat, vbo_id, idx_id, pipeline_id, rp_id;
-am_mat4 rot_mat, view;
+am_mat4 view;
 
 typedef struct test_camera {
     am_float32 pitch;
@@ -4921,7 +4905,7 @@ void update_cam(test_camera *test_cam);
 
 void init() {
     test_cam.cam = am_camera_perspective();
-    test_cam.cam.transform.position = am_vec3_create(0.0f, 0.0f, 0.0f);
+    test_cam.cam.transform.position = am_vec3_create(2.0f, 0.0f, 0.0f);
     am_platform_mouse_lock(true);
     int maj,min;
     glGetIntegerv(GL_MAJOR_VERSION, &maj);
@@ -4933,8 +4917,8 @@ void init() {
     shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .path = "C:\\Users\\truta\\CLionProjects\\ametrine\\test-shaders\\cube_v.glsl" },
-            { .type = AMGL_SHADER_FRAGMENT, .path = "C:\\Users\\truta\\CLionProjects\\ametrine\\test-shaders\\cube_f.glsl" }
+            { .type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_v.glsl" },
+            { .type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_f.glsl" }
         }
     });
 
@@ -4944,7 +4928,7 @@ void init() {
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .path = "C:/Users/truta/CLionProjects/ametrine/pics/t3.png"
+        .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
     });
 
     tex2_id = amgl_texture_create((amgl_texture_info){
@@ -4953,7 +4937,7 @@ void init() {
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .path = "C:/Users/truta/CLionProjects/ametrine/pics/t2.png"
+        .path = "/home/truta/CLionProjects/ametrine/pics/t2.png"
     });
 
     uni1_id = amgl_uniform_create((amgl_uniform_info){
@@ -4966,40 +4950,67 @@ void init() {
         .type = AMGL_UNIFORM_TYPE_SAMPLER2D
     });
 
-    rot_mat = am_mat4_rotatev(am_deg2rad(45.0f), am_vec3_create(0.7f, 0.0f, 1.0f));
-    uni3_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_rot",
-        .type = AMGL_UNIFORM_TYPE_MAT4
-    });
-
     view_mat = amgl_uniform_create((amgl_uniform_info){
         .name = "u_view",
         .type = AMGL_UNIFORM_TYPE_MAT4
     });
 
+    /*
     vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = (float[]) {
-            -0.3f, -0.3f, -0.3f, 0.0f,
-             0.3f, -0.3f, -0.3f, 1.0f,
-             0.3f,  0.3f, -0.3f, 0.0f,
-            -0.3f, 0.3f, -0.3f, 1.0f,
-            -0.3f, -0.3f, 0.3f, 0.0f,
-            0.3f, -0.3f, 0.3f, 1.0f,
-            0.3f, 0.3f, 0.3f, 0.0f,
-            -0.3f, 0.3f, 0.3f, 1.0f,
+            -1.0f, -1.0f, -1.0f, 0.0f,
+             1.0f, -1.0f, -1.0f, 1.0f,
+             1.0f,  1.0f, -1.0f, 0.0f,
+            -1.0f, 1.0f, -1.0f, 1.0f,
+            -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, -1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 0.0f,
+            -1.0f, 1.0f, 1.0f, 1.0f,
         },
         .size = sizeof(float)*8*3,
         .usage = AMGL_BUFFER_USAGE_STATIC,
+    });*/
+
+
+    vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = (float[]) {
+            -1.0f, 1.0f, 1.0f,1.0f,
+            1.0f,1.0f,1.0f,0.0f,
+            1.0f,1.0f,-1.0f,1.0f,
+            -1.0f,1.0f,-1.0f,0.0f,
+            -1.0f,1.0f,-1.0f,1.0f,
+            1.0f,1.0f,-1.0f,0.0f,
+            1.0f,-1.0f,-1.0f,1.0f,
+            -1.0f,-1.0f,-1.0f,0.0f,
+            1.0f,1.0f,-1.0f,1.0f,
+            1.0f,1.0f,1.0f,0.0f,
+            1.0f,-1.0f,1.0f,1.0f,
+            1.0f,-1.0f,-1.0f,0.0f,
+            -1.0f,1.0f,1.0f,1.0f,
+            -1.0f,1.0f,-1.0f,0.0f,
+            -1.0f,-1.0f,-1.0f,1.0f,
+            -1.0f,-1.0f,1.0f,0.0f,
+            1.0f,1.0f,1.0f,1.0f,
+            -1.0f,1.0f,1.0f,0.0f,
+            -1.0f,-1.0f,1.0f,1.0f,
+            1.0f,-1.0f,1.0f,0.0f,
+            1.0f,-1.0f,-1.0f,1.0f,
+            -1.0f,-1.0f,-1.0f,0.0f,
+            -1.0f,-1.0f,1.0f,1.0f,
+            1.0f,-1.0f,1.0f,0.0f
+    },
+    .size = sizeof(float)*24*4,
+    .usage = AMGL_BUFFER_USAGE_STATIC,
     });
 
     idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
         .data = (am_uint32[]){
-            0, 1, 3, 3, 1, 2,
-            1, 5, 2, 2, 5, 6,
-            5, 4, 6, 6, 4, 7,
-            4, 0, 7, 7, 0, 3,
-            3, 2, 7, 7, 2, 6,
-            4, 5, 0, 0, 5, 1
+            0,1,2,0,2,3,
+            4,5,6,4,6,7,
+            8,9,10,8,10,11,
+            12,13,14,12,14,15,
+            16,17,18,18,16,19,
+            20,22,21,20,23,22
         },
         .size = sizeof(am_uint32)*36,
         .offset = 0,
@@ -5008,8 +5019,8 @@ void init() {
 
     pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
         .raster = {
-            .shader_id = shader_id,
-            .face_culling = AMGL_FACE_CULL_FRONT
+            .shader_id = shader_id
+            //.face_culling = AMGL_FACE_CULL_FRONT
         },
         .depth = {.func = AMGL_DEPTH_FUNC_LESS},
         .layout = {
@@ -5026,7 +5037,8 @@ void init() {
 
 am_bool tt = false;
 void update() {
-    am_bool run = true;
+
+    if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_terminate();
 
     am_engine *engine = am_engine_get_instance();
     am_platform *platform = am_engine_get_subsystem(platform);
@@ -5039,11 +5051,9 @@ void update() {
         .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
         .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = idx_id}},
         .uniforms = {
-            .size = 2*sizeof(amgl_uniform_bind_info),
-            .info = (amgl_uniform_bind_info[]) {
-                {.uniform_id = uni3_id, .data = rot_mat.elements},
-                {.uniform_id = view_mat, .data = view.elements}
-            }
+            .size = sizeof(amgl_uniform_bind_info),
+            .info = &(amgl_uniform_bind_info){.uniform_id = view_mat, .data = view.elements}
+
         }
     };
 
@@ -5055,7 +5065,7 @@ void update() {
         });
         amgl_bind_pipeline(pipeline_id);
         amgl_set_bindings(&binds);
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = 12});
+        amgl_draw(&(amgl_draw_info){.start = 0, .count = 36});
     amgl_end_render_pass(rp_id);
 
     if (am_platform_key_pressed(AM_KEYCODE_X)) {
@@ -5065,44 +5075,44 @@ void update() {
 };
 
 void am_shutdown() {
-    return;
+return;
 };
 
 void update_cam(test_camera *test_cam) {
-    am_platform *platform = am_engine_get_subsystem(platform);
-    am_float64 dt = platform->time.delta;
-    am_vec2 dm = am_platform_mouse_get_delta();
-    am_int32 dp = am_platform_mouse_get_wheel_delta();
+am_platform *platform = am_engine_get_subsystem(platform);
+am_float64 dt = platform->time.delta;
+am_vec2 dm = am_platform_mouse_get_delta();
+am_int32 dp = am_platform_mouse_get_wheel_delta();
 
-    am_camera_offset_orientation(&test_cam->cam, -0.1f*dm.x, -0.1f*dm.y);
+am_camera_offset_orientation(&test_cam->cam, -0.1f*dm.x, -0.1f*dm.y);
 
-    am_vec3 vel = {0};
-    if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
+am_vec3 vel = {0};
+if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
+if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
+if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
+if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
+if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
+if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
 
-    test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale(5000.0f*dt, am_vec3_norm(vel)));
+test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale(5000.0f*dt, am_vec3_norm(vel)));
 };
 
 int main() {
-    am_engine_create((am_engine_info) {
-            .init = init,
-            .update = update,
-            .shutdown = am_shutdown,
-            .win_fullscreen = false,
-            .win_height = 800,
-            .win_width = 800,
-            .win_x = 50,
-            .win_y = 50,
-            .vsync_enabled = true,
-            .is_running = true
-            //.win_name = "Testing"
-    });
+am_engine_create((am_engine_info) {
+        .init = init,
+        .update = update,
+        .shutdown = am_shutdown,
+        .win_fullscreen = false,
+        .win_height = 800,
+        .win_width = 800,
+        .win_x = 50,
+        .win_y = 50,
+        .vsync_enabled = true,
+        .is_running = true
+        //.win_name = "Testing"
+});
 
-    while (true) am_engine_frame();
+while (true) am_engine_frame();
 
-    return 0;
+return 0;
 };
