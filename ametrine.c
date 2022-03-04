@@ -2,8 +2,9 @@
 
 //TODO: Compute shaders, instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
-//REVIEW: More defined default values perhaps?
+//REVIEW: More defined default values perhaps? More detailed warns
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
+//REVIEW: Line 5128ish, pass id instead of buffer index?
 
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
@@ -74,8 +75,6 @@ typedef am_uint32 am_id;
 
 //HACK: Temporary
 am_bool temp_check = true;
-
-//REVIEW: OpenGL functions
 
 #if defined(AM_LINUX)
 typedef void (AM_CALL PFNGLSWAPINTERVALEXTPROC) (Display *dpy, GLXDrawable drawable, int interval);
@@ -368,9 +367,9 @@ static inline am_mat4 am_vqs_to_mat4(const am_vqs* transform);
 #define AM_WINDOW_DEFAULT_HEIGHT 500
 #define AM_WINDOW_DEFAULT_NAME "Ametrine"
 
-#if defined(AM_LINUX) 
+#if defined(AM_LINUX)
     #define AM_WINDOW_DEFAULT_PARENT DefaultRootWindow(am_engine_get_subsystem(platform)->display)
-#else 
+#else
     #define AM_WINDOW_DEFAULT_PARENT 0
 #endif
 
@@ -482,14 +481,14 @@ typedef enum am_key_map {
     AM_KEYCODE_LEFT_CONTROL,
     AM_KEYCODE_LEFT_META,
     AM_KEYCODE_LEFT_ALT,
-    AM_KEYCODE_SPACE, 
+    AM_KEYCODE_SPACE,
     AM_KEYCODE_RIGHT_ALT,
     AM_KEYCODE_RIGHT_META,
     AM_KEYCODE_MENU,
     AM_KEYCODE_RIGHT_CONTROL,
     AM_KEYCODE_LEFT_ARROW,
     AM_KEYCODE_DOWN_ARROW,
-    AM_KEYCODE_RIGHT_ARROW, 
+    AM_KEYCODE_RIGHT_ARROW,
     AM_KEYCODE_NUMPAD_0,
     AM_KEYCODE_NUMPAD_DECIMAL,
     AM_KEYCODE_NUMPAD_EQUAL,
@@ -523,7 +522,7 @@ typedef struct am_window_info {
     am_uint64 parent;
     char name[AM_MAX_NAME_LENGTH];
     am_uint32 width;
-    am_uint32 height; 
+    am_uint32 height;
     am_uint32 x;
     am_uint32 y;
     am_bool is_fullscreen; //Useless for child windows, for now
@@ -610,7 +609,7 @@ am_key_map am_platform_translate_keysym(const KeySym *key_syms, am_int32 width);
 am_mouse_map am_platform_translate_button(am_uint32 button);
 am_platform *am_platform_create();
 void am_platform_poll_events();
-#if defined(AM_WINDOWS) 
+#if defined(AM_WINDOWS)
 LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM wparam, LPARAM lparam);
 #else
 void am_platform_event_handler(XEvent *xevent);
@@ -620,19 +619,19 @@ void am_platform_update(am_platform *platform);
 void am_platform_terminate(am_platform *platform);
 
 //Keyboard input
-void am_platform_key_press(am_key_map key); 
-void am_platform_key_release(am_key_map key); 
-am_bool am_platform_key_pressed(am_key_map key); 
+void am_platform_key_press(am_key_map key);
+void am_platform_key_release(am_key_map key);
+am_bool am_platform_key_pressed(am_key_map key);
 am_bool am_platform_key_down(am_key_map key);
-am_bool am_platform_key_released(am_key_map key); 
+am_bool am_platform_key_released(am_key_map key);
 am_bool am_platform_key_up(am_key_map key);
 
 //Mouse input
-void am_platform_mouse_button_press(am_mouse_map button); 
-void am_platform_mouse_button_release(am_mouse_map button); 
-am_bool am_platform_mouse_button_pressed(am_mouse_map button); 
-am_bool am_platform_mouse_button_down(am_mouse_map button); 
-am_bool am_platform_mouse_button_released(am_mouse_map button); 
+void am_platform_mouse_button_press(am_mouse_map button);
+void am_platform_mouse_button_release(am_mouse_map button);
+am_bool am_platform_mouse_button_pressed(am_mouse_map button);
+am_bool am_platform_mouse_button_down(am_mouse_map button);
+am_bool am_platform_mouse_button_released(am_mouse_map button);
 am_bool am_platform_mouse_button_up(am_mouse_map button);
 void am_platform_mouse_get_position(am_uint32 *x, am_uint32 *y);
 am_vec2 am_platform_mouse_get_positionv();
@@ -655,9 +654,9 @@ void am_platform_window_motion_callback_default(am_id id, am_uint32 x, am_uint32
 #define am_platform_set_key_callback(platform, callback) platform->callbacks.am_platform_key_callback = callback
 #define am_platform_set_mouse_button_callback(platform, callback) platform->callbacks.am_platform_mouse_button_callback = callback
 #define am_platform_set_mouse_motion_callback(platform, callback) platform->callbacks.am_platform_mouse_motion_callback = callback
-#define am_platform_set_mouse_scroll_callback(platform, callback) platform->callbacks.am_platform_mouse_scroll_callback = callback  
-#define am_platform_set_window_size_callback(platform, callback) platform->callbacks.am_platform_window_size_callback = callback  
-#define am_platform_set_window_motion_callback(platform, callback) platform->callbacks.am_platform_window_motion_callback = callback  
+#define am_platform_set_mouse_scroll_callback(platform, callback) platform->callbacks.am_platform_mouse_scroll_callback = callback
+#define am_platform_set_window_size_callback(platform, callback) platform->callbacks.am_platform_window_size_callback = callback
+#define am_platform_set_window_motion_callback(platform, callback) platform->callbacks.am_platform_window_motion_callback = callback
 
 //Windows
 am_id am_platform_window_create(am_window_info window_info);
@@ -762,7 +761,7 @@ typedef struct amgl_vertex_buffer_attribute {
     size_t stride;
     size_t offset;
     amgl_vertex_buffer_attribute_format format;
-    am_uint32 buffer_index; 
+    am_uint32 buffer_index;
 } amgl_vertex_buffer_attribute;
 
 typedef struct amgl_vertex_buffer_layout {
@@ -1254,11 +1253,11 @@ typedef struct am_engine_info {
 } am_engine_info;
 
 typedef struct amgl_ctx_data {
-    am_packed_array(amgl_texture) textures; 
-    am_packed_array(amgl_shader) shaders; 
+    am_packed_array(amgl_texture) textures;
+    am_packed_array(amgl_shader) shaders;
     am_packed_array(amgl_vertex_buffer) vertex_buffers;
-    am_packed_array(amgl_index_buffer) index_buffers; 
-    am_packed_array(amgl_frame_buffer) frame_buffers; 
+    am_packed_array(amgl_index_buffer) index_buffers;
+    am_packed_array(amgl_frame_buffer) frame_buffers;
     am_packed_array(amgl_uniform) uniforms;
     am_packed_array(amgl_render_pass) render_passes;
     am_packed_array(amgl_pipeline) pipelines;
@@ -1619,10 +1618,10 @@ static inline am_mat3 am_mat3_mul(am_mat3 m0, am_mat3 m1) {
 };
 
 static inline am_vec3 am_mat3_mul_vec3(am_mat3 m, am_vec3 v) {
-return am_vec3_create(
-    m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
-    m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
-    m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z
+    return am_vec3_create(
+        m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
+        m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
+        m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z
     );
 };
 
@@ -1776,116 +1775,116 @@ static inline am_mat4 am_mat4_inverse(am_mat4 m) {
     am_float32 temp[16];
 
     temp[0] = m.elements[5] * m.elements[10] * m.elements[15] -
-    m.elements[5] * m.elements[11] * m.elements[14] -
-    m.elements[9] * m.elements[6] * m.elements[15] +
-    m.elements[9] * m.elements[7] * m.elements[14] +
-    m.elements[13] * m.elements[6] * m.elements[11] -
-    m.elements[13] * m.elements[7] * m.elements[10];
+              m.elements[5] * m.elements[11] * m.elements[14] -
+              m.elements[9] * m.elements[6] * m.elements[15] +
+              m.elements[9] * m.elements[7] * m.elements[14] +
+              m.elements[13] * m.elements[6] * m.elements[11] -
+              m.elements[13] * m.elements[7] * m.elements[10];
 
     temp[4] = -m.elements[4] * m.elements[10] * m.elements[15] +
-    m.elements[4] * m.elements[11] * m.elements[14] +
-    m.elements[8] * m.elements[6] * m.elements[15] -
-    m.elements[8] * m.elements[7] * m.elements[14] -
-    m.elements[12] * m.elements[6] * m.elements[11] +
-    m.elements[12] * m.elements[7] * m.elements[10];
+              m.elements[4] * m.elements[11] * m.elements[14] +
+              m.elements[8] * m.elements[6] * m.elements[15] -
+              m.elements[8] * m.elements[7] * m.elements[14] -
+              m.elements[12] * m.elements[6] * m.elements[11] +
+              m.elements[12] * m.elements[7] * m.elements[10];
 
     temp[8] = m.elements[4] * m.elements[9] * m.elements[15] -
-    m.elements[4] * m.elements[11] * m.elements[13] -
-    m.elements[8] * m.elements[5] * m.elements[15] +
-    m.elements[8] * m.elements[7] * m.elements[13] +
-    m.elements[12] * m.elements[5] * m.elements[11] -
-    m.elements[12] * m.elements[7] * m.elements[9];
+              m.elements[4] * m.elements[11] * m.elements[13] -
+              m.elements[8] * m.elements[5] * m.elements[15] +
+              m.elements[8] * m.elements[7] * m.elements[13] +
+              m.elements[12] * m.elements[5] * m.elements[11] -
+              m.elements[12] * m.elements[7] * m.elements[9];
 
     temp[12] = -m.elements[4] * m.elements[9] * m.elements[14] +
-    m.elements[4] * m.elements[10] * m.elements[13] +
-    m.elements[8] * m.elements[5] * m.elements[14] -
-    m.elements[8] * m.elements[6] * m.elements[13] -
-    m.elements[12] * m.elements[5] * m.elements[10] +
-    m.elements[12] * m.elements[6] * m.elements[9];
+               m.elements[4] * m.elements[10] * m.elements[13] +
+               m.elements[8] * m.elements[5] * m.elements[14] -
+               m.elements[8] * m.elements[6] * m.elements[13] -
+               m.elements[12] * m.elements[5] * m.elements[10] +
+               m.elements[12] * m.elements[6] * m.elements[9];
 
     temp[1] = -m.elements[1] * m.elements[10] * m.elements[15] +
-    m.elements[1] * m.elements[11] * m.elements[14] +
-    m.elements[9] * m.elements[2] * m.elements[15] -
-    m.elements[9] * m.elements[3] * m.elements[14] -
-    m.elements[13] * m.elements[2] * m.elements[11] +
-    m.elements[13] * m.elements[3] * m.elements[10];
+              m.elements[1] * m.elements[11] * m.elements[14] +
+              m.elements[9] * m.elements[2] * m.elements[15] -
+              m.elements[9] * m.elements[3] * m.elements[14] -
+              m.elements[13] * m.elements[2] * m.elements[11] +
+              m.elements[13] * m.elements[3] * m.elements[10];
 
     temp[5] = m.elements[0] * m.elements[10] * m.elements[15] -
-    m.elements[0] * m.elements[11] * m.elements[14] -
-    m.elements[8] * m.elements[2] * m.elements[15] +
-    m.elements[8] * m.elements[3] * m.elements[14] +
-    m.elements[12] * m.elements[2] * m.elements[11] -
-    m.elements[12] * m.elements[3] * m.elements[10];
+              m.elements[0] * m.elements[11] * m.elements[14] -
+              m.elements[8] * m.elements[2] * m.elements[15] +
+              m.elements[8] * m.elements[3] * m.elements[14] +
+              m.elements[12] * m.elements[2] * m.elements[11] -
+              m.elements[12] * m.elements[3] * m.elements[10];
 
     temp[9] = -m.elements[0] * m.elements[9] * m.elements[15] +
-    m.elements[0] * m.elements[11] * m.elements[13] +
-    m.elements[8] * m.elements[1] * m.elements[15] -
-    m.elements[8] * m.elements[3] * m.elements[13] -
-    m.elements[12] * m.elements[1] * m.elements[11] +
-    m.elements[12] * m.elements[3] * m.elements[9];
+              m.elements[0] * m.elements[11] * m.elements[13] +
+              m.elements[8] * m.elements[1] * m.elements[15] -
+              m.elements[8] * m.elements[3] * m.elements[13] -
+              m.elements[12] * m.elements[1] * m.elements[11] +
+              m.elements[12] * m.elements[3] * m.elements[9];
 
     temp[13] = m.elements[0] * m.elements[9] * m.elements[14] -
-    m.elements[0] * m.elements[10] * m.elements[13] -
-    m.elements[8] * m.elements[1] * m.elements[14] +
-    m.elements[8] * m.elements[2] * m.elements[13] +
-    m.elements[12] * m.elements[1] * m.elements[10] -
-    m.elements[12] * m.elements[2] * m.elements[9];
+               m.elements[0] * m.elements[10] * m.elements[13] -
+               m.elements[8] * m.elements[1] * m.elements[14] +
+               m.elements[8] * m.elements[2] * m.elements[13] +
+               m.elements[12] * m.elements[1] * m.elements[10] -
+               m.elements[12] * m.elements[2] * m.elements[9];
 
     temp[2] = m.elements[1] * m.elements[6] * m.elements[15] -
-    m.elements[1] * m.elements[7] * m.elements[14] -
-    m.elements[5] * m.elements[2] * m.elements[15] +
-    m.elements[5] * m.elements[3] * m.elements[14] +
-    m.elements[13] * m.elements[2] * m.elements[7] -
-    m.elements[13] * m.elements[3] * m.elements[6];
+              m.elements[1] * m.elements[7] * m.elements[14] -
+              m.elements[5] * m.elements[2] * m.elements[15] +
+              m.elements[5] * m.elements[3] * m.elements[14] +
+              m.elements[13] * m.elements[2] * m.elements[7] -
+              m.elements[13] * m.elements[3] * m.elements[6];
 
     temp[6] = -m.elements[0] * m.elements[6] * m.elements[15] +
-    m.elements[0] * m.elements[7] * m.elements[14] +
-    m.elements[4] * m.elements[2] * m.elements[15] -
-    m.elements[4] * m.elements[3] * m.elements[14] -
-    m.elements[12] * m.elements[2] * m.elements[7] +
-    m.elements[12] * m.elements[3] * m.elements[6];
+              m.elements[0] * m.elements[7] * m.elements[14] +
+              m.elements[4] * m.elements[2] * m.elements[15] -
+              m.elements[4] * m.elements[3] * m.elements[14] -
+              m.elements[12] * m.elements[2] * m.elements[7] +
+              m.elements[12] * m.elements[3] * m.elements[6];
 
     temp[10] = m.elements[0] * m.elements[5] * m.elements[15] -
-    m.elements[0] * m.elements[7] * m.elements[13] -
-    m.elements[4] * m.elements[1] * m.elements[15] +
-    m.elements[4] * m.elements[3] * m.elements[13] +
-    m.elements[12] * m.elements[1] * m.elements[7] -
-    m.elements[12] * m.elements[3] * m.elements[5];
+               m.elements[0] * m.elements[7] * m.elements[13] -
+               m.elements[4] * m.elements[1] * m.elements[15] +
+               m.elements[4] * m.elements[3] * m.elements[13] +
+               m.elements[12] * m.elements[1] * m.elements[7] -
+               m.elements[12] * m.elements[3] * m.elements[5];
 
     temp[14] = -m.elements[0] * m.elements[5] * m.elements[14] +
-    m.elements[0] * m.elements[6] * m.elements[13] +
-    m.elements[4] * m.elements[1] * m.elements[14] -
-    m.elements[4] * m.elements[2] * m.elements[13] -
-    m.elements[12] * m.elements[1] * m.elements[6] +
-    m.elements[12] * m.elements[2] * m.elements[5];
+               m.elements[0] * m.elements[6] * m.elements[13] +
+               m.elements[4] * m.elements[1] * m.elements[14] -
+               m.elements[4] * m.elements[2] * m.elements[13] -
+               m.elements[12] * m.elements[1] * m.elements[6] +
+               m.elements[12] * m.elements[2] * m.elements[5];
 
     temp[3] = -m.elements[1] * m.elements[6] * m.elements[11] +
-    m.elements[1] * m.elements[7] * m.elements[10] +
-    m.elements[5] * m.elements[2] * m.elements[11] -
-    m.elements[5] * m.elements[3] * m.elements[10] -
-    m.elements[9] * m.elements[2] * m.elements[7] +
-    m.elements[9] * m.elements[3] * m.elements[6];
+              m.elements[1] * m.elements[7] * m.elements[10] +
+              m.elements[5] * m.elements[2] * m.elements[11] -
+              m.elements[5] * m.elements[3] * m.elements[10] -
+              m.elements[9] * m.elements[2] * m.elements[7] +
+              m.elements[9] * m.elements[3] * m.elements[6];
 
     temp[7] = m.elements[0] * m.elements[6] * m.elements[11] -
-    m.elements[0] * m.elements[7] * m.elements[10] -
-    m.elements[4] * m.elements[2] * m.elements[11] +
-    m.elements[4] * m.elements[3] * m.elements[10] +
-    m.elements[8] * m.elements[2] * m.elements[7] -
-    m.elements[8] * m.elements[3] * m.elements[6];
+              m.elements[0] * m.elements[7] * m.elements[10] -
+              m.elements[4] * m.elements[2] * m.elements[11] +
+              m.elements[4] * m.elements[3] * m.elements[10] +
+              m.elements[8] * m.elements[2] * m.elements[7] -
+              m.elements[8] * m.elements[3] * m.elements[6];
 
     temp[11] = -m.elements[0] * m.elements[5] * m.elements[11] +
-    m.elements[0] * m.elements[7] * m.elements[9] +
-    m.elements[4] * m.elements[1] * m.elements[11] -
-    m.elements[4] * m.elements[3] * m.elements[9] -
-    m.elements[8] * m.elements[1] * m.elements[7] +
-    m.elements[8] * m.elements[3] * m.elements[5];
+               m.elements[0] * m.elements[7] * m.elements[9] +
+               m.elements[4] * m.elements[1] * m.elements[11] -
+               m.elements[4] * m.elements[3] * m.elements[9] -
+               m.elements[8] * m.elements[1] * m.elements[7] +
+               m.elements[8] * m.elements[3] * m.elements[5];
 
     temp[15] = m.elements[0] * m.elements[5] * m.elements[10] -
-    m.elements[0] * m.elements[6] * m.elements[9] -
-    m.elements[4] * m.elements[1] * m.elements[10] +
-    m.elements[4] * m.elements[2] * m.elements[9] +
-    m.elements[8] * m.elements[1] * m.elements[6] -
-    m.elements[8] * m.elements[2] * m.elements[5];
+               m.elements[0] * m.elements[6] * m.elements[9] -
+               m.elements[4] * m.elements[1] * m.elements[10] +
+               m.elements[4] * m.elements[2] * m.elements[9] +
+               m.elements[8] * m.elements[1] * m.elements[6] -
+               m.elements[8] * m.elements[2] * m.elements[5];
 
     am_float32 determinant = m.elements[0] * temp[0] + m.elements[1] * temp[4] + m.elements[2] * temp[8] + m.elements[3] * temp[12];
     determinant = 1.0f / determinant;
@@ -2016,11 +2015,11 @@ static inline am_mat4 am_mat4_look_at(am_vec3 position, am_vec3 target, am_vec3 
 };
 
 static inline am_vec4 am_mat4_mul_vec4(am_mat4 m, am_vec4 v) {
-return am_vec4_create(m.elements[0 + 4 * 0] * v.x + m.elements[0 + 4 * 1] * v.y + m.elements[0 + 4 * 2] * v.z + m.elements[0 + 4 * 3] * v.w,
-                      m.elements[1 + 4 * 0] * v.x + m.elements[1 + 4 * 1] * v.y + m.elements[1 + 4 * 2] * v.z + m.elements[1 + 4 * 3] * v.w,
-                      m.elements[2 + 4 * 0] * v.x + m.elements[2 + 4 * 1] * v.y + m.elements[2 + 4 * 2] * v.z + m.elements[2 + 4 * 3] * v.w,
-                      m.elements[3 + 4 * 0] * v.x + m.elements[3 + 4 * 1] * v.y + m.elements[3 + 4 * 2] * v.z + m.elements[3 + 4 * 3] * v.w
-                      );
+    return am_vec4_create(m.elements[0 + 4 * 0] * v.x + m.elements[0 + 4 * 1] * v.y + m.elements[0 + 4 * 2] * v.z + m.elements[0 + 4 * 3] * v.w,
+                          m.elements[1 + 4 * 0] * v.x + m.elements[1 + 4 * 1] * v.y + m.elements[1 + 4 * 2] * v.z + m.elements[1 + 4 * 3] * v.w,
+                          m.elements[2 + 4 * 0] * v.x + m.elements[2 + 4 * 1] * v.y + m.elements[2 + 4 * 2] * v.z + m.elements[2 + 4 * 3] * v.w,
+                          m.elements[3 + 4 * 0] * v.x + m.elements[3 + 4 * 1] * v.y + m.elements[3 + 4 * 2] * v.z + m.elements[3 + 4 * 3] * v.w
+                          );
 };
 
 static inline am_vec3 am_mat4_mul_vec3(am_mat4 m, am_vec3 v) {
@@ -2102,10 +2101,10 @@ static inline am_quat am_quat_norm(am_quat q) {
 
 static inline am_quat am_quat_cross(am_quat q0, am_quat q1) {
     return am_quat_create (q0.x * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y,
-                          q0.w * q1.y + q0.y * q1.w + q0.z * q1.x - q0.x * q1.z,
-                          q0.w * q1.z + q0.z * q1.w + q0.x * q1.y - q0.y * q1.x,
-                          q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
-                          );
+                           q0.w * q1.y + q0.y * q1.w + q0.z * q1.x - q0.x * q1.z,
+                           q0.w * q1.z + q0.z * q1.w + q0.x * q1.y - q0.y * q1.x,
+                           q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
+                           );
 };
 
 // Inverse := Conjugate / Dot;
@@ -2153,8 +2152,8 @@ static inline am_quat am_quat_slerp(am_quat a, am_quat b, am_float32 t) {
         sclp = (float)sinf((1.0f - t) * omega) / s;
         sclq = (float)sinf(t * omega) / s;
     } else {
-    sclp = 1.0f - t;
-    sclq = t;
+        sclp = 1.0f - t;
+        sclq = t;
     };
 
     am_quat q;
@@ -2244,9 +2243,9 @@ static inline am_vqs am_vqs_create(am_vec3 translation, am_quat rotation, am_vec
 
 static inline am_vqs am_vqs_default() {
     am_vqs t = am_vqs_create(am_vec3_create(0.0f, 0.0f, 0.0f),
-                               am_quat_create(0.0f, 0.0f, 0.0f, 1.0f),
-                                  am_vec3_create(1.0f, 1.0f, 1.0f)
-                            );
+                             am_quat_create(0.0f, 0.0f, 0.0f, 1.0f),
+                             am_vec3_create(1.0f, 1.0f, 1.0f)
+                             );
     return t;
 };
 
@@ -2477,160 +2476,160 @@ am_platform *am_platform_create() {
     memset(&platform->time, 0, sizeof(platform->time));
 
     #if defined(AM_LINUX)
-    platform->display = XOpenDisplay(NULL);
-    memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
-    am_int32 min, max;
-    XDisplayKeycodes(platform->display, &min, &max);
-    am_int32 width;
-    KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
-    for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
-    XFree(key_syms);
+        platform->display = XOpenDisplay(NULL);
+        memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
+        am_int32 min, max;
+        XDisplayKeycodes(platform->display, &min, &max);
+        am_int32 width;
+        KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
+        for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
+        XFree(key_syms);
     #else
-    platform->input.keyboard.keycodes[0x00B] = AM_KEYCODE_0;
-    platform->input.keyboard.keycodes[0x002] = AM_KEYCODE_1;
-    platform->input.keyboard.keycodes[0x003] = AM_KEYCODE_2;
-    platform->input.keyboard.keycodes[0x004] = AM_KEYCODE_3;
-    platform->input.keyboard.keycodes[0x005] = AM_KEYCODE_4;
-    platform->input.keyboard.keycodes[0x006] = AM_KEYCODE_5;
-    platform->input.keyboard.keycodes[0x007] = AM_KEYCODE_6;
-    platform->input.keyboard.keycodes[0x008] = AM_KEYCODE_7;
-    platform->input.keyboard.keycodes[0x009] = AM_KEYCODE_8;
-    platform->input.keyboard.keycodes[0x00A] = AM_KEYCODE_9;
-    platform->input.keyboard.keycodes[0x01E] = AM_KEYCODE_A;
-    platform->input.keyboard.keycodes[0x030] = AM_KEYCODE_B;
-    platform->input.keyboard.keycodes[0x02E] = AM_KEYCODE_C;
-    platform->input.keyboard.keycodes[0x020] = AM_KEYCODE_D;
-    platform->input.keyboard.keycodes[0x012] = AM_KEYCODE_E;
-    platform->input.keyboard.keycodes[0x021] = AM_KEYCODE_F;
-    platform->input.keyboard.keycodes[0x022] = AM_KEYCODE_G;
-    platform->input.keyboard.keycodes[0x023] = AM_KEYCODE_H;
-    platform->input.keyboard.keycodes[0x017] = AM_KEYCODE_I;
-    platform->input.keyboard.keycodes[0x024] = AM_KEYCODE_J;
-    platform->input.keyboard.keycodes[0x025] = AM_KEYCODE_K;
-    platform->input.keyboard.keycodes[0x026] = AM_KEYCODE_L;
-    platform->input.keyboard.keycodes[0x032] = AM_KEYCODE_M;
-    platform->input.keyboard.keycodes[0x031] = AM_KEYCODE_N;
-    platform->input.keyboard.keycodes[0x018] = AM_KEYCODE_O;
-    platform->input.keyboard.keycodes[0x019] = AM_KEYCODE_P;
-    platform->input.keyboard.keycodes[0x010] = AM_KEYCODE_Q;
-    platform->input.keyboard.keycodes[0x013] = AM_KEYCODE_R;
-    platform->input.keyboard.keycodes[0x01F] = AM_KEYCODE_S;
-    platform->input.keyboard.keycodes[0x014] = AM_KEYCODE_T;
-    platform->input.keyboard.keycodes[0x016] = AM_KEYCODE_U;
-    platform->input.keyboard.keycodes[0x02F] = AM_KEYCODE_V;
-    platform->input.keyboard.keycodes[0x011] = AM_KEYCODE_W;
-    platform->input.keyboard.keycodes[0x02D] = AM_KEYCODE_X;
-    platform->input.keyboard.keycodes[0x015] = AM_KEYCODE_Y;
-    platform->input.keyboard.keycodes[0x02C] = AM_KEYCODE_Z;
-    platform->input.keyboard.keycodes[0x028] = AM_KEYCODE_APOSTROPHE;
-    platform->input.keyboard.keycodes[0x02B] = AM_KEYCODE_BACKSLASH;
-    platform->input.keyboard.keycodes[0x033] = AM_KEYCODE_COMMA;
-    platform->input.keyboard.keycodes[0x00D] = AM_KEYCODE_EQUAL;
-    platform->input.keyboard.keycodes[0x029] = AM_KEYCODE_ACCENT_GRAVE;
-    platform->input.keyboard.keycodes[0x01A] = AM_KEYCODE_LEFT_SQUARE_BRACKET;
-    platform->input.keyboard.keycodes[0x00C] = AM_KEYCODE_MINUS;
-    platform->input.keyboard.keycodes[0x034] = AM_KEYCODE_PERIOD;
-    platform->input.keyboard.keycodes[0x01B] = AM_KEYCODE_RIGHT_SQUARE_BRACKET;
-    platform->input.keyboard.keycodes[0x027] = AM_KEYCODE_SEMICOLON;
-    platform->input.keyboard.keycodes[0x035] = AM_KEYCODE_SLASH;
-    platform->input.keyboard.keycodes[0x00E] = AM_KEYCODE_BACKSPACE;
-    platform->input.keyboard.keycodes[0x153] = AM_KEYCODE_DELETE;
-    platform->input.keyboard.keycodes[0x14F] = AM_KEYCODE_END;
-    platform->input.keyboard.keycodes[0x01C] = AM_KEYCODE_ENTER;
-    platform->input.keyboard.keycodes[0x001] = AM_KEYCODE_ESCAPE;
-    platform->input.keyboard.keycodes[0x147] = AM_KEYCODE_HOME;
-    platform->input.keyboard.keycodes[0x152] = AM_KEYCODE_INSERT;
-    platform->input.keyboard.keycodes[0x15D] = AM_KEYCODE_MENU;
-    platform->input.keyboard.keycodes[0x151] = AM_KEYCODE_PAGE_DOWN;
-    platform->input.keyboard.keycodes[0x149] = AM_KEYCODE_PAGE_UP;
-    platform->input.keyboard.keycodes[0x045] = AM_KEYCODE_PAUSE;
-    platform->input.keyboard.keycodes[0x146] = AM_KEYCODE_PAUSE;
-    platform->input.keyboard.keycodes[0x039] = AM_KEYCODE_SPACE;
-    platform->input.keyboard.keycodes[0x00F] = AM_KEYCODE_TAB;
-    platform->input.keyboard.keycodes[0x03A] = AM_KEYCODE_CAPS_LOCK;
-    platform->input.keyboard.keycodes[0x145] = AM_KEYCODE_NUMPAD_NUM;
-    platform->input.keyboard.keycodes[0x046] = AM_KEYCODE_SCROLL_LOCK;
-    platform->input.keyboard.keycodes[0x03B] = AM_KEYCODE_F1;
-    platform->input.keyboard.keycodes[0x03C] = AM_KEYCODE_F2;
-    platform->input.keyboard.keycodes[0x03D] = AM_KEYCODE_F3;
-    platform->input.keyboard.keycodes[0x03E] = AM_KEYCODE_F4;
-    platform->input.keyboard.keycodes[0x03F] = AM_KEYCODE_F5;
-    platform->input.keyboard.keycodes[0x040] = AM_KEYCODE_F6;
-    platform->input.keyboard.keycodes[0x041] = AM_KEYCODE_F7;
-    platform->input.keyboard.keycodes[0x042] = AM_KEYCODE_F8;
-    platform->input.keyboard.keycodes[0x043] = AM_KEYCODE_F9;
-    platform->input.keyboard.keycodes[0x044] = AM_KEYCODE_F10;
-    platform->input.keyboard.keycodes[0x057] = AM_KEYCODE_F11;
-    platform->input.keyboard.keycodes[0x058] = AM_KEYCODE_F12;
-    platform->input.keyboard.keycodes[0x064] = AM_KEYCODE_F13;
-    platform->input.keyboard.keycodes[0x065] = AM_KEYCODE_F14;
-    platform->input.keyboard.keycodes[0x066] = AM_KEYCODE_F15;
-    platform->input.keyboard.keycodes[0x067] = AM_KEYCODE_F16;
-    platform->input.keyboard.keycodes[0x068] = AM_KEYCODE_F17;
-    platform->input.keyboard.keycodes[0x069] = AM_KEYCODE_F18;
-    platform->input.keyboard.keycodes[0x06A] = AM_KEYCODE_F19;
-    platform->input.keyboard.keycodes[0x06B] = AM_KEYCODE_F20;
-    platform->input.keyboard.keycodes[0x06C] = AM_KEYCODE_F21;
-    platform->input.keyboard.keycodes[0x06D] = AM_KEYCODE_F22;
-    platform->input.keyboard.keycodes[0x06E] = AM_KEYCODE_F23;
-    platform->input.keyboard.keycodes[0x076] = AM_KEYCODE_F24;
-    platform->input.keyboard.keycodes[0x038] = AM_KEYCODE_LEFT_ALT;
-    platform->input.keyboard.keycodes[0x01D] = AM_KEYCODE_LEFT_CONTROL;
-    platform->input.keyboard.keycodes[0x02A] = AM_KEYCODE_LEFT_SHIFT;
-    platform->input.keyboard.keycodes[0x15B] = AM_KEYCODE_LEFT_META;
-    platform->input.keyboard.keycodes[0x137] = AM_KEYCODE_PRINT_SCREEN;
-    platform->input.keyboard.keycodes[0x138] = AM_KEYCODE_RIGHT_ALT;
-    platform->input.keyboard.keycodes[0x11D] = AM_KEYCODE_RIGHT_CONTROL;
-    platform->input.keyboard.keycodes[0x036] = AM_KEYCODE_RIGHT_SHIFT;
-    platform->input.keyboard.keycodes[0x15C] = AM_KEYCODE_RIGHT_META;
-    platform->input.keyboard.keycodes[0x150] = AM_KEYCODE_DOWN_ARROW;
-    platform->input.keyboard.keycodes[0x14B] = AM_KEYCODE_LEFT_ARROW;
-    platform->input.keyboard.keycodes[0x14D] = AM_KEYCODE_RIGHT_ARROW;
-    platform->input.keyboard.keycodes[0x148] = AM_KEYCODE_UP_ARROW;
-    platform->input.keyboard.keycodes[0x052] = AM_KEYCODE_NUMPAD_0;
-    platform->input.keyboard.keycodes[0x04F] = AM_KEYCODE_NUMPAD_1;
-    platform->input.keyboard.keycodes[0x050] = AM_KEYCODE_NUMPAD_2;
-    platform->input.keyboard.keycodes[0x051] = AM_KEYCODE_NUMPAD_3;
-    platform->input.keyboard.keycodes[0x04B] = AM_KEYCODE_NUMPAD_4;
-    platform->input.keyboard.keycodes[0x04C] = AM_KEYCODE_NUMPAD_5;
-    platform->input.keyboard.keycodes[0x04D] = AM_KEYCODE_NUMPAD_6;
-    platform->input.keyboard.keycodes[0x047] = AM_KEYCODE_NUMPAD_7;
-    platform->input.keyboard.keycodes[0x048] = AM_KEYCODE_NUMPAD_8;
-    platform->input.keyboard.keycodes[0x049] = AM_KEYCODE_NUMPAD_9;
-    platform->input.keyboard.keycodes[0x04E] = AM_KEYCODE_NUMPAD_ADD;
-    platform->input.keyboard.keycodes[0x053] = AM_KEYCODE_NUMPAD_DECIMAL;
-    platform->input.keyboard.keycodes[0x135] = AM_KEYCODE_NUMPAD_DIVIDE;
-    platform->input.keyboard.keycodes[0x11C] = AM_KEYCODE_NUMPAD_ENTER;
-    platform->input.keyboard.keycodes[0x059] = AM_KEYCODE_NUMPAD_EQUAL;
-    platform->input.keyboard.keycodes[0x037] = AM_KEYCODE_NUMPAD_MULTIPLY;
-    platform->input.keyboard.keycodes[0x04A] = AM_KEYCODE_NUMPAD_SUBTRACT;
+        platform->input.keyboard.keycodes[0x00B] = AM_KEYCODE_0;
+        platform->input.keyboard.keycodes[0x002] = AM_KEYCODE_1;
+        platform->input.keyboard.keycodes[0x003] = AM_KEYCODE_2;
+        platform->input.keyboard.keycodes[0x004] = AM_KEYCODE_3;
+        platform->input.keyboard.keycodes[0x005] = AM_KEYCODE_4;
+        platform->input.keyboard.keycodes[0x006] = AM_KEYCODE_5;
+        platform->input.keyboard.keycodes[0x007] = AM_KEYCODE_6;
+        platform->input.keyboard.keycodes[0x008] = AM_KEYCODE_7;
+        platform->input.keyboard.keycodes[0x009] = AM_KEYCODE_8;
+        platform->input.keyboard.keycodes[0x00A] = AM_KEYCODE_9;
+        platform->input.keyboard.keycodes[0x01E] = AM_KEYCODE_A;
+        platform->input.keyboard.keycodes[0x030] = AM_KEYCODE_B;
+        platform->input.keyboard.keycodes[0x02E] = AM_KEYCODE_C;
+        platform->input.keyboard.keycodes[0x020] = AM_KEYCODE_D;
+        platform->input.keyboard.keycodes[0x012] = AM_KEYCODE_E;
+        platform->input.keyboard.keycodes[0x021] = AM_KEYCODE_F;
+        platform->input.keyboard.keycodes[0x022] = AM_KEYCODE_G;
+        platform->input.keyboard.keycodes[0x023] = AM_KEYCODE_H;
+        platform->input.keyboard.keycodes[0x017] = AM_KEYCODE_I;
+        platform->input.keyboard.keycodes[0x024] = AM_KEYCODE_J;
+        platform->input.keyboard.keycodes[0x025] = AM_KEYCODE_K;
+        platform->input.keyboard.keycodes[0x026] = AM_KEYCODE_L;
+        platform->input.keyboard.keycodes[0x032] = AM_KEYCODE_M;
+        platform->input.keyboard.keycodes[0x031] = AM_KEYCODE_N;
+        platform->input.keyboard.keycodes[0x018] = AM_KEYCODE_O;
+        platform->input.keyboard.keycodes[0x019] = AM_KEYCODE_P;
+        platform->input.keyboard.keycodes[0x010] = AM_KEYCODE_Q;
+        platform->input.keyboard.keycodes[0x013] = AM_KEYCODE_R;
+        platform->input.keyboard.keycodes[0x01F] = AM_KEYCODE_S;
+        platform->input.keyboard.keycodes[0x014] = AM_KEYCODE_T;
+        platform->input.keyboard.keycodes[0x016] = AM_KEYCODE_U;
+        platform->input.keyboard.keycodes[0x02F] = AM_KEYCODE_V;
+        platform->input.keyboard.keycodes[0x011] = AM_KEYCODE_W;
+        platform->input.keyboard.keycodes[0x02D] = AM_KEYCODE_X;
+        platform->input.keyboard.keycodes[0x015] = AM_KEYCODE_Y;
+        platform->input.keyboard.keycodes[0x02C] = AM_KEYCODE_Z;
+        platform->input.keyboard.keycodes[0x028] = AM_KEYCODE_APOSTROPHE;
+        platform->input.keyboard.keycodes[0x02B] = AM_KEYCODE_BACKSLASH;
+        platform->input.keyboard.keycodes[0x033] = AM_KEYCODE_COMMA;
+        platform->input.keyboard.keycodes[0x00D] = AM_KEYCODE_EQUAL;
+        platform->input.keyboard.keycodes[0x029] = AM_KEYCODE_ACCENT_GRAVE;
+        platform->input.keyboard.keycodes[0x01A] = AM_KEYCODE_LEFT_SQUARE_BRACKET;
+        platform->input.keyboard.keycodes[0x00C] = AM_KEYCODE_MINUS;
+        platform->input.keyboard.keycodes[0x034] = AM_KEYCODE_PERIOD;
+        platform->input.keyboard.keycodes[0x01B] = AM_KEYCODE_RIGHT_SQUARE_BRACKET;
+        platform->input.keyboard.keycodes[0x027] = AM_KEYCODE_SEMICOLON;
+        platform->input.keyboard.keycodes[0x035] = AM_KEYCODE_SLASH;
+        platform->input.keyboard.keycodes[0x00E] = AM_KEYCODE_BACKSPACE;
+        platform->input.keyboard.keycodes[0x153] = AM_KEYCODE_DELETE;
+        platform->input.keyboard.keycodes[0x14F] = AM_KEYCODE_END;
+        platform->input.keyboard.keycodes[0x01C] = AM_KEYCODE_ENTER;
+        platform->input.keyboard.keycodes[0x001] = AM_KEYCODE_ESCAPE;
+        platform->input.keyboard.keycodes[0x147] = AM_KEYCODE_HOME;
+        platform->input.keyboard.keycodes[0x152] = AM_KEYCODE_INSERT;
+        platform->input.keyboard.keycodes[0x15D] = AM_KEYCODE_MENU;
+        platform->input.keyboard.keycodes[0x151] = AM_KEYCODE_PAGE_DOWN;
+        platform->input.keyboard.keycodes[0x149] = AM_KEYCODE_PAGE_UP;
+        platform->input.keyboard.keycodes[0x045] = AM_KEYCODE_PAUSE;
+        platform->input.keyboard.keycodes[0x146] = AM_KEYCODE_PAUSE;
+        platform->input.keyboard.keycodes[0x039] = AM_KEYCODE_SPACE;
+        platform->input.keyboard.keycodes[0x00F] = AM_KEYCODE_TAB;
+        platform->input.keyboard.keycodes[0x03A] = AM_KEYCODE_CAPS_LOCK;
+        platform->input.keyboard.keycodes[0x145] = AM_KEYCODE_NUMPAD_NUM;
+        platform->input.keyboard.keycodes[0x046] = AM_KEYCODE_SCROLL_LOCK;
+        platform->input.keyboard.keycodes[0x03B] = AM_KEYCODE_F1;
+        platform->input.keyboard.keycodes[0x03C] = AM_KEYCODE_F2;
+        platform->input.keyboard.keycodes[0x03D] = AM_KEYCODE_F3;
+        platform->input.keyboard.keycodes[0x03E] = AM_KEYCODE_F4;
+        platform->input.keyboard.keycodes[0x03F] = AM_KEYCODE_F5;
+        platform->input.keyboard.keycodes[0x040] = AM_KEYCODE_F6;
+        platform->input.keyboard.keycodes[0x041] = AM_KEYCODE_F7;
+        platform->input.keyboard.keycodes[0x042] = AM_KEYCODE_F8;
+        platform->input.keyboard.keycodes[0x043] = AM_KEYCODE_F9;
+        platform->input.keyboard.keycodes[0x044] = AM_KEYCODE_F10;
+        platform->input.keyboard.keycodes[0x057] = AM_KEYCODE_F11;
+        platform->input.keyboard.keycodes[0x058] = AM_KEYCODE_F12;
+        platform->input.keyboard.keycodes[0x064] = AM_KEYCODE_F13;
+        platform->input.keyboard.keycodes[0x065] = AM_KEYCODE_F14;
+        platform->input.keyboard.keycodes[0x066] = AM_KEYCODE_F15;
+        platform->input.keyboard.keycodes[0x067] = AM_KEYCODE_F16;
+        platform->input.keyboard.keycodes[0x068] = AM_KEYCODE_F17;
+        platform->input.keyboard.keycodes[0x069] = AM_KEYCODE_F18;
+        platform->input.keyboard.keycodes[0x06A] = AM_KEYCODE_F19;
+        platform->input.keyboard.keycodes[0x06B] = AM_KEYCODE_F20;
+        platform->input.keyboard.keycodes[0x06C] = AM_KEYCODE_F21;
+        platform->input.keyboard.keycodes[0x06D] = AM_KEYCODE_F22;
+        platform->input.keyboard.keycodes[0x06E] = AM_KEYCODE_F23;
+        platform->input.keyboard.keycodes[0x076] = AM_KEYCODE_F24;
+        platform->input.keyboard.keycodes[0x038] = AM_KEYCODE_LEFT_ALT;
+        platform->input.keyboard.keycodes[0x01D] = AM_KEYCODE_LEFT_CONTROL;
+        platform->input.keyboard.keycodes[0x02A] = AM_KEYCODE_LEFT_SHIFT;
+        platform->input.keyboard.keycodes[0x15B] = AM_KEYCODE_LEFT_META;
+        platform->input.keyboard.keycodes[0x137] = AM_KEYCODE_PRINT_SCREEN;
+        platform->input.keyboard.keycodes[0x138] = AM_KEYCODE_RIGHT_ALT;
+        platform->input.keyboard.keycodes[0x11D] = AM_KEYCODE_RIGHT_CONTROL;
+        platform->input.keyboard.keycodes[0x036] = AM_KEYCODE_RIGHT_SHIFT;
+        platform->input.keyboard.keycodes[0x15C] = AM_KEYCODE_RIGHT_META;
+        platform->input.keyboard.keycodes[0x150] = AM_KEYCODE_DOWN_ARROW;
+        platform->input.keyboard.keycodes[0x14B] = AM_KEYCODE_LEFT_ARROW;
+        platform->input.keyboard.keycodes[0x14D] = AM_KEYCODE_RIGHT_ARROW;
+        platform->input.keyboard.keycodes[0x148] = AM_KEYCODE_UP_ARROW;
+        platform->input.keyboard.keycodes[0x052] = AM_KEYCODE_NUMPAD_0;
+        platform->input.keyboard.keycodes[0x04F] = AM_KEYCODE_NUMPAD_1;
+        platform->input.keyboard.keycodes[0x050] = AM_KEYCODE_NUMPAD_2;
+        platform->input.keyboard.keycodes[0x051] = AM_KEYCODE_NUMPAD_3;
+        platform->input.keyboard.keycodes[0x04B] = AM_KEYCODE_NUMPAD_4;
+        platform->input.keyboard.keycodes[0x04C] = AM_KEYCODE_NUMPAD_5;
+        platform->input.keyboard.keycodes[0x04D] = AM_KEYCODE_NUMPAD_6;
+        platform->input.keyboard.keycodes[0x047] = AM_KEYCODE_NUMPAD_7;
+        platform->input.keyboard.keycodes[0x048] = AM_KEYCODE_NUMPAD_8;
+        platform->input.keyboard.keycodes[0x049] = AM_KEYCODE_NUMPAD_9;
+        platform->input.keyboard.keycodes[0x04E] = AM_KEYCODE_NUMPAD_ADD;
+        platform->input.keyboard.keycodes[0x053] = AM_KEYCODE_NUMPAD_DECIMAL;
+        platform->input.keyboard.keycodes[0x135] = AM_KEYCODE_NUMPAD_DIVIDE;
+        platform->input.keyboard.keycodes[0x11C] = AM_KEYCODE_NUMPAD_ENTER;
+        platform->input.keyboard.keycodes[0x059] = AM_KEYCODE_NUMPAD_EQUAL;
+        platform->input.keyboard.keycodes[0x037] = AM_KEYCODE_NUMPAD_MULTIPLY;
+        platform->input.keyboard.keycodes[0x04A] = AM_KEYCODE_NUMPAD_SUBTRACT;
 
-    WNDCLASS window_class = {0};
-	window_class.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	window_class.hCursor = LoadCursor(NULL, IDC_ARROW);
-    //REVIEW: Might not be necessary, come back after OpenGL is implemented
-	window_class.style = CS_HREDRAW | CS_VREDRAW;
-	window_class.hInstance = GetModuleHandle(NULL);
-	window_class.lpfnWndProc = am_platform_event_handler;
-	window_class.cbClsExtra = 0;
-	window_class.cbWndExtra = 0;
-	window_class.lpszMenuName = NULL;
-	window_class.hbrBackground = NULL;
-    //HACK: Colored here just for visuals
-    window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
-	window_class.lpszClassName = "AM_ROOT";
-	if (!RegisterClass(&window_class)) {
-        printf("[FAIL] Failed to register root class!\n");
-        return NULL;
-    };
-    //HACK: Colored here just for visuals
-    window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
-    window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
-    window_class.lpszClassName = "AM_CHILD";
-    if (!RegisterClass(&window_class)) {
-        printf("[FAIL] Failed to register child class!\n");
-        return NULL;
-    };
+        WNDCLASS window_class = {0};
+        window_class.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+        window_class.hCursor = LoadCursor(NULL, IDC_ARROW);
+        //REVIEW: Might not be necessary, come back after OpenGL is implemented
+        window_class.style = CS_HREDRAW | CS_VREDRAW;
+        window_class.hInstance = GetModuleHandle(NULL);
+        window_class.lpfnWndProc = am_platform_event_handler;
+        window_class.cbClsExtra = 0;
+        window_class.cbWndExtra = 0;
+        window_class.lpszMenuName = NULL;
+        window_class.hbrBackground = NULL;
+        //HACK: Colored here just for visuals
+        window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
+        window_class.lpszClassName = "AM_ROOT";
+        if (!RegisterClass(&window_class)) {
+            printf("[FAIL] Failed to register root class!\n");
+            return NULL;
+        };
+        //HACK: Colored here just for visuals
+        window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
+        window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
+        window_class.lpszClassName = "AM_CHILD";
+        if (!RegisterClass(&window_class)) {
+            printf("[FAIL] Failed to register child class!\n");
+            return NULL;
+        };
     #endif
 
     platform->input.mouse.wheel_delta = 0;
@@ -2655,49 +2654,49 @@ am_platform *am_platform_create() {
 void am_platform_poll_events() {
     am_platform *platform = am_engine_get_subsystem(platform);
     #if defined(AM_LINUX)
-    XEvent xevent;
-    while (XPending(platform->display)) {
-        XNextEvent(platform->display, &xevent);
-        am_platform_event_handler(&xevent);  
-    };
+        XEvent xevent;
+        while (XPending(platform->display)) {
+            XNextEvent(platform->display, &xevent);
+            am_platform_event_handler(&xevent);
+        };
     #else
-    MSG msg;
-    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-    };
+        MSG msg;
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+        };
     #endif
 
     //HACK: Coords are bound to main window
     if (platform->input.mouse.locked) {
         #if defined(AM_LINUX)
-        am_platform_mouse_set_position(am_packed_array_get_ptr(platform->windows, 1)->width/2, am_packed_array_get_ptr(platform->windows, 1)->height/2);
+                am_platform_mouse_set_position(am_packed_array_get_ptr(platform->windows, 1)->width/2, am_packed_array_get_ptr(platform->windows, 1)->height/2);
         #else
-        am_vec2u pos = am_platform_window_get_size(1);
-        am_platform_mouse_set_position(pos.x/2, pos.y/2);
+                am_vec2u pos = am_platform_window_get_size(1);
+                am_platform_mouse_set_position(pos.x/2, pos.y/2);
         #endif
     };
 };
 
-#if defined(AM_LINUX) 
+#if defined(AM_LINUX)
 void am_platform_event_handler(XEvent *xevent) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_uint64 handle = xevent->xany.window;
     am_id id = -1;
 
     for (am_uint32 i = 0; i < am_packed_array_get_count(platform->windows); i++)
-        if (platform->windows->elements[i].handle == handle) 
+        if (platform->windows->elements[i].handle == handle)
             id = platform->windows->elements[i].id;
 
     switch (xevent->type) {
         case KeyPress: {
             am_key_map key = platform->input.keyboard.keycodes[xevent->xkey.keycode];
-            platform->callbacks.am_platform_key_callback(id, key, AM_EVENT_KEY_PRESS);  
+            platform->callbacks.am_platform_key_callback(id, key, AM_EVENT_KEY_PRESS);
             break;
         };
         case KeyRelease: {
             am_key_map key = platform->input.keyboard.keycodes[xevent->xkey.keycode];
-            platform->callbacks.am_platform_key_callback(id, key, AM_EVENT_KEY_RELEASE);  
+            platform->callbacks.am_platform_key_callback(id, key, AM_EVENT_KEY_RELEASE);
             break;
         };
         case ButtonPress: {
@@ -2723,7 +2722,7 @@ void am_platform_event_handler(XEvent *xevent) {
         case MotionNotify: {
             platform->callbacks.am_platform_mouse_motion_callback(id, xevent->xbutton.x, xevent->xbutton.y, AM_EVENT_MOUSE_MOTION);
             break;
-        };  
+        };
         case ConfigureNotify: {
             am_window *window = am_packed_array_get_ptr(platform->windows, id);
             if (window->height != xevent->xconfigure.height || window->width != xevent->xconfigure.width) {
@@ -2739,7 +2738,7 @@ void am_platform_event_handler(XEvent *xevent) {
             am_packed_array_erase(platform->windows, id);
 
             am_bool check_no_root = true;
-            for (am_int32 i = 0; i < am_packed_array_get_count(platform->windows); i++) 
+            for (am_int32 i = 0; i < am_packed_array_get_count(platform->windows); i++)
                 if (platform->windows->elements[i].parent == AM_WINDOW_DEFAULT_PARENT) {
                     printf("check no root false");
                     check_no_root = false;
@@ -2786,7 +2785,7 @@ LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM 
         };
         case WM_LBUTTONUP: {
             platform->callbacks.am_platform_mouse_button_callback(id, AM_MOUSE_BUTTON_LEFT, AM_EVENT_MOUSE_BUTTON_RELEASE);
-            break;  
+            break;
         };
         case WM_MBUTTONDOWN: {
             platform->callbacks.am_platform_mouse_button_callback(id, AM_MOUSE_BUTTON_MIDDLE, AM_EVENT_MOUSE_BUTTON_PRESS);
@@ -2794,7 +2793,7 @@ LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM 
         };
         case WM_MBUTTONUP: {
             platform->callbacks.am_platform_mouse_button_callback(id, AM_MOUSE_BUTTON_MIDDLE, AM_EVENT_MOUSE_BUTTON_RELEASE);
-            break;  
+            break;
         };
         case WM_RBUTTONDOWN: {
             platform->callbacks.am_platform_mouse_button_callback(id, AM_MOUSE_BUTTON_RIGHT, AM_EVENT_MOUSE_BUTTON_PRESS);
@@ -2802,7 +2801,7 @@ LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM 
         };
         case WM_RBUTTONUP: {
             platform->callbacks.am_platform_mouse_button_callback(id, AM_MOUSE_BUTTON_RIGHT, AM_EVENT_MOUSE_BUTTON_RELEASE);
-            break;  
+            break;
         };
         case WM_MOUSEWHEEL: {
             ++platform->input.mouse.wheel_delta;
@@ -2863,13 +2862,13 @@ void am_platform_terminate(am_platform *platform) {
     if (platform->input.mouse.locked) am_platform_mouse_lock(false);
     for (am_int32 i = 0; i < am_packed_array_get_count(platform->windows); i++) am_platform_window_destroy(platform->windows->elements[i].id);
     #if defined(AM_LINUX)
-    //This sends the proper closing xevents
-    am_platform_update(am_engine_get_subsystem(platform));
+        //This sends the proper closing xevents
+        am_platform_update(am_engine_get_subsystem(platform));
     #else
-    UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
-    UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
+        UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
+        UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
     #endif
-    
+
     am_packed_array_destroy(platform->windows);
     am_free(platform);
 };
@@ -2884,25 +2883,25 @@ void am_platform_key_release(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return;
     am_platform *platform = am_engine_get_subsystem(platform);
     platform->input.keyboard.map[key] = false;
-}; 
+};
 
 am_bool am_platform_key_pressed(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.keyboard.map[key] && !platform->input.keyboard.prev_map[key];
-}; 
+};
 
 am_bool am_platform_key_down(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return platform->input.keyboard.map[key] && platform->input.keyboard.prev_map[key];
-}; 
+};
 
 am_bool am_platform_key_released(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
     am_platform *platform = am_engine_get_subsystem(platform);
     return !platform->input.keyboard.map[key] && platform->input.keyboard.prev_map[key];
-}; 
+};
 
 am_bool am_platform_key_up(am_key_map key) {
     if (key >= AM_KEYCODE_COUNT) return false;
@@ -2914,7 +2913,7 @@ void am_platform_mouse_button_press(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return;
     am_platform *platform = am_engine_get_subsystem(platform);
     platform->input.mouse.map[button] = true;
-}; 
+};
 
 void am_platform_mouse_button_release(am_mouse_map button) {
     if (button >= AM_MOUSE_BUTTON_COUNT) return;
@@ -2967,13 +2966,13 @@ void am_platform_mouse_set_position(am_uint32 x, am_uint32 y) {
     platform->input.mouse.position.y = y;
 
     #if defined(AM_LINUX)
-    XWarpPointer(platform->display, None, am_packed_array_get_ptr(platform->windows, 1)->handle, 0, 0, 0, 0, (am_int32)x, (am_int32)y);
-    XFlush(platform->display);
+        XWarpPointer(platform->display, None, am_packed_array_get_ptr(platform->windows, 1)->handle, 0, 0, 0, 0, (am_int32)x, (am_int32)y);
+        XFlush(platform->display);
     #else
-    POINT pos = { (am_int32)x, (am_int32)y};
-    //HACK:
-    ClientToScreen((HWND)am_packed_array_get_ptr(platform->windows, 1)->handle, &pos);
-    SetCursorPos(pos.x, pos.y);
+        POINT pos = { (am_int32)x, (am_int32)y};
+        //HACK:
+        ClientToScreen((HWND)am_packed_array_get_ptr(platform->windows, 1)->handle, &pos);
+        SetCursorPos(pos.x, pos.y);
     #endif
 };
 
@@ -2998,32 +2997,32 @@ void am_platform_mouse_lock(am_bool lock) {
     //HACK: Grabs main window but you should be able to specify this
     am_window *window_to_lock = am_packed_array_get_ptr(platform->windows, 1);
     #if defined(AM_LINUX)
-    if (lock) {
-        platform->input.mouse.locked = lock;
-        am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
-        XGrabPointer(platform->display, window_to_lock->handle, true,
-                     ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-                     GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
-        );
-    } else {
-       platform->input.mouse.locked = lock;
-       XUngrabPointer(platform->display, 0);
-       am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
-    };
+        if (lock) {
+            platform->input.mouse.locked = lock;
+            am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
+            XGrabPointer(platform->display, window_to_lock->handle, true,
+                         ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                         GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
+            );
+        } else {
+            platform->input.mouse.locked = lock;
+            XUngrabPointer(platform->display, 0);
+            am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
+        };
     #else
-    if (lock) {
-        platform->input.mouse.locked = lock;
-        am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
-        RECT clipRect;
-        GetClientRect((HWND)window_to_lock->handle, &clipRect);
-        ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.left);
-        ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.right);
-        ClipCursor(&clipRect);
-    } else {
-        platform->input.mouse.locked = lock;
-        ClipCursor(NULL);
-        am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
-    }
+        if (lock) {
+            platform->input.mouse.locked = lock;
+            am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
+            RECT clipRect;
+            GetClientRect((HWND)window_to_lock->handle, &clipRect);
+            ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.left);
+            ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.right);
+            ClipCursor(&clipRect);
+        } else {
+            platform->input.mouse.locked = lock;
+            ClipCursor(NULL);
+            am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
+        }
     #endif
 
 };
@@ -3177,7 +3176,7 @@ am_id am_platform_window_create(am_window_info window_info) {
                                                 new_window->visual_info->depth, InputOutput,
                                                 new_window->visual_info->visual, CWColormap | CWEventMask,
                                                 &window_attributes
-                                                );
+    );
     if (window == BadAlloc || window == BadColor || window == BadCursor || window == BadMatch || window == BadPixmap || window == BadValue || window == BadWindow) {
         printf("[FAIL] am_platform_window_create (id: %u): Could not create window!\n", ret_id);
         am_packed_array_erase(platform->windows, ret_id);
@@ -3191,36 +3190,36 @@ am_id am_platform_window_create(am_window_info window_info) {
     XMapWindow(platform->display, (Window)new_window->handle);
 
     #else
-	DWORD dwExStyle = WS_EX_LEFT; // 0
-    DWORD dwStyle = WS_OVERLAPPED; // 0
-    if (window_info.parent == AM_WINDOW_DEFAULT_PARENT) {
-	    dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
-        dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-    };
+        DWORD dwExStyle = WS_EX_LEFT; // 0
+        DWORD dwStyle = WS_OVERLAPPED; // 0
+        if (window_info.parent == AM_WINDOW_DEFAULT_PARENT) {
+            dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
+            dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
+        };
 
-    RECT window_rect = {
-        .left = 0,
-        .right = (long)window_info.width,
-        .top = 0,
-        .bottom = (long)window_info.height
-    };
-    AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
-    am_int32 rect_width = window_rect.right - window_rect.left;
-    am_int32 rect_height = window_rect.bottom - window_rect.top;
+        RECT window_rect = {
+            .left = 0,
+            .right = (long)window_info.width,
+            .top = 0,
+            .bottom = (long)window_info.height
+        };
+        AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
+        am_int32 rect_width = window_rect.right - window_rect.left;
+        am_int32 rect_height = window_rect.bottom - window_rect.top;
 
-    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_DEFAULT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS,
-                                                   window_info.name, dwStyle, (am_int32)window_info.x, (am_int32)window_info.y, rect_width, rect_height,
-                                                   NULL, NULL, GetModuleHandle(NULL), NULL
-                                                   );
-    if (new_window->handle == 0) {
-        printf("[FAIL] am_platform_window_create (id: %u): Could not create window!\n", new_window->id);
-        return AM_PA_INVALID_ID;
-    };
-    if ((window_info.parent != AM_WINDOW_DEFAULT_PARENT)) {
-        SetParent((HWND)new_window->handle, (HWND)window_info.parent);
-        SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
-    };
-    ShowWindow((HWND)new_window->handle, 1);
+        new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_DEFAULT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS,
+                                                       window_info.name, dwStyle, (am_int32)window_info.x, (am_int32)window_info.y, rect_width, rect_height,
+                                                       NULL, NULL, GetModuleHandle(NULL), NULL
+                                                       );
+        if (new_window->handle == 0) {
+            printf("[FAIL] am_platform_window_create (id: %u): Could not create window!\n", new_window->id);
+            return AM_PA_INVALID_ID;
+        };
+        if ((window_info.parent != AM_WINDOW_DEFAULT_PARENT)) {
+            SetParent((HWND)new_window->handle, (HWND)window_info.parent);
+            SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
+        };
+        ShowWindow((HWND)new_window->handle, 1);
     #endif
 
     new_window->x = window_info.x;
@@ -3238,27 +3237,27 @@ am_id am_platform_window_create(am_window_info window_info) {
     //REVIEW: Should all windows share contexts?
     am_window *main_window = am_packed_array_get_ptr(platform->windows, 1);
     #if defined(AM_LINUX)
-    new_window->context = NULL;
-    new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
-    glXMakeCurrent(platform->display, new_window->handle, new_window->context);
+        new_window->context = NULL;
+        new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
+        glXMakeCurrent(platform->display, new_window->handle, new_window->context);
     #else
-    new_window->hdc = GetDC((HWND)new_window->handle);
-    PIXELFORMATDESCRIPTOR pixel_format_desc = {
-        sizeof(PIXELFORMATDESCRIPTOR),1,
-        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA,
-        32,0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
-        24,8,0, PFD_MAIN_PLANE, 0, 0, 0, 0
-    };
+        new_window->hdc = GetDC((HWND)new_window->handle);
+        PIXELFORMATDESCRIPTOR pixel_format_desc = {
+            sizeof(PIXELFORMATDESCRIPTOR),1,
+            PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA,
+            32,0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            24,8,0, PFD_MAIN_PLANE, 0, 0, 0, 0
+        };
 
-    am_int32 suggested_pf_index = ChoosePixelFormat(new_window->hdc, &pixel_format_desc);
-    PIXELFORMATDESCRIPTOR suggested_pf;
-    DescribePixelFormat(new_window->hdc, suggested_pf_index, sizeof(suggested_pf), &suggested_pf);
-    SetPixelFormat(new_window->hdc, suggested_pf_index, &suggested_pf);
+        am_int32 suggested_pf_index = ChoosePixelFormat(new_window->hdc, &pixel_format_desc);
+        PIXELFORMATDESCRIPTOR suggested_pf;
+        DescribePixelFormat(new_window->hdc, suggested_pf_index, sizeof(suggested_pf), &suggested_pf);
+        SetPixelFormat(new_window->hdc, suggested_pf_index, &suggested_pf);
 
-    new_window->context = wglCreateContext(new_window->hdc);
-    wglMakeCurrent(new_window->hdc, new_window->context);
-    wglShareLists(new_window->context, main_window->context);
+        new_window->context = wglCreateContext(new_window->hdc);
+        wglMakeCurrent(new_window->hdc, new_window->context);
+        wglShareLists(new_window->context, main_window->context);
     #endif
 
     //Have to do this here unfortunately
@@ -3285,20 +3284,20 @@ void am_platform_window_resize(am_id id, am_uint32 width, am_uint32 height) {
     window->cache.width = window->width;
     window->cache.height = window->height;
     #if defined(AM_LINUX)
-    XResizeWindow(platform->display, window->handle, width, height);
+        XResizeWindow(platform->display, window->handle, width, height);
     #else
-    RECT rect = {
-        .left = 0,
-        .top = 0,
-        .bottom = (long)window->height,
-        .right = (long)window->width
-    };
-    if (window->parent == AM_WINDOW_DEFAULT_PARENT)
-        AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
-    else
-        AdjustWindowRectEx(&rect, 0, false, 0);
+        RECT rect = {
+            .left = 0,
+            .top = 0,
+            .bottom = (long)window->height,
+            .right = (long)window->width
+        };
+        if (window->parent == AM_WINDOW_DEFAULT_PARENT)
+            AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
+        else
+            AdjustWindowRectEx(&rect, 0, false, 0);
 
-    SetWindowPos((HWND)window->handle, 0, 0, 0 , rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
+        SetWindowPos((HWND)window->handle, 0, 0, 0 , rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
     #endif
 };
 
@@ -3313,20 +3312,20 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
     window->cache.y = window->y;
 
     #if defined(AM_LINUX)
-    XMoveWindow(platform->display, window->handle, (am_int32)x, (am_int32)y);
+        XMoveWindow(platform->display, window->handle, (am_int32)x, (am_int32)y);
     #else
-    RECT rect = {
-        .left = (long)x,
-        .top = (long)y,
-        .bottom = (long)window->height,
-        .right = (long)window->width
-    };
-    if (window->parent == AM_WINDOW_DEFAULT_PARENT)
-        AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
-    else
-        AdjustWindowRectEx(&rect, 0, false, 0);
-    SetWindowPos((HWND)window->handle, 0, rect.left, rect.top, 0, 0, SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
-    #endif  
+        RECT rect = {
+            .left = (long)x,
+            .top = (long)y,
+            .bottom = (long)window->height,
+            .right = (long)window->width
+        };
+        if (window->parent == AM_WINDOW_DEFAULT_PARENT)
+            AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
+        else
+            AdjustWindowRectEx(&rect, 0, false, 0);
+        SetWindowPos((HWND)window->handle, 0, rect.left, rect.top, 0, 0, SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
+    #endif
 };
 
 //REVIEW: Child windows could go "is_fullscreen" by taking the parent's client dimensions
@@ -3344,56 +3343,54 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
     window->cache.is_fullscreen = window->is_fullscreen;
     window->is_fullscreen = state;
     am_window_info temp_info = {
-            .width = window->width,
-            .height = window->height,
-            .x = window->x,
-            .y = window->y,
-            .is_fullscreen = window->is_fullscreen,
-            .parent = window->parent,
+        .width = window->width,
+        .height = window->height,
+        .x = window->x,
+        .y = window->y,
+        .is_fullscreen = window->is_fullscreen,
+        .parent = window->parent,
     };
     snprintf(temp_info.name, AM_MAX_NAME_LENGTH, "%s", window->name);
     //REVIEW: Currently not needed for linux
     #if defined(AM_WINDOWS)
-    am_window_cache temp_cache = window->cache;
+        am_window_cache temp_cache = window->cache;
     #endif
 
     #if defined(AM_LINUX)
-    Atom wm_state = XInternAtom(platform->display, "_NET_WM_STATE", false);
-    Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
-    XEvent xevent = {0};
-    xevent.type = ClientMessage;
-    xevent.xclient.window = window->handle;
-    xevent.xclient.message_type = wm_state;
-    xevent.xclient.format = 32;
-    xevent.xclient.data.l[0] = state ? 1:0;
-    xevent.xclient.data.l[1] = (long)wm_fs;
-    xevent.xclient.data.l[3] = 0l;
-    XSendEvent(platform->display, AM_WINDOW_DEFAULT_PARENT, false, SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
-    XFlush(platform->display);
-    XWindowAttributes window_attribs = {0};
-    XGetWindowAttributes(platform->display, window->handle, &window_attribs);
-    printf("Fullscreen toggle\n Pos: %d %d\n Size: %d %d\nFullscreen toggle end\n\n", window_attribs.x, window_attribs.y, window_attribs.width, window_attribs.height);
-    memcpy(&window->cache, &temp_info, sizeof(am_window_info));
-
-
-    #else
-    DWORD dw_style = GetWindowLong((HWND)window->handle, GWL_STYLE);
-    if (window->is_fullscreen) {
-        printf("Going fullscreen\n");
-        MONITORINFO monitor_info = {sizeof(monitor_info)};
-        GetMonitorInfo(MonitorFromWindow((HWND)window->handle, MONITOR_DEFAULTTONEAREST), &monitor_info);
-        SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style & ~WS_OVERLAPPEDWINDOW);
-        SetWindowPos((HWND)window->handle, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
-                     monitor_info.rcMonitor.right - monitor_info.rcMonitor.left, monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
-                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED
-                     );
+        Atom wm_state = XInternAtom(platform->display, "_NET_WM_STATE", false);
+        Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
+        XEvent xevent = {0};
+        xevent.type = ClientMessage;
+        xevent.xclient.window = window->handle;
+        xevent.xclient.message_type = wm_state;
+        xevent.xclient.format = 32;
+        xevent.xclient.data.l[0] = state ? 1:0;
+        xevent.xclient.data.l[1] = (long)wm_fs;
+        xevent.xclient.data.l[3] = 0l;
+        XSendEvent(platform->display, AM_WINDOW_DEFAULT_PARENT, false, SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
+        XFlush(platform->display);
+        XWindowAttributes window_attribs = {0};
+        XGetWindowAttributes(platform->display, window->handle, &window_attribs);
+        printf("Fullscreen toggle\n Pos: %d %d\n Size: %d %d\nFullscreen toggle end\n\n", window_attribs.x, window_attribs.y, window_attribs.width, window_attribs.height);
         memcpy(&window->cache, &temp_info, sizeof(am_window_info));
-    } else {
-        printf("Going not is_fullscreen\n");
-        SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style | WS_OVERLAPPEDWINDOW);
-        am_platform_window_resize(id, temp_cache.width, temp_cache.height);
-        am_platform_window_move(id, temp_cache.x, temp_cache.y);
-    };
+    #else
+        DWORD dw_style = GetWindowLong((HWND)window->handle, GWL_STYLE);
+        if (window->is_fullscreen) {
+            printf("Going fullscreen\n");
+            MONITORINFO monitor_info = {sizeof(monitor_info)};
+            GetMonitorInfo(MonitorFromWindow((HWND)window->handle, MONITOR_DEFAULTTONEAREST), &monitor_info);
+            SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos((HWND)window->handle, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
+                         monitor_info.rcMonitor.right - monitor_info.rcMonitor.left, monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+                         );
+            memcpy(&window->cache, &temp_info, sizeof(am_window_info));
+        } else {
+            printf("Going not is_fullscreen\n");
+            SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style | WS_OVERLAPPEDWINDOW);
+            am_platform_window_resize(id, temp_cache.width, temp_cache.height);
+            am_platform_window_move(id, temp_cache.x, temp_cache.y);
+        };
     #endif
 };
 
@@ -3402,10 +3399,10 @@ am_vec2u am_platform_window_get_size(am_id id) {
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
     #if defined(AM_LINUX)
     #else
-    RECT area;
-    GetClientRect((HWND)window->handle, &area);
-    am_vec2u ret = {area.right, area.bottom};
-    return ret;
+        RECT area;
+        GetClientRect((HWND)window->handle, &area);
+        am_vec2u ret = {area.right, area.bottom};
+        return ret;
     #endif
 };
 
@@ -3417,50 +3414,50 @@ void am_platform_window_destroy(am_id id) {
         return;
     };
     #if defined(AM_LINUX)
-    glXDestroyContext(platform->display, window->context);
-    XUnmapWindow(platform->display, window->handle);
-    XDestroyWindow(platform->display, window->handle);
-    XFreeColormap(platform->display, window->colormap);
-    XFree(window->visual_info);
-    XFlush(platform->display);
+        glXDestroyContext(platform->display, window->context);
+        XUnmapWindow(platform->display, window->handle);
+        XDestroyWindow(platform->display, window->handle);
+        XFreeColormap(platform->display, window->colormap);
+        XFree(window->visual_info);
+        XFlush(platform->display);
     #else
-    DestroyWindow((HWND)(window->handle));
+        DestroyWindow((HWND)(window->handle));
     #endif
 };
 
 void am_platform_timer_create() {
     am_platform *platform = am_engine_get_subsystem(platform);
     #if defined(AM_LINUX)
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
 
-    platform->time.frequency = 1000000000;
+        platform->time.frequency = 1000000000;
     #else
-    QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
-    QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
+        QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
+        QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
     #endif
 };
 
 void am_platform_timer_sleep(am_float32 ms) {
     #if defined(AM_LINUX)
-    usleep((__useconds_t)(ms*1000.0f));
+        usleep((__useconds_t)(ms*1000.0f));
     #else
-    timeBeginPeriod(1);
-    Sleep((uint64_t)ms);
-    timeEndPeriod(1);
+        timeBeginPeriod(1);
+        Sleep((uint64_t)ms);
+        timeEndPeriod(1);
     #endif
 };
 
 am_uint64 am_platform_timer_value() {
     #if defined(AM_LINUX)
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
     #else
-    am_uint64 value;
-    QueryPerformanceCounter((LARGE_INTEGER*)&value);
-    return value;
+        am_uint64 value;
+        QueryPerformanceCounter((LARGE_INTEGER*)&value);
+        return value;
     #endif
 };
 
@@ -3498,7 +3495,7 @@ am_id amgl_shader_create(amgl_shader_info info) {
     new_shader->id = ret_id;
 
     am_uint32 main_shader = glCreateProgram();
-    am_uint32 shader_list[info.num_sources]; 
+    am_uint32 shader_list[info.num_sources];
     for (am_int32 i = 0; i < info.num_sources; i++) {
         am_uint32 shader = 0;
 
@@ -3559,7 +3556,7 @@ am_id amgl_shader_create(amgl_shader_info info) {
         return AM_PA_INVALID_ID;
     };
 
-    for (am_int32 i = 0; i < info.num_sources; i++) { 
+    for (am_int32 i = 0; i < info.num_sources; i++) {
         glDetachShader(main_shader, shader_list[i]);
         glDeleteShader(shader_list[i]);
         am_free(info.sources[i].source);
@@ -3651,7 +3648,7 @@ am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
 
     if (info.data == NULL) printf("[WARN] amgl_index_buffer_create (id: %u): Data pointer is NULL!\n", engine->ctx_data.index_buffers->next_id);
     if (info.size == 0) printf("[WARN] amgl_index_buffer_create (id: %u): Size is not specified!\n", engine->ctx_data.index_buffers->next_id);
-    
+
     amgl_index_buffer *index_bfr = (amgl_index_buffer*)malloc(sizeof(amgl_index_buffer));
     if (index_bfr == NULL) {
         printf("[FAIL] amgl_vertex_index_create (id: %u): Could not allocate memory for index buffer!\n", engine->ctx_data.index_buffers->next_id);
@@ -3747,7 +3744,7 @@ am_id amgl_uniform_create(amgl_uniform_info info) {
 void amgl_uniform_update(am_int32 id, amgl_uniform_info info) {
     amgl_uniform *uniform = amgl_uniform_lookup(id);
     uniform->info = info;
-    uniform->location = glGetUniformLocation(uniform->info.shader_id, uniform->info.win_name);
+    uniform->location = glGetUniformLocation(uniform->info.cube_shader_id, uniform->info.win_name);
     glUniform1fv(uniform->location, 1, (float*)uniform->info.data);
 };
 */
@@ -3904,19 +3901,19 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
 
     if (file) {
         #if defined(AM_LINUX)
-        struct stat st;
-        stat(path, &st);
-        rd_size = st.st_size;
+                struct stat st;
+                stat(path, &st);
+                rd_size = st.st_size;
         #else
-        HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        LARGE_INTEGER size;
-        GetFileSizeEx(file_hwnd, &size);
-        rd_size = (am_int32) size.QuadPart;
-        CloseHandle(file_hwnd);
+                HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                LARGE_INTEGER size;
+                GetFileSizeEx(file_hwnd, &size);
+                rd_size = (am_int32) size.QuadPart;
+                CloseHandle(file_hwnd);
         #endif
         buffer = (char*)am_malloc(rd_size+1);
         if (buffer) fread(buffer, 1, rd_size, file);
-        buffer[rd_size] = '\0'; 
+        buffer[rd_size] = '\0';
 
     };
     fclose(file);
@@ -4087,7 +4084,7 @@ am_id amgl_pipeline_create(amgl_pipeline_info info) {
     snprintf(pipeline->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     am_int32 ret_id = am_packed_array_add(engine->ctx_data.pipelines, *pipeline);
     am_free(pipeline);
-    return ret_id;  
+    return ret_id;
 };
 
 am_int32 amgl_blend_translate_func(amgl_blend_func func) {
@@ -4227,7 +4224,7 @@ am_int32 amgl_index_buffer_size_translate(size_t size) {
 
 void amgl_pipeline_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
-    am_packed_array_erase(engine->ctx_data.pipelines, id);  
+    am_packed_array_erase(engine->ctx_data.pipelines, id);
 };
 
 
@@ -4271,13 +4268,13 @@ void amgl_vsync(am_id window_id, am_bool state) {
     glFlush();
     //Have to load SwapInterval here because this is called for each window on creation
     #if defined(AM_LINUX)
-    am_platform *platform = am_engine_get_subsystem(platform);
-    am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
-    if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
+        am_platform *platform = am_engine_get_subsystem(platform);
+        am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
+        if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
         glSwapInterval(platform->display, window->handle, state);
     #else
         if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
-        glSwapInterval(state == true ? 1:0);
+            glSwapInterval(state == true ? 1:0);
     #endif
 };
 
@@ -4317,7 +4314,7 @@ void amgl_end_render_pass(am_id render_pass_id) {
 void amgl_bind_pipeline(am_id pipeline_id) {
     am_engine* engine = am_engine_get_instance();
     if (am_packed_array_has(engine->ctx_data.pipelines, pipeline_id)) {
-        
+
         engine->ctx_data.frame_cache.index_buffer = (amgl_index_buffer){.id = AM_PA_INVALID_ID};
         engine->ctx_data.frame_cache.index_element_size = 0;
         engine->ctx_data.frame_cache.pipeline = (amgl_pipeline){.id = AM_PA_INVALID_ID};
@@ -4325,11 +4322,11 @@ void amgl_bind_pipeline(am_id pipeline_id) {
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        
+
         amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, pipeline_id);
         engine->ctx_data.frame_cache.pipeline = *pipeline;
 
-        
+
         if (!pipeline->depth.func) {
             glDisable(GL_DEPTH_TEST);
         } else {
@@ -4379,8 +4376,8 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     am_uint32 index_count = info->index_buffers.info ? info->index_buffers.size ? info->index_buffers.size / sizeof(amgl_index_buffer_bind_info) : 1 : 0;
     am_uint32 uniform_count = info->uniforms.info ? info->uniforms.size ? info->uniforms.size / sizeof(amgl_uniform_bind_info) : 1 : 0;
     am_uint32 texture_count = info->textures.info ? info->textures.size ? info->textures.size / sizeof(amgl_texture_bind_info) : 1 : 0;
-    
-    
+
+
     if (vertex_count) {
         am_dyn_array_clear(engine->ctx_data.frame_cache.vertex_buffers);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -4462,7 +4459,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
             }
             case AMGL_UNIFORM_TYPE_MAT3: {
                 glUniformMatrix3fv((am_int32)uniform->location, 1, false, (float*)(uniform->data));
-              break;
+                break;
             };
             case AMGL_UNIFORM_TYPE_MAT4: {
                 glUniformMatrix4fv((am_int32)uniform->location, 1, false, (float*)(uniform->data));
@@ -4487,7 +4484,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
 
         if (!am_packed_array_has(engine->ctx_data.textures, id)) {
             printf("[FAIL] amgl_set_bindings (id: %u): Texture could not be found!\n", id);
-            break;       
+            break;
         };
         amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, id);
         am_int32 format = amgl_texture_translate_format(texture->format);
@@ -4664,12 +4661,12 @@ am_mat4 am_camera_get_proj(am_camera* cam, am_int32 view_width, am_int32 view_he
             const am_float32 ortho_scale = cam->ortho_scale;
             const am_float32 aspect_ratio = _ar;
             proj_mat = am_mat4_ortho(
-                    -ortho_scale * aspect_ratio,
-                    ortho_scale * aspect_ratio,
-                    -ortho_scale,
-                    ortho_scale,
-                    -distance,
-                    distance
+                -ortho_scale * aspect_ratio,
+                ortho_scale * aspect_ratio,
+                -ortho_scale,
+                ortho_scale,
+                -distance,
+                distance
             );
         } break;
     };
@@ -4747,9 +4744,6 @@ void am_engine_create(am_engine_info engine_info) {
     printf("b win\n");
     am_platform_window_create(main);
     printf("a win\n");
-    #if defined(AM_LINUX)
-    //XSetWindowBackground(am_engine_get_subsystem(platform)->display, main_wind->handle, 0x0000FF);
-    #endif
 
     //Base framebuffer
     amgl_frame_buffer base_fbo = {
@@ -4762,9 +4756,9 @@ void am_engine_create(am_engine_info engine_info) {
 
     am_platform *platform = am_engine_get_subsystem(platform);
     #if defined(AM_LINUX)
-    glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, am_packed_array_get_ptr(platform->windows, 1)->context);
+        glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, am_packed_array_get_ptr(platform->windows, 1)->context);
     #else
-    wglMakeCurrent(am_packed_array_get_ptr(platform->windows, 1)->hdc, am_packed_array_get_ptr(platform->windows, 1)->context);
+        wglMakeCurrent(am_packed_array_get_ptr(platform->windows, 1)->hdc, am_packed_array_get_ptr(platform->windows, 1)->context);
     #endif
     engine->init();
     engine->is_running = true;
@@ -4775,9 +4769,9 @@ void am_engine_frame() {
     am_engine *engine = am_engine_get_instance();
 
     #if defined (AM_LINUX)
-    const am_float64 coef = 1000000000.0f;
+        const am_float64 coef = 1000000000.0f;
     #else
-    const am_float64 coef = 10000000.0f;
+        const am_float64 coef = 10000000.0f;
 
     #endif
     platform->time.current = (am_float64)am_platform_elapsed_time() / coef;
@@ -4797,11 +4791,11 @@ void am_engine_frame() {
     };
 
     for (am_int32 i =  1; i <= am_packed_array_get_count(platform->windows); i++) {
-        #if defined(AM_LINUX)
-        glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, i)->handle);
-        #else
-        SwapBuffers(am_packed_array_get_ptr(platform->windows, i)->hdc);
-        #endif
+    #if defined(AM_LINUX)
+            glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, i)->handle);
+    #else
+            SwapBuffers(am_packed_array_get_ptr(platform->windows, i)->hdc);
+    #endif
     };
 
     platform->time.current  = (am_float64)am_platform_elapsed_time() / coef;
@@ -4866,21 +4860,21 @@ void am_engine_terminate(){
 
 char* am_util_read_file(const char *path) {
     FILE *source = fopen(path, "rb");
-    printf("errno %d\n", errno);
+    if (!source) printf("am_util_read_file (id: ?): Could not open file, errno %d!\n", errno);
     am_int32 rd_size = 0;
     char* buffer = NULL;
     if (source) {
-        #if defined(AM_LINUX)
+#if defined(AM_LINUX)
         struct stat st;
         stat(path, &st);
         rd_size = (am_int32)st.st_size;
-        #else
+#else
         HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         LARGE_INTEGER size;
         GetFileSizeEx(file_hwnd, &size);
         rd_size = (am_int32) size.QuadPart;
         CloseHandle(file_hwnd);
-        #endif
+#endif
         buffer = (char*)am_malloc(rd_size+1);
         if (buffer) fread(buffer, 1, rd_size, source);
         buffer[rd_size] = '\0';
@@ -4894,7 +4888,15 @@ char* am_util_read_file(const char *path) {
 //----------------------------------------------------------------------------//
 
 
-am_id shader_id, tex1_id, tex2_id, uni1_id, uni2_id, uni3_id, view_mat, vbo_id, idx_id, pipeline_id, rp_id;
+
+
+
+
+
+
+
+
+am_id cube_shader_id, normal_shader_id, cube_tex_id, camera_pos_id, sampler_id, uni2_id, ambient_id, light_pos_id, view_mat, cube_vbo_id, cube_norm_vbo_id, normal_vbo_id, cube_idx_id, cube_pipeline_id, normal_pipeline_id, rp_id;
 am_mat4 view;
 
 typedef struct test_camera {
@@ -4903,21 +4905,18 @@ typedef struct test_camera {
 } test_camera;
 
 test_camera test_cam = {0};
-
 void update_cam(test_camera *test_cam);
+
+am_vec3 light_pos = {5.0f, 1.0f, 2.0f};
+am_vec3 light_color = {1.0f, 1.0f, 1.0f};
 
 void init() {
     test_cam.cam = am_camera_perspective();
-    test_cam.cam.transform.position = am_vec3_create(2.0f, 0.0f, 0.0f);
+    test_cam.cam.transform.position = am_vec3_create(0.0f, 1.0f, 3.0f);
     am_platform_mouse_lock(true);
-    int maj,min;
-    glGetIntegerv(GL_MAJOR_VERSION, &maj);
-    glGetIntegerv(GL_MINOR_VERSION, &min);
-    printf("major %d minor %d\n", maj, min);
     am_platform *platform = am_engine_get_subsystem(platform);
-    //XSetWindowBackground(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, 0xFF0000);
 
-    shader_id = amgl_shader_create((amgl_shader_info) {
+    cube_shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
             { .type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_v.glsl" },
@@ -4925,32 +4924,33 @@ void init() {
         }
     });
 
-    tex1_id = amgl_texture_create((amgl_texture_info){
+    normal_shader_id = amgl_shader_create((amgl_shader_info){
+        .num_sources = 2,
+        .sources = (amgl_shader_source_info[]) {
+            {.type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_f.glsl"}
+        }
+    });
+
+    cube_tex_id = amgl_texture_create((amgl_texture_info){
         .format = AMGL_TEXTURE_FORMAT_RGBA,
         .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .path = "/home/truta/CLionProjects/ametrine/pics/t3.png"
+        .mip_num = 3,
+        .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .path = "/home/truta/CLionProjects/ametrine/pics/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
     });
 
-    tex2_id = amgl_texture_create((amgl_texture_info){
-        .format = AMGL_TEXTURE_FORMAT_RGBA,
-        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
-        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .path = "/home/truta/CLionProjects/ametrine/pics/t2.png"
-    });
-
-    uni1_id = amgl_uniform_create((amgl_uniform_info){
+    sampler_id = amgl_uniform_create((amgl_uniform_info){
         .name = "u_tex1",
         .type = AMGL_UNIFORM_TYPE_SAMPLER2D
     });
 
-    uni2_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_tex2",
-        .type = AMGL_UNIFORM_TYPE_SAMPLER2D
+    ambient_id = amgl_uniform_create((amgl_uniform_info) {
+        .name = "u_ambient_col",
+        .type = AMGL_UNIFORM_TYPE_VEC3
     });
 
     view_mat = amgl_uniform_create((amgl_uniform_info){
@@ -4958,79 +4958,172 @@ void init() {
         .type = AMGL_UNIFORM_TYPE_MAT4
     });
 
-    /*
-    vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = (float[]) {
-            -1.0f, -1.0f, -1.0f, 0.0f,
-             1.0f, -1.0f, -1.0f, 1.0f,
-             1.0f,  1.0f, -1.0f, 0.0f,
-            -1.0f, 1.0f, -1.0f, 1.0f,
-            -1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, -1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 0.0f,
-            -1.0f, 1.0f, 1.0f, 1.0f,
-        },
-        .size = sizeof(float)*8*3,
-        .usage = AMGL_BUFFER_USAGE_STATIC,
-    });*/
-
-
-    vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = (float[]) {
-            -1.0f, 1.0f, 1.0f,1.0f,
-            1.0f,1.0f,1.0f,0.0f,
-            1.0f,1.0f,-1.0f,1.0f,
-            -1.0f,1.0f,-1.0f,0.0f,
-            -1.0f,1.0f,-1.0f,1.0f,
-            1.0f,1.0f,-1.0f,0.0f,
-            1.0f,-1.0f,-1.0f,1.0f,
-            -1.0f,-1.0f,-1.0f,0.0f,
-            1.0f,1.0f,-1.0f,1.0f,
-            1.0f,1.0f,1.0f,0.0f,
-            1.0f,-1.0f,1.0f,1.0f,
-            1.0f,-1.0f,-1.0f,0.0f,
-            -1.0f,1.0f,1.0f,1.0f,
-            -1.0f,1.0f,-1.0f,0.0f,
-            -1.0f,-1.0f,-1.0f,1.0f,
-            -1.0f,-1.0f,1.0f,0.0f,
-            1.0f,1.0f,1.0f,1.0f,
-            -1.0f,1.0f,1.0f,0.0f,
-            -1.0f,-1.0f,1.0f,1.0f,
-            1.0f,-1.0f,1.0f,0.0f,
-            1.0f,-1.0f,-1.0f,1.0f,
-            -1.0f,-1.0f,-1.0f,0.0f,
-            -1.0f,-1.0f,1.0f,1.0f,
-            1.0f,-1.0f,1.0f,0.0f
-    },
-    .size = sizeof(float)*24*4,
-    .usage = AMGL_BUFFER_USAGE_STATIC,
+    light_pos_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_light_pos",
+        .type = AMGL_UNIFORM_TYPE_VEC3
     });
 
-    idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
+    camera_pos_id = amgl_uniform_create((amgl_uniform_info){
+       .name = "u_cam_pos",
+       .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+
+    am_float32 cube_coords[120] = {
+        //Pos coords                  //Texture coords
+        -1.0f, 1.0f, 1.0f,  0.0f, 0.0f,
+        1.0f,1.0f,1.0f,  1.0f, 0.0f,
+        1.0f,1.0f,-1.0f, 1.0f, 1.0f,
+        -1.0f,1.0f,-1.0f, 0.0f, 1.0f,
+
+        -1.0f,1.0f,-1.0f, 0.0f, 0.0f,
+        1.0f,1.0f,-1.0f, 1.0f, 0.0f,
+        1.0f,-1.0f,-1.0f, 1.0f, 1.0f,
+        -1.0f,-1.0f,-1.0f, 0.0f, 1.0f,
+
+        1.0f,1.0f,-1.0f, 0.0f, 0.0f,
+        1.0f,1.0f,1.0f, 1.0f, 0.0f,
+        1.0f,-1.0f,1.0f, 1.0f, 1.0f,
+        1.0f,-1.0f,-1.0f, 0.0f, 1.0f,
+
+        -1.0f,1.0f,1.0f, 0.0f, 0.0f,
+        -1.0f,1.0f,-1.0f, 1.0f, 0.0f,
+        -1.0f,-1.0f,-1.0f, 1.0f, 1.0f,
+        -1.0f,-1.0f,1.0f, 0.0f, 1.0f,
+
+        1.0f,1.0f,1.0f, 0.0f, 0.0f,
+        -1.0f,1.0f,1.0f, 1.0f, 0.0f,
+        -1.0f,-1.0f,1.0f, 1.0f, 1.0f,
+        1.0f,-1.0f,1.0f, 0.0f, 1.0f,
+
+        1.0f,-1.0f,-1.0f, 0.0f, 0.0f,
+        1.0f,-1.0f,1.0f, 0.0f, 1.0f,
+        -1.0f,-1.0f,1.0f, 1.0f, 1.0f,
+        -1.0f,-1.0f,-1.0f, 1.0f, 0.0f,
+    };
+
+    cube_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = cube_coords,
+        .size = sizeof(float)*120,
+        .usage = AMGL_BUFFER_USAGE_STATIC,
+    });
+
+
+    cube_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
         .data = (am_uint32[]){
             0,1,2,0,2,3,
             4,5,6,4,6,7,
             8,9,10,8,10,11,
             12,13,14,12,14,15,
-            16,17,18,18,16,19,
-            20,22,21,20,23,22
+            16,17,18,16, 18,19,
+            //20,22, 21,20,23,22
+            20, 21, 22, 20, 22, 23
         },
         .size = sizeof(am_uint32)*36,
         .offset = 0,
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
 
-    pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
+    am_float32 display_normals[144];
+    am_float32 cube_normals[72];
+    int i = 0;
+    int v = 0;
+    int m = 0;
+    for (int k = 0; k < 6; k++) {
+        am_vec3 o = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //0
+        i += 5;
+        am_vec3 s = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //1
+        i += 5;
+        am_vec3 q = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //2
+        i += 5;
+        am_vec3 r = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //3
+        i += 5;
+
+        am_vec3 norm = am_vec3_cross(am_vec3_sub(s,o), am_vec3_sub(r,o));
+        norm = am_vec3_norm(norm);
+
+        display_normals[v++] = o.x;
+        display_normals[v++] = o.y;
+        display_normals[v++] = o.z;
+        display_normals[v++] = o.x + norm.x;
+        display_normals[v++] = o.y + norm.y;
+        display_normals[v++] = o.z + norm.z;
+        cube_normals[m++] = norm.x;
+        cube_normals[m++] = norm.y;
+        cube_normals[m++] = norm.z;
+
+        display_normals[v++] = s.x;
+        display_normals[v++] = s.y;
+        display_normals[v++] = s.z;
+        display_normals[v++] = s.x + norm.x;
+        display_normals[v++] = s.y + norm.y;
+        display_normals[v++] = s.z + norm.z;
+        cube_normals[m++] = norm.x;
+        cube_normals[m++] = norm.y;
+        cube_normals[m++] = norm.z;
+
+        display_normals[v++] = q.x;
+        display_normals[v++] = q.y;
+        display_normals[v++] = q.z;
+        display_normals[v++] = q.x + norm.x;
+        display_normals[v++] = q.y + norm.y;
+        display_normals[v++] = q.z + norm.z;
+        cube_normals[m++] = norm.x;
+        cube_normals[m++] = norm.y;
+        cube_normals[m++] = norm.z;
+
+        display_normals[v++] = r.x;
+        display_normals[v++] = r.y;
+        display_normals[v++] = r.z;
+        display_normals[v++] = r.x + norm.x;
+        display_normals[v++] = r.y + norm.y;
+        display_normals[v++] = r.z + norm.z;
+        cube_normals[m++] = norm.x;
+        cube_normals[m++] = norm.y;
+        cube_normals[m++] = norm.z;
+    };
+
+    cube_norm_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = cube_normals,
+        .size = 72*sizeof(float),
+        .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    normal_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = display_normals,
+        .size = sizeof(float)*144,
+        .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    //Pipeline for normal drawing
+    normal_pipeline_id = amgl_pipeline_create((amgl_pipeline_info) {
         .raster = {
-            .shader_id = shader_id
-            //.face_culling = AMGL_FACE_CULL_FRONT
+            .primitive = AMGL_PRIMITIVE_LINES,
+            .shader_id = normal_shader_id
         },
         .depth = {.func = AMGL_DEPTH_FUNC_LESS},
         .layout = {
-            .num_attribs = 2,
+            .num_attribs = 1,
+            .attributes = &(amgl_vertex_buffer_attribute) {
+                .format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3,
+                .offset = 0*sizeof(float),
+                .stride = 3*sizeof(float)
+            }
+        }
+    });
+
+    //Pipeline for cube drawing
+    cube_pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
+        .raster = {
+            .shader_id = cube_shader_id,
+            .face_culling = AMGL_FACE_CULL_BACK
+        },
+        .depth = {.func = AMGL_DEPTH_FUNC_LESS},
+        .layout = {
+            .num_attribs = 3,
             .attributes = (amgl_vertex_buffer_attribute[]){
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 4*sizeof(float)},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT, .offset = 3*sizeof(float), .stride = 4*sizeof(float)}
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 5*sizeof(float), .buffer_index = 0},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 3*sizeof(float), .stride = 5*sizeof(float), .buffer_index = 0},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 1}
             }
         }
     });
@@ -5038,7 +5131,6 @@ void init() {
     rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
 };
 
-am_bool tt = false;
 void update() {
     if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_quit();
 
@@ -5049,25 +5141,56 @@ void update() {
     update_cam(&test_cam);
     view = am_camera_get_view_projection(&test_cam.cam, (am_int32)main->width, (am_int32)main->height);
 
-    amgl_bindings_info binds = {
-        .vertex_buffers = {.info = &(amgl_vertex_buffer_bind_info){.vertex_buffer_id = vbo_id}, .size = sizeof(amgl_vertex_buffer_bind_info)},
-        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = idx_id}},
+
+    amgl_bindings_info cube_binds = {
+        .vertex_buffers = {
+            .size = 2*sizeof(amgl_vertex_buffer_bind_info),
+            .info = (amgl_vertex_buffer_bind_info[]) {
+                {.vertex_buffer_id = cube_vbo_id},
+                {.vertex_buffer_id = cube_norm_vbo_id}
+            }
+        },
+        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = cube_idx_id}},
+        .uniforms = {
+            .size = 5*sizeof(amgl_uniform_bind_info),
+            .info = (amgl_uniform_bind_info[]) {
+                {.uniform_id = view_mat, .data = view.elements},
+                {.uniform_id = sampler_id, .data = &cube_tex_id},
+                {.uniform_id = ambient_id, .data = light_color.xyz},
+                {.uniform_id = light_pos_id, .data = light_pos.xyz},
+                {.uniform_id = camera_pos_id, .data = test_cam.cam.transform.position.xyz}
+            }
+        }
+    };
+
+    amgl_bindings_info normal_binds = {
+        .vertex_buffers = {
+            .size = sizeof(amgl_vertex_buffer_bind_info),
+            .info = (amgl_vertex_buffer_bind_info[]) {
+                {.vertex_buffer_id = normal_vbo_id}
+            }
+        },
         .uniforms = {
             .size = sizeof(amgl_uniform_bind_info),
             .info = &(amgl_uniform_bind_info){.uniform_id = view_mat, .data = view.elements}
-
         }
     };
 
     amgl_start_render_pass(rp_id);
-        amgl_clear((amgl_clear_desc) {
-            .color = {0.0f, 0.0f, 0.0f, 0.0f},
-            .num = 2,
-            .types = (amgl_clear_type[]){AMGL_CLEAR_COLOR, AMGL_CLEAR_DEPTH}
-        });
-        amgl_bind_pipeline(pipeline_id);
-        amgl_set_bindings(&binds);
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = 36});
+    amgl_clear((amgl_clear_desc) {
+        .color = {0.0f, 0.0f, 0.0f, 0.0f},
+        .num = 2,
+        .types = (amgl_clear_type[]){AMGL_CLEAR_COLOR, AMGL_CLEAR_DEPTH}
+    });
+
+    amgl_bind_pipeline(cube_pipeline_id);
+    amgl_set_bindings(&cube_binds);
+    amgl_draw(&(amgl_draw_info){.start = 0, .count = 36});
+
+    amgl_bind_pipeline(normal_pipeline_id);
+    amgl_set_bindings(&normal_binds);
+    amgl_draw(&(amgl_draw_info){.start = 0, .count = 72});
+
     amgl_end_render_pass(rp_id);
 
 };
@@ -5096,7 +5219,7 @@ void update_cam(test_camera *test_cam) {
 };
 
 int main() {
-am_engine_create((am_engine_info) {
+    am_engine_create((am_engine_info) {
         .init = init,
         .update = update,
         .shutdown = am_shutdown,
@@ -5108,9 +5231,9 @@ am_engine_create((am_engine_info) {
         .vsync_enabled = true,
         .is_running = true
         //.win_name = "Testing"
-});
+    });
 
-while (am_engine_get_instance()->is_running) am_engine_frame();
+    while (am_engine_get_instance()->is_running) am_engine_frame();
 
-return 0;
+    return 0;
 };
