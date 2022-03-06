@@ -5,6 +5,7 @@
 //REVIEW: More defined default values perhaps? More detailed warns
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
 //REVIEW: Line 5128ish, pass id instead of buffer index?
+//TODO: 3D textures
 
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
@@ -4896,8 +4897,11 @@ char* am_util_read_file(const char *path) {
 
 
 
-am_id cube_shader_id, normal_shader_id, cube_tex_id, camera_pos_id, sampler_id, uni2_id, ambient_id, light_pos_id, view_mat, cube_vbo_id, cube_norm_vbo_id, normal_vbo_id, cube_idx_id, cube_pipeline_id, normal_pipeline_id, rp_id;
+am_id cube_shader_id, normal_shader_id, plane_shader_id, cube_tex_id, plane_tex_id, camera_pos_id, sampler_id,
+        uni2_id, ambient_id, light_pos_id, view_mat_id, cube_vbo_id, cube_norm_vbo_id, normal_vbo_id, phong_toggle_id,
+        plane_vbo_id, cube_idx_id, plane_idx_id, cube_pipeline_id, normal_pipeline_id, plane_pipeline_id, rp_id;
 am_mat4 view;
+am_int32 toggle_phong = false;
 
 typedef struct test_camera {
     am_float32 pitch;
@@ -4907,7 +4911,7 @@ typedef struct test_camera {
 test_camera test_cam = {0};
 void update_cam(test_camera *test_cam);
 
-am_vec3 light_pos = {5.0f, 1.0f, 2.0f};
+am_vec3 light_pos = {5.0f, -2.3f, -2.0f};
 am_vec3 light_color = {1.0f, 1.0f, 1.0f};
 
 void init() {
@@ -4924,14 +4928,6 @@ void init() {
         }
     });
 
-    normal_shader_id = amgl_shader_create((amgl_shader_info){
-        .num_sources = 2,
-        .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_f.glsl"}
-        }
-    });
-
     cube_tex_id = amgl_texture_create((amgl_texture_info){
         .format = AMGL_TEXTURE_FORMAT_RGBA,
         .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
@@ -4941,31 +4937,6 @@ void init() {
         .mip_num = 3,
         .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .path = "/home/truta/CLionProjects/ametrine/pics/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
-    });
-
-    sampler_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_tex1",
-        .type = AMGL_UNIFORM_TYPE_SAMPLER2D
-    });
-
-    ambient_id = amgl_uniform_create((amgl_uniform_info) {
-        .name = "u_ambient_col",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-
-    view_mat = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_view",
-        .type = AMGL_UNIFORM_TYPE_MAT4
-    });
-
-    light_pos_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_light_pos",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-
-    camera_pos_id = amgl_uniform_create((amgl_uniform_info){
-       .name = "u_cam_pos",
-       .type = AMGL_UNIFORM_TYPE_VEC3
     });
 
     am_float32 cube_coords[120] = {
@@ -5007,7 +4978,6 @@ void init() {
         .usage = AMGL_BUFFER_USAGE_STATIC,
     });
 
-
     cube_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
         .data = (am_uint32[]){
             0,1,2,0,2,3,
@@ -5021,6 +4991,22 @@ void init() {
         .size = sizeof(am_uint32)*36,
         .offset = 0,
         .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    cube_pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
+        .raster = {
+            .shader_id = cube_shader_id,
+            .face_culling = AMGL_FACE_CULL_BACK
+        },
+        .depth = {.func = AMGL_DEPTH_FUNC_LESS},
+        .layout = {
+            .num_attribs = 3,
+            .attributes = (amgl_vertex_buffer_attribute[]){
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 5*sizeof(float), .buffer_index = 0},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 3*sizeof(float), .stride = 5*sizeof(float), .buffer_index = 0},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 1}
+            }
+        }
     });
 
     am_float32 display_normals[144];
@@ -5088,6 +5074,14 @@ void init() {
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
 
+    normal_shader_id = amgl_shader_create((amgl_shader_info){
+        .num_sources = 2,
+        .sources = (amgl_shader_source_info[]) {
+            {.type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_f.glsl"}
+        }
+    });
+
     normal_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = display_normals,
         .size = sizeof(float)*144,
@@ -5111,21 +5105,87 @@ void init() {
         }
     });
 
-    //Pipeline for cube drawing
-    cube_pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
+    plane_shader_id = amgl_shader_create((amgl_shader_info){
+        .num_sources = 2,
+        .sources = (amgl_shader_source_info[]) {
+            {.type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/plane_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/plane_f.glsl"},
+        }
+    });
+
+    plane_tex_id = amgl_texture_create((amgl_texture_info){
+        .format = AMGL_TEXTURE_FORMAT_RGBA,
+        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
+        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
+        .mip_num = 3,
+        .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .path = "/home/truta/CLionProjects/ametrine/pics/mud_texture/Stylized_Dry_Mud_001_basecolor.jpg"
+    });
+
+    plane_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = (float[]) {
+            //Vertex coords                 //Texture coords   //Normals
+            -8.0f, -3.0f, 8.0f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+            8.0f,-3.0f,8.0f,  1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+            8.0f,-3.0f,-8.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+            -8.0f,-3.0f,-8.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+        },
+        .size = sizeof(float)*32,
+        .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    plane_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
+        .data = (int[]) {
+            0,1,2,
+            0,2,3
+        },
+        .size = 6*sizeof(int),
+        .offset = 0,
+        .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    plane_pipeline_id = amgl_pipeline_create((amgl_pipeline_info) {
         .raster = {
-            .shader_id = cube_shader_id,
+            .primitive = AMGL_PRIMITIVE_TRIANGLES,
+            .shader_id = plane_shader_id,
             .face_culling = AMGL_FACE_CULL_BACK
         },
         .depth = {.func = AMGL_DEPTH_FUNC_LESS},
         .layout = {
             .num_attribs = 3,
-            .attributes = (amgl_vertex_buffer_attribute[]){
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 5*sizeof(float), .buffer_index = 0},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 3*sizeof(float), .stride = 5*sizeof(float), .buffer_index = 0},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 1}
+            .attributes = (amgl_vertex_buffer_attribute[]) {
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 8*sizeof(float)},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 3*sizeof(float), .stride = 8*sizeof(float)},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 5*sizeof(float), .stride = 8*sizeof(float)}
             }
         }
+    });
+
+    sampler_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_tex1",
+        .type = AMGL_UNIFORM_TYPE_SAMPLER2D
+    });
+
+    view_mat_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_view",
+        .type = AMGL_UNIFORM_TYPE_MAT4
+    });
+
+    light_pos_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_light_pos",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+
+    camera_pos_id = amgl_uniform_create((amgl_uniform_info){
+       .name = "u_cam_pos",
+       .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+
+    phong_toggle_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "blinn_toggle",
+        .type = AMGL_UNIFORM_TYPE_INT
     });
 
     rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
@@ -5133,6 +5193,7 @@ void init() {
 
 void update() {
     if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_quit();
+    if (am_platform_key_pressed(AM_KEYCODE_T)) toggle_phong = !toggle_phong;
 
     am_engine *engine = am_engine_get_instance();
     am_platform *platform = am_engine_get_subsystem(platform);
@@ -5154,11 +5215,11 @@ void update() {
         .uniforms = {
             .size = 5*sizeof(amgl_uniform_bind_info),
             .info = (amgl_uniform_bind_info[]) {
-                {.uniform_id = view_mat, .data = view.elements},
+                {.uniform_id = view_mat_id, .data = view.elements},
                 {.uniform_id = sampler_id, .data = &cube_tex_id},
-                {.uniform_id = ambient_id, .data = light_color.xyz},
                 {.uniform_id = light_pos_id, .data = light_pos.xyz},
-                {.uniform_id = camera_pos_id, .data = test_cam.cam.transform.position.xyz}
+                {.uniform_id = camera_pos_id, .data = test_cam.cam.transform.position.xyz},
+                {.uniform_id = phong_toggle_id, .data = &toggle_phong}
             }
         }
     };
@@ -5172,7 +5233,27 @@ void update() {
         },
         .uniforms = {
             .size = sizeof(amgl_uniform_bind_info),
-            .info = &(amgl_uniform_bind_info){.uniform_id = view_mat, .data = view.elements}
+            .info = &(amgl_uniform_bind_info){.uniform_id = view_mat_id, .data = view.elements}
+        }
+    };
+
+    amgl_bindings_info plane_binds = {
+        .vertex_buffers = {
+            .size = sizeof(amgl_vertex_buffer_bind_info),
+            .info = &(amgl_vertex_buffer_bind_info) {
+                .vertex_buffer_id = plane_vbo_id
+            }
+        },
+        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = plane_idx_id}},
+        .uniforms = {
+            .size = 5*sizeof(amgl_uniform_bind_info),
+            .info = (amgl_uniform_bind_info[]) {
+                {.uniform_id = view_mat_id, .data = view.elements},
+                {.uniform_id = sampler_id, .data = &plane_tex_id, .binding = 0},
+                {.uniform_id = light_pos_id, .data = light_pos.xyz},
+                {.uniform_id = camera_pos_id, .data = test_cam.cam.transform.position.xyz},
+                {.uniform_id = phong_toggle_id, .data = &toggle_phong}
+            }
         }
     };
 
@@ -5190,6 +5271,10 @@ void update() {
     amgl_bind_pipeline(normal_pipeline_id);
     amgl_set_bindings(&normal_binds);
     amgl_draw(&(amgl_draw_info){.start = 0, .count = 72});
+
+    amgl_bind_pipeline(plane_pipeline_id);
+    amgl_set_bindings(&plane_binds);
+    amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
 
     amgl_end_render_pass(rp_id);
 
@@ -5228,7 +5313,8 @@ int main() {
         .win_width = 800,
         .win_x = 50,
         .win_y = 50,
-        .vsync_enabled = true,
+        .vsync_enabled = false,
+        .desired_fps = 120,
         .is_running = true
         //.win_name = "Testing"
     });
