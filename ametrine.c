@@ -549,7 +549,7 @@ typedef struct am_window {
         GLXContext context;
     #else
         HDC hdc;
-        HGLRC context;
+            HGLRC context;
     #endif
 } am_window;
 
@@ -603,7 +603,7 @@ typedef struct am_platform {
 } am_platform;
 
 
-//Platform 
+//Platform
 #if defined(AM_LINUX)
 am_key_map am_platform_translate_keysym(const KeySym *key_syms, am_int32 width);
 #endif
@@ -785,9 +785,9 @@ typedef struct amgl_vertex_buffer {
 
 /*
 typedef struct amgl_vertex_buffer_update_info {
-    amgl_vertex_buffer_info info; 
+    amgl_vertex_buffer_info info;
     amgl_buffer_update_type update_type;
-    size_t offset; 
+    size_t offset;
 } amgl_vertex_buffer_update_info;
 */
 
@@ -1105,7 +1105,6 @@ typedef struct amgl_bindings_info {
     } textures;
 } amgl_bindings_info;
 
-//REVIEW: Should perhaps hold IDs instead?
 typedef struct amgl_frame_cache {
     amgl_index_buffer index_buffer;
     size_t index_element_size;
@@ -1277,7 +1276,6 @@ typedef struct am_engine {
     amgl_ctx_data ctx_data;
     //IDEA: A scene structure, maybe scenegraph?
     //am_audio audio; TODO: Implement
-    //am_pfngl pfngl; TODO: Implement
 } am_engine;
 
 //The only one that should exist
@@ -1662,7 +1660,7 @@ static inline am_mat3 am_mat3_rotateq(am_vec4 q) {
     m.m[3] = 2 * (xy - wz);     m.m[4] = 1 - 2 * (x2 + z2); m.m[5] = 2 * (yz + wx);
     m.m[6] = 2 * (xz + wy);     m.m[7] = 2 * (yz - wx);     m.m[8] = 1 - 2 * (x2 + y2);
     return m;
-}
+};
 
 static inline am_mat3 am_mat3_rsq(am_vec4 q, am_vec3 s) {
     am_mat3 mr = am_mat3_rotateq(q);
@@ -1675,7 +1673,8 @@ static inline am_mat3 am_mat3_inverse(am_mat3 m) {
 
     am_float64 det = (am_float64)(m.m[0 * 3 + 0] * (m.m[1 * 3 + 1] * m.m[2 * 3 + 2] - m.m[2 * 3 + 1] * m.m[1 * 3 + 2]) -
                                   m.m[0 * 3 + 1] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 2] - m.m[1 * 3 + 2] * m.m[2 * 3 + 0]) +
-                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0]));
+                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0])
+                                  );
 
     am_float64 inv_det = det ? 1.0 / det : 0.0;
 
@@ -2631,7 +2630,7 @@ am_platform *am_platform_create() {
             printf("[FAIL] Failed to register child class!\n");
             return NULL;
         };
-    #endif
+#endif
 
     platform->input.mouse.wheel_delta = 0;
     platform->input.mouse.position.x = 0;
@@ -3741,15 +3740,6 @@ am_id amgl_uniform_create(amgl_uniform_info info) {
     return ret_id;
 };
 
-/*
-void amgl_uniform_update(am_int32 id, amgl_uniform_info info) {
-    amgl_uniform *uniform = amgl_uniform_lookup(id);
-    uniform->info = info;
-    uniform->location = glGetUniformLocation(uniform->info.cube_shader_id, uniform->info.win_name);
-    glUniform1fv(uniform->location, 1, (float*)uniform->info.data);
-};
-*/
-
 void amgl_uniform_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     am_packed_array_erase(engine->ctx_data.uniforms, id);
@@ -4434,9 +4424,11 @@ void amgl_set_bindings(amgl_bindings_info *info) {
                 printf("[FAIL] amgl_set_bindings (id: %u): Uniform not found by name: %s!\n", uniform->id, uniform->name);
                 break;
             };
-            uniform->shader_id = shader_id;
-            uniform->data = info->uniforms.info[i].data;
         }
+
+        uniform->shader_id = shader_id;
+        uniform->data = info->uniforms.info[i].data;
+
         switch (uniform->type) {
             case AMGL_UNIFORM_TYPE_FLOAT: {
                 glUniform1f((am_int32)uniform->location, *((float*)uniform->data));
@@ -4888,43 +4880,89 @@ char* am_util_read_file(const char *path) {
 //                               END  UTIL IMPL                               //
 //----------------------------------------------------------------------------//
 
+typedef struct point_light {
+    am_vec3 position;
+    am_float32 constant;
+    am_float32 linear;
+    am_float32 quadratic;
 
+    am_vec3 ambient;
+    am_vec3 diffuse;
+    am_vec3 specular;
+} point_light;
 
+am_id cube_shader_id, normal_shader_id, plane_shader_id, cube_tex_id, plane1_tex_id, camera_pos_id, sampler_id,
+    point_light_id1, point_light_id2, point_light_id3, point_light_id4, point_light_id5, point_light_id6, point_light_id7,
+    point_light_id11, point_light_id12, point_light_id13, point_light_id14, point_light_id15, point_light_id16, point_light_id17,
+    view_mat_id, cube_coords_vbo_id, cube_norm_vbo_id, normal_vbo_id, phong_toggle_id,
+    plane1_vbo_id, cube_idx_id, plane_idx_id, cube_pipeline_id, normal_pipeline_id, plane_pipeline_id, rp_id,
+    cube_uvs_vbo_id, plane2_tex_id, plane2_vbo_id;
 
-
-
-
-
-
-
-am_id cube_shader_id, normal_shader_id, plane_shader_id, cube_tex_id, plane_tex_id, camera_pos_id, sampler_id,
-        uni2_id, ambient_id, light_pos_id, view_mat_id, cube_vbo_id, cube_norm_vbo_id, normal_vbo_id, phong_toggle_id,
-        plane_vbo_id, cube_idx_id, plane_idx_id, cube_pipeline_id, normal_pipeline_id, plane_pipeline_id, rp_id;
 am_mat4 view;
 am_int32 toggle_phong = false;
+am_camera cam = {0};
+point_light point_light1 = {0};
+point_light point_light2 = {0};
 
-typedef struct test_camera {
-    am_float32 pitch;
-    am_camera cam;
-} test_camera;
+void update_cam(am_camera *camera);
+void compute_surface_normals(am_float32 *vertices, am_int32 count, am_float32 *out_normals);
+void compute_display_normals(am_float32 *vertices, am_float32 *normals, am_uint32 n_count, am_float32 *display_normals);
 
-test_camera test_cam = {0};
-void update_cam(test_camera *test_cam);
+void compute_surface_normals(am_float32 *vertices, am_int32 count, am_float32 *out_normals) {
+    am_uint32 j = 0;
+    for (am_uint32 i = 0; i < count*3-11; i += 12) {
+        am_vec3 A = am_vec3_create(vertices[i], vertices[i+1], vertices[i+2]);
+        am_vec3 B = am_vec3_create(vertices[i+3], vertices[i+4], vertices[i+5]);
+        am_vec3 C = am_vec3_create(vertices[i+6], vertices[i+7], vertices[i+8]);
+        am_vec3 ABxAC = am_vec3_cross(am_vec3_sub(B, A), am_vec3_sub(C, A));
+        ABxAC = am_vec3_norm(ABxAC);
+        out_normals[j++] = ABxAC.x;
+        out_normals[j++] = ABxAC.y;
+        out_normals[j++] = ABxAC.z;
+    }
+};
 
-am_vec3 light_pos = {5.0f, -2.3f, -2.0f};
-am_vec3 light_color = {1.0f, 1.0f, 1.0f};
+void compute_display_normals(am_float32 *vertices, am_float32 *normals, am_uint32 n_count, am_float32 *display_normals) {
+    am_uint32 j = 0;
+    for (am_uint32 i = 0; i < n_count*3; i += 3) {
+        display_normals[j++] = vertices[i];
+        display_normals[j++] = vertices[i+1];
+        display_normals[j++] = vertices[i+2];
+        display_normals[j++] = vertices[i] + normals[i];
+        display_normals[j++] = vertices[i+1] + normals[i+1];
+        display_normals[j++] = vertices[i+2] + normals[i+2];
+    }
+};
 
 void init() {
-    test_cam.cam = am_camera_perspective();
-    test_cam.cam.transform.position = am_vec3_create(0.0f, 1.0f, 3.0f);
+    //Camera
+    cam = am_camera_perspective();
+    cam.transform.position = am_vec3_create(0.0f, 1.0f, 3.0f);
     am_platform_mouse_lock(true);
-    am_platform *platform = am_engine_get_subsystem(platform);
 
+    //Point lights
+    point_light1.position = am_vec3_create(5.0f, 3.0f, 2.0f);
+    point_light1.constant = 1.0f;
+    point_light1.linear = 0.09f;
+    point_light1.quadratic = 0.032f;
+    point_light1.diffuse = am_vec3_create(0.8f, 0.8f, 0.8f);
+    point_light1.ambient = am_vec3_create(0.05f, 0.05f, 0.05f);
+    point_light1.specular = am_vec3_create(1.0f, 1.0f, 1.0f);
+
+    point_light2.position = am_vec3_create(-3.0f, 2.0f, 2.0f);
+    point_light2.constant = 1.0f;
+    point_light2.linear = 0.09f;
+    point_light2.quadratic = 0.032f;
+    point_light2.diffuse = am_vec3_create(0.6f, 0.6f, 0.8f);
+    point_light2.ambient = am_vec3_create(0.03f, 0.03f, 0.06f);
+    point_light2.specular = am_vec3_create(0.9f, 0.9f, 1.0f);
+
+    //Cube
     cube_shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_v.glsl" },
-            { .type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/cube_f.glsl" }
+            { .type = AMGL_SHADER_VERTEX, .path = "../test-shaders/cube_v.glsl" },
+            { .type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/cube_f.glsl" }
         }
     });
 
@@ -4936,45 +4974,83 @@ void init() {
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
         .mip_num = 3,
         .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "/home/truta/CLionProjects/ametrine/pics/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
+        .path = "../pics/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
     });
 
-    am_float32 cube_coords[120] = {
-        //Pos coords                  //Texture coords
-        -1.0f, 1.0f, 1.0f,  0.0f, 0.0f,
-        1.0f,1.0f,1.0f,  1.0f, 0.0f,
-        1.0f,1.0f,-1.0f, 1.0f, 1.0f,
-        -1.0f,1.0f,-1.0f, 0.0f, 1.0f,
+    am_float32 cube_coords[12*6] = {
+        //Pos coords
+        -1.0f, 1.0f, 1.0f,
+        1.0f,1.0f,1.0f,
+        1.0f,1.0f,-1.0f,
+        -1.0f,1.0f,-1.0f,
 
-        -1.0f,1.0f,-1.0f, 0.0f, 0.0f,
-        1.0f,1.0f,-1.0f, 1.0f, 0.0f,
-        1.0f,-1.0f,-1.0f, 1.0f, 1.0f,
-        -1.0f,-1.0f,-1.0f, 0.0f, 1.0f,
+        -1.0f,1.0f,-1.0f,
+        1.0f,1.0f,-1.0f,
+        1.0f,-1.0f,-1.0f,
+        -1.0f,-1.0f,-1.0f,
 
-        1.0f,1.0f,-1.0f, 0.0f, 0.0f,
-        1.0f,1.0f,1.0f, 1.0f, 0.0f,
-        1.0f,-1.0f,1.0f, 1.0f, 1.0f,
-        1.0f,-1.0f,-1.0f, 0.0f, 1.0f,
+        1.0f,1.0f,-1.0f,
+        1.0f,1.0f,1.0f,
+        1.0f,-1.0f,1.0f,
+        1.0f,-1.0f,-1.0f,
 
-        -1.0f,1.0f,1.0f, 0.0f, 0.0f,
-        -1.0f,1.0f,-1.0f, 1.0f, 0.0f,
-        -1.0f,-1.0f,-1.0f, 1.0f, 1.0f,
-        -1.0f,-1.0f,1.0f, 0.0f, 1.0f,
+        -1.0f,1.0f,1.0f,
+        -1.0f,1.0f,-1.0f,
+        -1.0f,-1.0f,-1.0f,
+        -1.0f,-1.0f,1.0f,
 
-        1.0f,1.0f,1.0f, 0.0f, 0.0f,
-        -1.0f,1.0f,1.0f, 1.0f, 0.0f,
-        -1.0f,-1.0f,1.0f, 1.0f, 1.0f,
-        1.0f,-1.0f,1.0f, 0.0f, 1.0f,
+        1.0f,1.0f,1.0f,
+        -1.0f,1.0f,1.0f,
+        -1.0f,-1.0f,1.0f,
+        1.0f,-1.0f,1.0f,
 
-        1.0f,-1.0f,-1.0f, 0.0f, 0.0f,
-        1.0f,-1.0f,1.0f, 0.0f, 1.0f,
-        -1.0f,-1.0f,1.0f, 1.0f, 1.0f,
-        -1.0f,-1.0f,-1.0f, 1.0f, 0.0f,
+        1.0f,-1.0f,-1.0f,
+        1.0f,-1.0f,1.0f,
+        -1.0f,-1.0f,1.0f,
+        -1.0f,-1.0f,-1.0f
     };
 
-    cube_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+    am_float32 cube_uvs[6*8] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+
+        0.0f, 0.0f,
+        0.0f, 1.0f,
+        1.0f, 1.0f,
+        1.0f, 0.0f
+    };
+
+    cube_coords_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = cube_coords,
-        .size = sizeof(float)*120,
+        .size = sizeof(float)*12*6,
+        .usage = AMGL_BUFFER_USAGE_STATIC,
+    });
+
+    cube_uvs_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = cube_uvs,
+        .size = sizeof(float)*6*8,
         .usage = AMGL_BUFFER_USAGE_STATIC,
     });
 
@@ -5002,83 +5078,62 @@ void init() {
         .layout = {
             .num_attribs = 3,
             .attributes = (amgl_vertex_buffer_attribute[]){
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 5*sizeof(float), .buffer_index = 0},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 3*sizeof(float), .stride = 5*sizeof(float), .buffer_index = 0},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 1}
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 0},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 0, .stride = 2*sizeof(float), .buffer_index = 1},
+                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 2}
             }
         }
     });
 
-    am_float32 display_normals[144];
-    am_float32 cube_normals[72];
-    int i = 0;
-    int v = 0;
-    int m = 0;
-    for (int k = 0; k < 6; k++) {
-        am_vec3 o = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //0
-        i += 5;
-        am_vec3 s = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //1
-        i += 5;
-        am_vec3 q = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //2
-        i += 5;
-        am_vec3 r = am_vec3_create(cube_coords[i], cube_coords[i+1],cube_coords[i+2]); //3
-        i += 5;
+    am_float32 cube_normals_t[18] = {0};
+    compute_surface_normals(cube_coords, 24, cube_normals_t);
 
-        am_vec3 norm = am_vec3_cross(am_vec3_sub(s,o), am_vec3_sub(r,o));
-        norm = am_vec3_norm(norm);
+    am_float32 cube_normals[6*4*3] = {
+        cube_normals_t[0], cube_normals_t[1], cube_normals_t[2],
+        cube_normals_t[0], cube_normals_t[1], cube_normals_t[2],
+        cube_normals_t[0], cube_normals_t[1], cube_normals_t[2],
+        cube_normals_t[0],cube_normals_t[1], cube_normals_t[2],
 
-        display_normals[v++] = o.x;
-        display_normals[v++] = o.y;
-        display_normals[v++] = o.z;
-        display_normals[v++] = o.x + norm.x;
-        display_normals[v++] = o.y + norm.y;
-        display_normals[v++] = o.z + norm.z;
-        cube_normals[m++] = norm.x;
-        cube_normals[m++] = norm.y;
-        cube_normals[m++] = norm.z;
+        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
+        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
+        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
+        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
 
-        display_normals[v++] = s.x;
-        display_normals[v++] = s.y;
-        display_normals[v++] = s.z;
-        display_normals[v++] = s.x + norm.x;
-        display_normals[v++] = s.y + norm.y;
-        display_normals[v++] = s.z + norm.z;
-        cube_normals[m++] = norm.x;
-        cube_normals[m++] = norm.y;
-        cube_normals[m++] = norm.z;
+        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
+        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
+        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
+        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
 
-        display_normals[v++] = q.x;
-        display_normals[v++] = q.y;
-        display_normals[v++] = q.z;
-        display_normals[v++] = q.x + norm.x;
-        display_normals[v++] = q.y + norm.y;
-        display_normals[v++] = q.z + norm.z;
-        cube_normals[m++] = norm.x;
-        cube_normals[m++] = norm.y;
-        cube_normals[m++] = norm.z;
+        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
+        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
+        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
+        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
 
-        display_normals[v++] = r.x;
-        display_normals[v++] = r.y;
-        display_normals[v++] = r.z;
-        display_normals[v++] = r.x + norm.x;
-        display_normals[v++] = r.y + norm.y;
-        display_normals[v++] = r.z + norm.z;
-        cube_normals[m++] = norm.x;
-        cube_normals[m++] = norm.y;
-        cube_normals[m++] = norm.z;
+        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
+        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
+        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
+        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
+
+        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
+        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
+        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
+        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
     };
+
+    am_float32 display_normals[144] = {0};
+    compute_display_normals(cube_coords, cube_normals, 24, display_normals);
 
     cube_norm_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = cube_normals,
-        .size = 72*sizeof(float),
+        .size = 12*6*sizeof(float),
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
 
     normal_shader_id = amgl_shader_create((amgl_shader_info){
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/normal_vis_f.glsl"}
+            {.type = AMGL_SHADER_VERTEX, .path = "../test-shaders/normal_vis_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/normal_vis_f.glsl"}
         }
     });
 
@@ -5108,12 +5163,22 @@ void init() {
     plane_shader_id = amgl_shader_create((amgl_shader_info){
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "/home/truta/CLionProjects/ametrine/test-shaders/plane_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "/home/truta/CLionProjects/ametrine/test-shaders/plane_f.glsl"},
+            {.type = AMGL_SHADER_VERTEX, .path = "../test-shaders/cube_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/cube_f.glsl"},
         }
     });
 
-    plane_tex_id = amgl_texture_create((amgl_texture_info){
+    plane_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
+        .data = (int[]) {
+            0,1,2,
+            0,2,3
+        },
+        .size = 6*sizeof(int),
+        .offset = 0,
+        .usage = AMGL_BUFFER_USAGE_STATIC
+    });
+
+    plane1_tex_id = amgl_texture_create((amgl_texture_info){
         .format = AMGL_TEXTURE_FORMAT_RGBA,
         .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
         .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
@@ -5121,10 +5186,10 @@ void init() {
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
         .mip_num = 3,
         .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "/home/truta/CLionProjects/ametrine/pics/mud_texture/Stylized_Dry_Mud_001_basecolor.jpg"
+        .path = "../pics/mud_texture/Stylized_Dry_Mud_001_basecolor.jpg"
     });
 
-    plane_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+    plane1_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
         .data = (float[]) {
             //Vertex coords                 //Texture coords   //Normals
             -8.0f, -3.0f, 8.0f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
@@ -5136,13 +5201,28 @@ void init() {
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
 
-    plane_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
-        .data = (int[]) {
-            0,1,2,
-            0,2,3
+    plane2_tex_id = amgl_texture_create((amgl_texture_info){
+        .format = AMGL_TEXTURE_FORMAT_RGBA,
+        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
+        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
+        .mip_num = 3,
+        .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
+        .path = "../pics/wall_texture/Substance_graph_BaseColor.jpg"
+    });
+
+    plane2_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
+        .data = (float[]) {
+            //Vertex coords                 //Texture coords   //Normals
+            -8.0f,5.0f,8.0f, 0.0f, 1.0f, 0.0f, 0.0f, -1.0f,
+            8.0f,5.0f,8.0f, 1.0f, 1.0f, 0.0f, 0.0f, -1.0f,
+            8.0f,-3.0f,8.0f,  1.0f, 0.0f, 0.0f, 0.0f, -1.0f,
+            -8.0f, -3.0f, 8.0f,  0.0f, 0.0f, 0.0f, 0.0f, -1.0f,
+
+
         },
-        .size = 6*sizeof(int),
-        .offset = 0,
+        .size = sizeof(float)*32,
         .usage = AMGL_BUFFER_USAGE_STATIC
     });
 
@@ -5173,19 +5253,68 @@ void init() {
         .type = AMGL_UNIFORM_TYPE_MAT4
     });
 
-    light_pos_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_light_pos",
+    point_light_id1 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.position",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+    point_light_id2 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.constant",
+        .type = AMGL_UNIFORM_TYPE_FLOAT
+    });
+    point_light_id3 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.linear",
+        .type = AMGL_UNIFORM_TYPE_FLOAT
+    });
+    point_light_id4 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.quadratic",
+        .type = AMGL_UNIFORM_TYPE_FLOAT
+    });
+    point_light_id5 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.ambient",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+    point_light_id6 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.specular",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+    point_light_id7 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light1.diffuse",
         .type = AMGL_UNIFORM_TYPE_VEC3
     });
 
-    camera_pos_id = amgl_uniform_create((amgl_uniform_info){
-       .name = "u_cam_pos",
-       .type = AMGL_UNIFORM_TYPE_VEC3
+    point_light_id11 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.position",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+    point_light_id12 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.constant",
+        .type = AMGL_UNIFORM_TYPE_FLOAT
+    });
+    point_light_id13 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.linear",
+        .type = AMGL_UNIFORM_TYPE_FLOAT
+    });
+    point_light_id14 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.quadratic",
+        .type = AMGL_UNIFORM_TYPE_FLOAT
+    });
+    point_light_id15 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.ambient",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+    point_light_id16 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.specular",
+        .type = AMGL_UNIFORM_TYPE_VEC3
+    });
+    point_light_id17 = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_point_light2.diffuse",
+        .type = AMGL_UNIFORM_TYPE_VEC3
     });
 
-    phong_toggle_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "blinn_toggle",
-        .type = AMGL_UNIFORM_TYPE_INT
+
+    camera_pos_id = amgl_uniform_create((amgl_uniform_info){
+        .name = "u_cam_pos",
+        .type = AMGL_UNIFORM_TYPE_VEC3
     });
 
     rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
@@ -5195,31 +5324,43 @@ void update() {
     if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_quit();
     if (am_platform_key_pressed(AM_KEYCODE_T)) toggle_phong = !toggle_phong;
 
-    am_engine *engine = am_engine_get_instance();
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *main = am_packed_array_get_ptr(platform->windows, 1);
 
-    update_cam(&test_cam);
-    view = am_camera_get_view_projection(&test_cam.cam, (am_int32)main->width, (am_int32)main->height);
+    update_cam(&cam);
+    view = am_camera_get_view_projection(&cam, (am_int32)main->width, (am_int32)main->height);
 
 
     amgl_bindings_info cube_binds = {
         .vertex_buffers = {
-            .size = 2*sizeof(amgl_vertex_buffer_bind_info),
+            .size = 3*sizeof(amgl_vertex_buffer_bind_info),
             .info = (amgl_vertex_buffer_bind_info[]) {
-                {.vertex_buffer_id = cube_vbo_id},
+                {.vertex_buffer_id = cube_coords_vbo_id},
+                {.vertex_buffer_id = cube_uvs_vbo_id},
                 {.vertex_buffer_id = cube_norm_vbo_id}
             }
         },
         .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = cube_idx_id}},
         .uniforms = {
-            .size = 5*sizeof(amgl_uniform_bind_info),
+            .size = 17*sizeof(amgl_uniform_bind_info),
             .info = (amgl_uniform_bind_info[]) {
                 {.uniform_id = view_mat_id, .data = view.elements},
                 {.uniform_id = sampler_id, .data = &cube_tex_id},
-                {.uniform_id = light_pos_id, .data = light_pos.xyz},
-                {.uniform_id = camera_pos_id, .data = test_cam.cam.transform.position.xyz},
-                {.uniform_id = phong_toggle_id, .data = &toggle_phong}
+                {.uniform_id = point_light_id1, .data = point_light1.position.xyz},
+                {.uniform_id = point_light_id2, .data = &point_light1.constant},
+                {.uniform_id = point_light_id3, .data = &point_light1.linear},
+                {.uniform_id = point_light_id4, .data = &point_light1.quadratic},
+                {.uniform_id = point_light_id5, .data = &point_light1.ambient.xyz},
+                {.uniform_id = point_light_id6, .data = &point_light1.specular.xyz},
+                {.uniform_id = point_light_id7, .data = &point_light1.diffuse.xyz},
+                {.uniform_id = point_light_id11, .data = point_light2.position.xyz},
+                {.uniform_id = point_light_id12, .data = &point_light2.constant},
+                {.uniform_id = point_light_id13, .data = &point_light2.linear},
+                {.uniform_id = point_light_id14, .data = &point_light2.quadratic},
+                {.uniform_id = point_light_id15, .data = &point_light2.ambient.xyz},
+                {.uniform_id = point_light_id16, .data = &point_light2.specular.xyz},
+                {.uniform_id = point_light_id17, .data = &point_light2.diffuse.xyz},
+                {.uniform_id = camera_pos_id, .data = cam.transform.position.xyz},
             }
         }
     };
@@ -5237,22 +5378,66 @@ void update() {
         }
     };
 
-    amgl_bindings_info plane_binds = {
+    amgl_bindings_info plane1_binds = {
         .vertex_buffers = {
             .size = sizeof(amgl_vertex_buffer_bind_info),
             .info = &(amgl_vertex_buffer_bind_info) {
-                .vertex_buffer_id = plane_vbo_id
+                .vertex_buffer_id = plane1_vbo_id
             }
         },
         .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = plane_idx_id}},
         .uniforms = {
-            .size = 5*sizeof(amgl_uniform_bind_info),
+            .size = 17*sizeof(amgl_uniform_bind_info),
             .info = (amgl_uniform_bind_info[]) {
                 {.uniform_id = view_mat_id, .data = view.elements},
-                {.uniform_id = sampler_id, .data = &plane_tex_id, .binding = 0},
-                {.uniform_id = light_pos_id, .data = light_pos.xyz},
-                {.uniform_id = camera_pos_id, .data = test_cam.cam.transform.position.xyz},
-                {.uniform_id = phong_toggle_id, .data = &toggle_phong}
+                {.uniform_id = sampler_id, .data = &plane1_tex_id},
+                {.uniform_id = point_light_id1, .data = point_light1.position.xyz},
+                {.uniform_id = point_light_id2, .data = &point_light1.constant},
+                {.uniform_id = point_light_id3, .data = &point_light1.linear},
+                {.uniform_id = point_light_id4, .data = &point_light1.quadratic},
+                {.uniform_id = point_light_id5, .data = &point_light1.ambient.xyz},
+                {.uniform_id = point_light_id6, .data = &point_light1.specular.xyz},
+                {.uniform_id = point_light_id7, .data = &point_light1.diffuse.xyz},
+                {.uniform_id = point_light_id11, .data = point_light2.position.xyz},
+                {.uniform_id = point_light_id12, .data = &point_light2.constant},
+                {.uniform_id = point_light_id13, .data = &point_light2.linear},
+                {.uniform_id = point_light_id14, .data = &point_light2.quadratic},
+                {.uniform_id = point_light_id15, .data = &point_light2.ambient.xyz},
+                {.uniform_id = point_light_id16, .data = &point_light2.specular.xyz},
+                {.uniform_id = point_light_id17, .data = &point_light2.diffuse.xyz},
+                {.uniform_id = camera_pos_id, .data = cam.transform.position.xyz},
+            }
+        }
+    };
+
+    amgl_bindings_info plane2_binds = {
+        .vertex_buffers = {
+            .size = sizeof(amgl_vertex_buffer_bind_info),
+            .info = &(amgl_vertex_buffer_bind_info) {
+                .vertex_buffer_id = plane2_vbo_id
+            }
+        },
+        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = plane_idx_id}},
+        .uniforms = {
+            .size = 17*sizeof(amgl_uniform_bind_info),
+            .info = (amgl_uniform_bind_info[]) {
+                {.uniform_id = view_mat_id, .data = view.elements},
+                {.uniform_id = sampler_id, .data = &plane2_tex_id},
+                {.uniform_id = point_light_id1, .data = point_light1.position.xyz},
+                {.uniform_id = point_light_id2, .data = &point_light1.constant},
+                {.uniform_id = point_light_id3, .data = &point_light1.linear},
+                {.uniform_id = point_light_id4, .data = &point_light1.quadratic},
+                {.uniform_id = point_light_id5, .data = &point_light1.ambient.xyz},
+                {.uniform_id = point_light_id6, .data = &point_light1.specular.xyz},
+                {.uniform_id = point_light_id7, .data = &point_light1.diffuse.xyz},
+                {.uniform_id = point_light_id11, .data = point_light2.position.xyz},
+                {.uniform_id = point_light_id12, .data = &point_light2.constant},
+                {.uniform_id = point_light_id13, .data = &point_light2.linear},
+                {.uniform_id = point_light_id14, .data = &point_light2.quadratic},
+                {.uniform_id = point_light_id15, .data = &point_light2.ambient.xyz},
+                {.uniform_id = point_light_id16, .data = &point_light2.specular.xyz},
+                {.uniform_id = point_light_id17, .data = &point_light2.diffuse.xyz},
+                {.uniform_id = camera_pos_id, .data = cam.transform.position.xyz},
             }
         }
     };
@@ -5273,7 +5458,11 @@ void update() {
     amgl_draw(&(amgl_draw_info){.start = 0, .count = 72});
 
     amgl_bind_pipeline(plane_pipeline_id);
-    amgl_set_bindings(&plane_binds);
+    amgl_set_bindings(&plane1_binds);
+    amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
+
+    amgl_bind_pipeline(plane_pipeline_id);
+    amgl_set_bindings(&plane2_binds);
     amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
 
     amgl_end_render_pass(rp_id);
@@ -5284,23 +5473,22 @@ void am_shutdown() {
     return;
 };
 
-void update_cam(test_camera *test_cam) {
+void update_cam(am_camera *camera) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_float64 dt = platform->time.delta;
     am_vec2 dm = am_platform_mouse_get_delta();
-    am_int32 dp = am_platform_mouse_get_wheel_delta();
 
-    am_camera_offset_orientation(&test_cam->cam, -0.1f*dm.x, -0.1f*dm.y);
+    am_camera_offset_orientation(camera, -0.1f * dm.x, -0.1f * dm.y);
 
     am_vec3 vel = {0};
-    if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(&test_cam->cam));
-    if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(&test_cam->cam));
+    if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(camera));
+    if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(camera));
+    if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(camera));
+    if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(camera));
+    if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(camera));
+    if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(camera));
 
-    test_cam->cam.transform.position = am_vec3_add(test_cam->cam.transform.position, am_vec3_scale((am_float32)(5000.0f*dt), am_vec3_norm(vel)));
+    camera->transform.position = am_vec3_add(camera->transform.position, am_vec3_scale((am_float32)(5000.0f * dt), am_vec3_norm(vel)));
 };
 
 int main() {
@@ -5314,7 +5502,7 @@ int main() {
         .win_x = 50,
         .win_y = 50,
         .vsync_enabled = false,
-        .desired_fps = 120,
+        .desired_fps = 60,
         .is_running = true
         //.win_name = "Testing"
     });

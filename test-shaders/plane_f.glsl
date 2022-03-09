@@ -28,7 +28,7 @@ void main() {
         vec3 halfDir = normalize(light_dir + view_dir);
         spec = pow(max(dot(normals, halfDir), 0.0), 32);
     };
-    vec3 specular = vec3(specular_strenght) * spec;
+    vec3 specular = vec3(specular_strenght) * spec * color;
 
 
     frag_color = vec4(ambient, 1.0) + vec4(diffuse, 1.0) + vec4(specular, 1.0);
