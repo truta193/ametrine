@@ -5200,8 +5200,8 @@ void init() {
     cube_shader_id = amgl_shader_create((amgl_shader_info) {
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .path = "../test-shaders/cube_v.glsl" },
-            { .type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/cube_f.glsl" }
+            { .type = AMGL_SHADER_VERTEX, .path = "../shaders/cube_v.glsl" },
+            { .type = AMGL_SHADER_FRAGMENT, .path = "../shaders/cube_f.glsl" }
         }
     });
 
@@ -5213,7 +5213,7 @@ void init() {
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
         .mip_num = 3,
         .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "../pics/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
+        .path = "../textures/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
     });
 
     am_float32 cube_coords[12*6] = {
@@ -5391,8 +5391,8 @@ void init() {
     normal_shader_id = amgl_shader_create((amgl_shader_info){
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "../test-shaders/normal_vis_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/normal_vis_f.glsl"}
+            {.type = AMGL_SHADER_VERTEX, .path = "../shaders/normal_vis_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "../shaders/normal_vis_f.glsl"}
         }
     });
 
@@ -5422,8 +5422,8 @@ void init() {
     plane_shader_id = amgl_shader_create((amgl_shader_info){
         .num_sources = 2,
         .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "../test-shaders/cube_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/cube_f.glsl"},
+            {.type = AMGL_SHADER_VERTEX, .path = "../shaders/cube_v.glsl"},
+            {.type = AMGL_SHADER_FRAGMENT, .path = "../shaders/cube_f.glsl"},
         }
     });
 
@@ -5445,7 +5445,7 @@ void init() {
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
         .mip_num = 3,
         .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "../pics/mud_texture/Stylized_Dry_Mud_001_basecolor.jpg"
+        .path = "../textures/mud_texture/Stylized_Dry_Mud_001_basecolor.jpg"
     });
 
     plane1_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
@@ -5468,7 +5468,7 @@ void init() {
         .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
         .mip_num = 3,
         .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "../pics/wall_texture/Substance_graph_BaseColor.jpg"
+        .path = "../textures/wall_texture/Substance_graph_BaseColor.jpg"
     });
 
     plane2_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
