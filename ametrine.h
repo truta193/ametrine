@@ -4,7 +4,7 @@
 //TODO: Halve array space once size goes below half of capacity?
 //REVIEW: More defined default values perhaps? More detailed warns
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
-//REVIEW: Line 5128ish, pass id instead of buffer index? //outdated index
+//REVIEW: Line 5128ish, pass id instead of buffer index?
 //TODO: 3D textures
 
 //----------------------------------------------------------------------------//
@@ -67,10 +67,10 @@ typedef enum {false, true} am_bool;
 typedef am_uint32 am_id;
 
 #if defined(AM_LINUX)
-    #define AM_CALL *
-    #define amgl_get_proc_address(str) glXGetProcAddress((unsigned char*)(str))
+#define AM_CALL *
+#define amgl_get_proc_address(str) glXGetProcAddress((unsigned char*)(str))
 #else
-    #define AM_CALL __stdcall*
+#define AM_CALL __stdcall*
     #define amgl_get_proc_address(str) wglGetProcAddress((str))
 #endif
 
@@ -369,9 +369,9 @@ static inline am_mat4 am_vqs_to_mat4(const am_vqs* transform);
 #define AM_WINDOW_DEFAULT_NAME "Ametrine"
 
 #if defined(AM_LINUX)
-    #define AM_WINDOW_DEFAULT_PARENT DefaultRootWindow(am_engine_get_subsystem(platform)->display)
+#define AM_WINDOW_DEFAULT_PARENT DefaultRootWindow(am_engine_get_subsystem(platform)->display)
 #else
-    #define AM_WINDOW_DEFAULT_PARENT 0
+#define AM_WINDOW_DEFAULT_PARENT 0
 #endif
 
 typedef enum am_key_map {
@@ -543,14 +543,14 @@ typedef struct am_window {
     am_bool is_fullscreen; //Useless for child windows
     am_window_cache cache;
 
-    #if defined(AM_LINUX)
-        Colormap colormap;
-        XVisualInfo *visual_info;
-        GLXContext context;
-    #else
-        HDC hdc;
-            HGLRC context;
-    #endif
+#if defined(AM_LINUX)
+    Colormap colormap;
+    XVisualInfo *visual_info;
+    GLXContext context;
+#else
+    HDC hdc;
+        HGLRC context;
+#endif
 } am_window;
 
 typedef struct am_platform_callbacks {
@@ -593,9 +593,9 @@ typedef struct am_platform_time {
 } am_platform_time;
 
 typedef struct am_platform {
-    #if defined(AM_LINUX)
-        Display *display;
-    #endif
+#if defined(AM_LINUX)
+    Display *display;
+#endif
     am_packed_array(am_window) windows;
     am_platform_input input;
     am_platform_time time;
@@ -1105,6 +1105,7 @@ typedef struct amgl_bindings_info {
     } textures;
 } amgl_bindings_info;
 
+//REVIEW: Should perhaps hold IDs instead?
 typedef struct amgl_frame_cache {
     amgl_index_buffer index_buffer;
     size_t index_element_size;
@@ -1276,6 +1277,7 @@ typedef struct am_engine {
     amgl_ctx_data ctx_data;
     //IDEA: A scene structure, maybe scenegraph?
     //am_audio audio; TODO: Implement
+    //am_pfngl pfngl; TODO: Implement
 } am_engine;
 
 //The only one that should exist
@@ -1356,6 +1358,7 @@ void am_dyn_array_resize(void **array, size_t add_size) {
         };
         header->capacity = new_capacity;
         *array = (size_t*)header + 2;
+        //*array = (size_t*)header + sizeof(am_dyn_array_header);
     };
 };
 
@@ -1684,7 +1687,7 @@ static inline am_mat3 am_mat3_rotateq(am_vec4 q) {
     m.m[3] = 2 * (xy - wz);     m.m[4] = 1 - 2 * (x2 + z2); m.m[5] = 2 * (yz + wx);
     m.m[6] = 2 * (xz + wy);     m.m[7] = 2 * (yz - wx);     m.m[8] = 1 - 2 * (x2 + y2);
     return m;
-};
+}
 
 static inline am_mat3 am_mat3_rsq(am_vec4 q, am_vec3 s) {
     am_mat3 mr = am_mat3_rotateq(q);
@@ -1697,8 +1700,7 @@ static inline am_mat3 am_mat3_inverse(am_mat3 m) {
 
     am_float64 det = (am_float64)(m.m[0 * 3 + 0] * (m.m[1 * 3 + 1] * m.m[2 * 3 + 2] - m.m[2 * 3 + 1] * m.m[1 * 3 + 2]) -
                                   m.m[0 * 3 + 1] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 2] - m.m[1 * 3 + 2] * m.m[2 * 3 + 0]) +
-                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0])
-                                  );
+                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0]));
 
     am_float64 inv_det = det ? 1.0 / det : 0.0;
 
@@ -2043,7 +2045,7 @@ static inline am_vec4 am_mat4_mul_vec4(am_mat4 m, am_vec4 v) {
                           m.elements[1 + 4 * 0] * v.x + m.elements[1 + 4 * 1] * v.y + m.elements[1 + 4 * 2] * v.z + m.elements[1 + 4 * 3] * v.w,
                           m.elements[2 + 4 * 0] * v.x + m.elements[2 + 4 * 1] * v.y + m.elements[2 + 4 * 2] * v.z + m.elements[2 + 4 * 3] * v.w,
                           m.elements[3 + 4 * 0] * v.x + m.elements[3 + 4 * 1] * v.y + m.elements[3 + 4 * 2] * v.z + m.elements[3 + 4 * 3] * v.w
-                          );
+    );
 };
 
 static inline am_vec3 am_mat4_mul_vec3(am_mat4 m, am_vec3 v) {
@@ -2083,7 +2085,7 @@ static inline am_quat am_quat_mul(am_quat q0, am_quat q1) {
                           q0.w * q1.y + q1.w * q0.y + q0.z * q1.x - q1.z * q0.x,
                           q0.w * q1.z + q1.w * q0.z + q0.x * q1.y - q1.x * q0.y,
                           q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
-                          );
+    );
 };
 
 static inline am_quat am_quat_mul_list(am_uint32 count, ...) {
@@ -2100,7 +2102,7 @@ static inline am_quat am_quat_mul_quat(am_quat q0, am_quat q1) {
                           q0.w * q1.y + q1.w * q0.y + q0.z * q1.x - q1.z * q0.x,
                           q0.w * q1.z + q1.w * q0.z + q0.x * q1.y - q1.x * q0.y,
                           q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
-                          );
+    );
 };
 
 static inline am_quat am_quat_scale(am_quat q, am_float32 s) {
@@ -2128,7 +2130,7 @@ static inline am_quat am_quat_cross(am_quat q0, am_quat q1) {
                            q0.w * q1.y + q0.y * q1.w + q0.z * q1.x - q0.x * q1.z,
                            q0.w * q1.z + q0.z * q1.w + q0.x * q1.y - q0.y * q1.x,
                            q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z
-                           );
+    );
 };
 
 // Inverse := Conjugate / Dot;
@@ -2269,7 +2271,7 @@ static inline am_vqs am_vqs_default() {
     am_vqs t = am_vqs_create(am_vec3_create(0.0f, 0.0f, 0.0f),
                              am_quat_create(0.0f, 0.0f, 0.0f, 1.0f),
                              am_vec3_create(1.0f, 1.0f, 1.0f)
-                             );
+    );
     return t;
 };
 
@@ -2499,17 +2501,17 @@ am_platform *am_platform_create() {
 
     memset(&platform->time, 0, sizeof(platform->time));
 
-    #if defined(AM_LINUX)
-        platform->display = XOpenDisplay(NULL);
-        memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
-        am_int32 min, max;
-        XDisplayKeycodes(platform->display, &min, &max);
-        am_int32 width;
-        KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
-        for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
-        XFree(key_syms);
-    #else
-        platform->input.keyboard.keycodes[0x00B] = AM_KEYCODE_0;
+#if defined(AM_LINUX)
+    platform->display = XOpenDisplay(NULL);
+    memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
+    am_int32 min, max;
+    XDisplayKeycodes(platform->display, &min, &max);
+    am_int32 width;
+    KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
+    for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
+    XFree(key_syms);
+#else
+    platform->input.keyboard.keycodes[0x00B] = AM_KEYCODE_0;
         platform->input.keyboard.keycodes[0x002] = AM_KEYCODE_1;
         platform->input.keyboard.keycodes[0x003] = AM_KEYCODE_2;
         platform->input.keyboard.keycodes[0x004] = AM_KEYCODE_3;
@@ -2677,28 +2679,28 @@ am_platform *am_platform_create() {
 
 void am_platform_poll_events() {
     am_platform *platform = am_engine_get_subsystem(platform);
-    #if defined(AM_LINUX)
-        XEvent xevent;
-        while (XPending(platform->display)) {
-            XNextEvent(platform->display, &xevent);
-            am_platform_event_handler(&xevent);
-        };
-    #else
-        MSG msg;
+#if defined(AM_LINUX)
+    XEvent xevent;
+    while (XPending(platform->display)) {
+        XNextEvent(platform->display, &xevent);
+        am_platform_event_handler(&xevent);
+    };
+#else
+    MSG msg;
         while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
         };
-    #endif
+#endif
 
     //HACK: Coords are bound to main window
     if (platform->input.mouse.locked) {
-        #if defined(AM_LINUX)
-                am_platform_mouse_set_position(am_packed_array_get_ptr(platform->windows, 1)->width/2, am_packed_array_get_ptr(platform->windows, 1)->height/2);
-        #else
-                am_vec2u pos = am_platform_window_get_size(1);
+#if defined(AM_LINUX)
+        am_platform_mouse_set_position(am_packed_array_get_ptr(platform->windows, 1)->width/2, am_packed_array_get_ptr(platform->windows, 1)->height/2);
+#else
+        am_vec2u pos = am_platform_window_get_size(1);
                 am_platform_mouse_set_position(pos.x/2, pos.y/2);
-        #endif
+#endif
     };
 };
 
@@ -2885,13 +2887,13 @@ void am_platform_update(am_platform *platform) {
 void am_platform_terminate(am_platform *platform) {
     if (platform->input.mouse.locked) am_platform_mouse_lock(false);
     for (am_int32 i = 0; i < am_packed_array_get_count(platform->windows); i++) am_platform_window_destroy(platform->windows->elements[i].id);
-    #if defined(AM_LINUX)
-        //This sends the proper closing xevents
-        am_platform_update(am_engine_get_subsystem(platform));
-    #else
-        UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
+#if defined(AM_LINUX)
+    //This sends the proper closing xevents
+    am_platform_update(am_engine_get_subsystem(platform));
+#else
+    UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
         UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
-    #endif
+#endif
 
     am_packed_array_destroy(platform->windows);
     am_free(platform);
@@ -2989,15 +2991,15 @@ void am_platform_mouse_set_position(am_uint32 x, am_uint32 y) {
     platform->input.mouse.position.x = x;
     platform->input.mouse.position.y = y;
 
-    #if defined(AM_LINUX)
-        XWarpPointer(platform->display, None, am_packed_array_get_ptr(platform->windows, 1)->handle, 0, 0, 0, 0, (am_int32)x, (am_int32)y);
-        XFlush(platform->display);
-    #else
-        POINT pos = { (am_int32)x, (am_int32)y};
+#if defined(AM_LINUX)
+    XWarpPointer(platform->display, None, am_packed_array_get_ptr(platform->windows, 1)->handle, 0, 0, 0, 0, (am_int32)x, (am_int32)y);
+    XFlush(platform->display);
+#else
+    POINT pos = { (am_int32)x, (am_int32)y};
         //HACK:
         ClientToScreen((HWND)am_packed_array_get_ptr(platform->windows, 1)->handle, &pos);
         SetCursorPos(pos.x, pos.y);
-    #endif
+#endif
 };
 
 am_vec2 am_platform_mouse_get_delta() {
@@ -3020,21 +3022,21 @@ void am_platform_mouse_lock(am_bool lock) {
     if (platform->input.mouse.locked == lock) return;
     //HACK: Grabs main window but you should be able to specify this
     am_window *window_to_lock = am_packed_array_get_ptr(platform->windows, 1);
-    #if defined(AM_LINUX)
-        if (lock) {
-            platform->input.mouse.locked = lock;
-            am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
-            XGrabPointer(platform->display, window_to_lock->handle, true,
-                         ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-                         GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
-            );
-        } else {
-            platform->input.mouse.locked = lock;
-            XUngrabPointer(platform->display, 0);
-            am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
-        };
-    #else
-        if (lock) {
+#if defined(AM_LINUX)
+    if (lock) {
+        platform->input.mouse.locked = lock;
+        am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
+        XGrabPointer(platform->display, window_to_lock->handle, true,
+                     ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                     GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
+        );
+    } else {
+        platform->input.mouse.locked = lock;
+        XUngrabPointer(platform->display, 0);
+        am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
+    };
+#else
+    if (lock) {
             platform->input.mouse.locked = lock;
             am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
             RECT clipRect;
@@ -3047,7 +3049,7 @@ void am_platform_mouse_lock(am_bool lock) {
             ClipCursor(NULL);
             am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
         }
-    #endif
+#endif
 
 };
 
@@ -3213,8 +3215,8 @@ am_id am_platform_window_create(am_window_info window_info) {
     XStoreName(platform->display, (Window)new_window->handle, window_info.name);
     XMapWindow(platform->display, (Window)new_window->handle);
 
-    #else
-        DWORD dwExStyle = WS_EX_LEFT; // 0
+#else
+    DWORD dwExStyle = WS_EX_LEFT; // 0
         DWORD dwStyle = WS_OVERLAPPED; // 0
         if (window_info.parent == AM_WINDOW_DEFAULT_PARENT) {
             dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
@@ -3244,7 +3246,7 @@ am_id am_platform_window_create(am_window_info window_info) {
             SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
         };
         ShowWindow((HWND)new_window->handle, 1);
-    #endif
+#endif
 
     new_window->x = window_info.x;
     new_window->y = window_info.y;
@@ -3260,12 +3262,12 @@ am_id am_platform_window_create(am_window_info window_info) {
     //REVIEW: Once main window is deleted, cannot create new ones?
     //REVIEW: Should all windows share contexts?
     am_window *main_window = am_packed_array_get_ptr(platform->windows, 1);
-    #if defined(AM_LINUX)
-        new_window->context = NULL;
-        new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
-        glXMakeCurrent(platform->display, new_window->handle, new_window->context);
-    #else
-        new_window->hdc = GetDC((HWND)new_window->handle);
+#if defined(AM_LINUX)
+    new_window->context = NULL;
+    new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
+    glXMakeCurrent(platform->display, new_window->handle, new_window->context);
+#else
+    new_window->hdc = GetDC((HWND)new_window->handle);
         PIXELFORMATDESCRIPTOR pixel_format_desc = {
             sizeof(PIXELFORMATDESCRIPTOR),1,
             PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA,
@@ -3282,7 +3284,7 @@ am_id am_platform_window_create(am_window_info window_info) {
         new_window->context = wglCreateContext(new_window->hdc);
         wglMakeCurrent(new_window->hdc, new_window->context);
         wglShareLists(new_window->context, main_window->context);
-    #endif
+#endif
 
     //Have to do this here unfortunately
     if (am_packed_array_get_count(platform->windows) <= 1)
@@ -3290,11 +3292,11 @@ am_id am_platform_window_create(am_window_info window_info) {
 
     amgl_vsync(new_window->id, am_engine_get_instance()->vsync_enabled);
 
-    #if defined(AM_LINUX)
-        glXMakeCurrent(platform->display, 0, 0);
-    #else
-        wglMakeCurrent(0,0);
-    #endif
+#if defined(AM_LINUX)
+    glXMakeCurrent(platform->display, 0, 0);
+#else
+    wglMakeCurrent(0,0);
+#endif
     return ret_id;
 };
 
@@ -3335,10 +3337,10 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
     window->cache.x = window->x;
     window->cache.y = window->y;
 
-    #if defined(AM_LINUX)
-        XMoveWindow(platform->display, window->handle, (am_int32)x, (am_int32)y);
-    #else
-        RECT rect = {
+#if defined(AM_LINUX)
+    XMoveWindow(platform->display, window->handle, (am_int32)x, (am_int32)y);
+#else
+    RECT rect = {
             .left = (long)x,
             .top = (long)y,
             .bottom = (long)window->height,
@@ -3349,7 +3351,7 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
         else
             AdjustWindowRectEx(&rect, 0, false, 0);
         SetWindowPos((HWND)window->handle, 0, rect.left, rect.top, 0, 0, SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
-    #endif
+#endif
 };
 
 //REVIEW: Child windows could go "is_fullscreen" by taking the parent's client dimensions
@@ -3376,29 +3378,29 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
     };
     snprintf(temp_info.name, AM_MAX_NAME_LENGTH, "%s", window->name);
     //REVIEW: Currently not needed for linux
-    #if defined(AM_WINDOWS)
-        am_window_cache temp_cache = window->cache;
-    #endif
+#if defined(AM_WINDOWS)
+    am_window_cache temp_cache = window->cache;
+#endif
 
-    #if defined(AM_LINUX)
-        Atom wm_state = XInternAtom(platform->display, "_NET_WM_STATE", false);
-        Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
-        XEvent xevent = {0};
-        xevent.type = ClientMessage;
-        xevent.xclient.window = window->handle;
-        xevent.xclient.message_type = wm_state;
-        xevent.xclient.format = 32;
-        xevent.xclient.data.l[0] = state ? 1:0;
-        xevent.xclient.data.l[1] = (long)wm_fs;
-        xevent.xclient.data.l[3] = 0l;
-        XSendEvent(platform->display, AM_WINDOW_DEFAULT_PARENT, false, SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
-        XFlush(platform->display);
-        XWindowAttributes window_attribs = {0};
-        XGetWindowAttributes(platform->display, window->handle, &window_attribs);
-        printf("Fullscreen toggle\n Pos: %d %d\n Size: %d %d\nFullscreen toggle end\n\n", window_attribs.x, window_attribs.y, window_attribs.width, window_attribs.height);
-        memcpy(&window->cache, &temp_info, sizeof(am_window_info));
-    #else
-        DWORD dw_style = GetWindowLong((HWND)window->handle, GWL_STYLE);
+#if defined(AM_LINUX)
+    Atom wm_state = XInternAtom(platform->display, "_NET_WM_STATE", false);
+    Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
+    XEvent xevent = {0};
+    xevent.type = ClientMessage;
+    xevent.xclient.window = window->handle;
+    xevent.xclient.message_type = wm_state;
+    xevent.xclient.format = 32;
+    xevent.xclient.data.l[0] = state ? 1:0;
+    xevent.xclient.data.l[1] = (long)wm_fs;
+    xevent.xclient.data.l[3] = 0l;
+    XSendEvent(platform->display, AM_WINDOW_DEFAULT_PARENT, false, SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
+    XFlush(platform->display);
+    XWindowAttributes window_attribs = {0};
+    XGetWindowAttributes(platform->display, window->handle, &window_attribs);
+    printf("Fullscreen toggle\n Pos: %d %d\n Size: %d %d\nFullscreen toggle end\n\n", window_attribs.x, window_attribs.y, window_attribs.width, window_attribs.height);
+    memcpy(&window->cache, &temp_info, sizeof(am_window_info));
+#else
+    DWORD dw_style = GetWindowLong((HWND)window->handle, GWL_STYLE);
         if (window->is_fullscreen) {
             printf("Going fullscreen\n");
             MONITORINFO monitor_info = {sizeof(monitor_info)};
@@ -3415,19 +3417,19 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
             am_platform_window_resize(id, temp_cache.width, temp_cache.height);
             am_platform_window_move(id, temp_cache.x, temp_cache.y);
         };
-    #endif
+#endif
 };
 
 am_vec2u am_platform_window_get_size(am_id id) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
-    #if defined(AM_LINUX)
-    #else
-        RECT area;
+#if defined(AM_LINUX)
+#else
+    RECT area;
         GetClientRect((HWND)window->handle, &area);
         am_vec2u ret = {area.right, area.bottom};
         return ret;
-    #endif
+#endif
 };
 
 void am_platform_window_destroy(am_id id) {
@@ -3437,52 +3439,52 @@ void am_platform_window_destroy(am_id id) {
         printf("[FAIL] am_platform_window_destroy (id: %u): Window id is invalid!\n", id);
         return;
     };
-    #if defined(AM_LINUX)
-        glXDestroyContext(platform->display, window->context);
-        XUnmapWindow(platform->display, window->handle);
-        XDestroyWindow(platform->display, window->handle);
-        XFreeColormap(platform->display, window->colormap);
-        XFree(window->visual_info);
-        XFlush(platform->display);
-    #else
-        DestroyWindow((HWND)(window->handle));
-    #endif
+#if defined(AM_LINUX)
+    glXDestroyContext(platform->display, window->context);
+    XUnmapWindow(platform->display, window->handle);
+    XDestroyWindow(platform->display, window->handle);
+    XFreeColormap(platform->display, window->colormap);
+    XFree(window->visual_info);
+    XFlush(platform->display);
+#else
+    DestroyWindow((HWND)(window->handle));
+#endif
 };
 
 void am_platform_timer_create() {
     am_platform *platform = am_engine_get_subsystem(platform);
-    #if defined(AM_LINUX)
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+#if defined(AM_LINUX)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
 
-        platform->time.frequency = 1000000000;
-    #else
-        QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
+    platform->time.frequency = 1000000000;
+#else
+    QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
         QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
-    #endif
+#endif
 };
 
 void am_platform_timer_sleep(am_float32 ms) {
-    #if defined(AM_LINUX)
-        usleep((__useconds_t)(ms*1000.0f));
-    #else
-        timeBeginPeriod(1);
+#if defined(AM_LINUX)
+    usleep((__useconds_t)(ms*1000.0f));
+#else
+    timeBeginPeriod(1);
         Sleep((uint64_t)ms);
         timeEndPeriod(1);
-    #endif
+#endif
 };
 
 am_uint64 am_platform_timer_value() {
-    #if defined(AM_LINUX)
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
-    #else
-        am_uint64 value;
+#if defined(AM_LINUX)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+#else
+    am_uint64 value;
         QueryPerformanceCounter((LARGE_INTEGER*)&value);
         return value;
-    #endif
+#endif
 };
 
 am_uint64 am_platform_elapsed_time() {
@@ -3764,6 +3766,15 @@ am_id amgl_uniform_create(amgl_uniform_info info) {
     return ret_id;
 };
 
+/*
+void amgl_uniform_update(am_int32 id, amgl_uniform_info info) {
+    amgl_uniform *uniform = amgl_uniform_lookup(id);
+    uniform->info = info;
+    uniform->location = glGetUniformLocation(uniform->info.cube_shader_id, uniform->info.win_name);
+    glUniform1fv(uniform->location, 1, (float*)uniform->info.data);
+};
+*/
+
 void amgl_uniform_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     am_packed_array_erase(engine->ctx_data.uniforms, id);
@@ -3858,7 +3869,7 @@ am_id amgl_texture_create(amgl_texture_info info) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t);
 
-    //REVIEW: Research if this is needed for every texture, might not be needed if using shaders as far as I understand
+    //TODO: Research if this is needed for every texture, might not be needed if using shaders as far as I understand
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -3915,17 +3926,17 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
     size_t rd_size = 0;
 
     if (file) {
-        #if defined(AM_LINUX)
-                struct stat st;
-                stat(path, &st);
-                rd_size = st.st_size;
-        #else
-                HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+#if defined(AM_LINUX)
+        struct stat st;
+        stat(path, &st);
+        rd_size = st.st_size;
+#else
+        HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                 LARGE_INTEGER size;
                 GetFileSizeEx(file_hwnd, &size);
                 rd_size = (am_int32) size.QuadPart;
                 CloseHandle(file_hwnd);
-        #endif
+#endif
         buffer = (char*)am_malloc(rd_size+1);
         if (buffer) fread(buffer, 1, rd_size, file);
         buffer[rd_size] = '\0';
@@ -3934,6 +3945,7 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
     amgl_texture_load_from_memory(buffer, info, rd_size, flip);
 };
 
+//REVIEW: Needed? Could merge with above
 void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, size_t size, am_bool flip) {
     am_int32 num_comps = 0;
     stbi_set_flip_vertically_on_load(flip);
@@ -4281,15 +4293,15 @@ void amgl_vsync(am_id window_id, am_bool state) {
     //REVIEW: Not sure if glFlush() is needed but I read it can help
     glFlush();
     //Have to load SwapInterval here because this is called for each window on creation
-    #if defined(AM_LINUX)
-        am_platform *platform = am_engine_get_subsystem(platform);
-        am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
-        if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
-        glSwapInterval(platform->display, window->handle, state);
-    #else
-        if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
+#if defined(AM_LINUX)
+    am_platform *platform = am_engine_get_subsystem(platform);
+    am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
+    if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
+    glSwapInterval(platform->display, window->handle, state);
+#else
+    if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
             glSwapInterval(state == true ? 1:0);
-    #endif
+#endif
 };
 
 void amgl_start_render_pass(am_id render_pass_id) {
@@ -4771,11 +4783,11 @@ void am_engine_create(am_engine_info engine_info) {
     amgl_set_viewport(0,0, (am_int32)main.width, (am_int32)main.height);
 
     am_platform *platform = am_engine_get_subsystem(platform);
-    #if defined(AM_LINUX)
-        glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, am_packed_array_get_ptr(platform->windows, 1)->context);
-    #else
-        wglMakeCurrent(am_packed_array_get_ptr(platform->windows, 1)->hdc, am_packed_array_get_ptr(platform->windows, 1)->context);
-    #endif
+#if defined(AM_LINUX)
+    glXMakeCurrent(am_engine_get_subsystem(platform)->display, am_packed_array_get_ptr(platform->windows, 1)->handle, am_packed_array_get_ptr(platform->windows, 1)->context);
+#else
+    wglMakeCurrent(am_packed_array_get_ptr(platform->windows, 1)->hdc, am_packed_array_get_ptr(platform->windows, 1)->context);
+#endif
     engine->init();
     engine->is_running = true;
 };
@@ -4784,12 +4796,12 @@ void am_engine_frame() {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_engine *engine = am_engine_get_instance();
 
-    #if defined (AM_LINUX)
-        const am_float64 coef = 1000000000.0f;
-    #else
-        const am_float64 coef = 10000000.0f;
+#if defined (AM_LINUX)
+    const am_float64 coef = 1000000000.0f;
+#else
+    const am_float64 coef = 10000000.0f;
 
-    #endif
+#endif
     platform->time.current = (am_float64)am_platform_elapsed_time() / coef;
     platform->time.update = platform->time.current - platform->time.previous;
     platform->time.previous = platform->time.current;
@@ -4807,11 +4819,11 @@ void am_engine_frame() {
     };
 
     for (am_int32 i =  1; i <= am_packed_array_get_count(platform->windows); i++) {
-    #if defined(AM_LINUX)
-            glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, i)->handle);
-    #else
-            SwapBuffers(am_packed_array_get_ptr(platform->windows, i)->hdc);
-    #endif
+#if defined(AM_LINUX)
+        glXSwapBuffers(platform->display, am_packed_array_get_ptr(platform->windows, i)->handle);
+#else
+        SwapBuffers(am_packed_array_get_ptr(platform->windows, i)->hdc);
+#endif
     };
 
     platform->time.current  = (am_float64)am_platform_elapsed_time() / coef;
@@ -5115,658 +5127,3 @@ void am_util_obj_interpret_buffer(char *start, char *end, am_util_obj *object) {
 //----------------------------------------------------------------------------//
 //                               END  UTIL IMPL                               //
 //----------------------------------------------------------------------------//
-
-typedef struct point_light {
-    am_vec3 position;
-    am_float32 constant;
-    am_float32 linear;
-    am_float32 quadratic;
-
-    am_vec3 ambient;
-    am_vec3 diffuse;
-    am_vec3 specular;
-} point_light;
-
-am_id cube_shader_id, normal_shader_id, plane_shader_id, cube_tex_id, plane1_tex_id, camera_pos_id, sampler_id,
-    point_light_id1, point_light_id2, point_light_id3, point_light_id4, point_light_id5, point_light_id6, point_light_id7,
-    point_light_id11, point_light_id12, point_light_id13, point_light_id14, point_light_id15, point_light_id16, point_light_id17,
-    view_mat_id, cube_coords_vbo_id, cube_norm_vbo_id, normal_vbo_id, phong_toggle_id,
-    plane1_vbo_id, cube_idx_id, plane_idx_id, cube_pipeline_id, normal_pipeline_id, plane_pipeline_id, rp_id,
-    cube_uvs_vbo_id, plane2_tex_id, plane2_vbo_id;
-
-am_mat4 view;
-am_int32 toggle_phong = false;
-am_camera cam = {0};
-point_light point_light1 = {0};
-point_light point_light2 = {0};
-am_util_obj *obj1;
-
-void update_cam(am_camera *camera);
-void compute_surface_normals(am_float32 *vertices, am_int32 count, am_float32 *out_normals);
-void compute_display_normals(am_float32 *vertices, am_float32 *normals, am_uint32 n_count, am_float32 *display_normals);
-
-void compute_surface_normals(am_float32 *vertices, am_int32 count, am_float32 *out_normals) {
-    am_uint32 j = 0;
-    for (am_uint32 i = 0; i < count*3-11; i += 12) {
-        am_vec3 A = am_vec3_create(vertices[i], vertices[i+1], vertices[i+2]);
-        am_vec3 B = am_vec3_create(vertices[i+3], vertices[i+4], vertices[i+5]);
-        am_vec3 C = am_vec3_create(vertices[i+6], vertices[i+7], vertices[i+8]);
-        am_vec3 ABxAC = am_vec3_cross(am_vec3_sub(B, A), am_vec3_sub(C, A));
-        ABxAC = am_vec3_norm(ABxAC);
-        out_normals[j++] = ABxAC.x;
-        out_normals[j++] = ABxAC.y;
-        out_normals[j++] = ABxAC.z;
-    }
-};
-
-void compute_display_normals(am_float32 *vertices, am_float32 *normals, am_uint32 n_count, am_float32 *display_normals) {
-    am_uint32 j = 0;
-    for (am_uint32 i = 0; i < n_count*3; i += 3) {
-        display_normals[j++] = vertices[i];
-        display_normals[j++] = vertices[i+1];
-        display_normals[j++] = vertices[i+2];
-        display_normals[j++] = vertices[i] + normals[i];
-        display_normals[j++] = vertices[i+1] + normals[i+1];
-        display_normals[j++] = vertices[i+2] + normals[i+2];
-    }
-};
-
-void init() {
-    //Camera
-    cam = am_camera_perspective();
-    cam.transform.position = am_vec3_create(0.0f, 1.0f, 3.0f);
-    am_platform_mouse_lock(true);
-
-    //Point lights
-    point_light1.position = am_vec3_create(5.0f, 5.0f, 2.0f);
-    point_light1.constant = 1.0f;
-    point_light1.linear = 0.09f;
-    point_light1.quadratic = 0.032f;
-    point_light1.diffuse = am_vec3_create(0.8f, 0.8f, 0.8f);
-    point_light1.ambient = am_vec3_create(0.05f, 0.05f, 0.05f);
-    point_light1.specular = am_vec3_create(1.0f, 1.0f, 1.0f);
-
-    point_light2.position = am_vec3_create(-3.0f, 2.0f, 2.0f);
-    point_light2.constant = 1.0f;
-    point_light2.linear = 0.09f;
-    point_light2.quadratic = 0.032f;
-    point_light2.diffuse = am_vec3_create(0.6f, 0.6f, 0.8f);
-    point_light2.ambient = am_vec3_create(0.03f, 0.03f, 0.06f);
-    point_light2.specular = am_vec3_create(0.9f, 0.9f, 1.0f);
-
-    obj1 = am_util_obj_create("../objects/monkey.obj");
-
-    //Cube
-    cube_shader_id = amgl_shader_create((amgl_shader_info) {
-        .num_sources = 2,
-        .sources = (amgl_shader_source_info[]) {
-            { .type = AMGL_SHADER_VERTEX, .path = "../test-shaders/cube_v.glsl" },
-            { .type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/cube_f.glsl" }
-        }
-    });
-
-    cube_tex_id = amgl_texture_create((amgl_texture_info){
-        .format = AMGL_TEXTURE_FORMAT_RGBA,
-        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
-        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .mip_num = 3,
-        .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "../pics/scifi_cube/Sci_fi_Metal_Panel_002_basecolor.jpg"
-    });
-
-    am_float32 cube_coords[12*6] = {
-        //Pos coords
-        -1.0f, 1.0f, 1.0f,
-        1.0f,1.0f,1.0f,
-        1.0f,1.0f,-1.0f,
-        -1.0f,1.0f,-1.0f,
-
-        -1.0f,1.0f,-1.0f,
-        1.0f,1.0f,-1.0f,
-        1.0f,-1.0f,-1.0f,
-        -1.0f,-1.0f,-1.0f,
-
-        1.0f,1.0f,-1.0f,
-        1.0f,1.0f,1.0f,
-        1.0f,-1.0f,1.0f,
-        1.0f,-1.0f,-1.0f,
-
-        -1.0f,1.0f,1.0f,
-        -1.0f,1.0f,-1.0f,
-        -1.0f,-1.0f,-1.0f,
-        -1.0f,-1.0f,1.0f,
-
-        1.0f,1.0f,1.0f,
-        -1.0f,1.0f,1.0f,
-        -1.0f,-1.0f,1.0f,
-        1.0f,-1.0f,1.0f,
-
-        1.0f,-1.0f,-1.0f,
-        1.0f,-1.0f,1.0f,
-        -1.0f,-1.0f,1.0f,
-        -1.0f,-1.0f,-1.0f
-    };
-
-    am_float32 cube_uvs[6*8] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-
-        0.0f, 0.0f,
-        0.0f, 1.0f,
-        1.0f, 1.0f,
-        1.0f, 0.0f
-    };
-
-    /*
-    cube_coords_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = cube_coords,
-        .size = sizeof(float)*12*6,
-        .usage = AMGL_BUFFER_USAGE_STATIC,
-    });
-
-    cube_uvs_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = cube_uvs,
-        .size = sizeof(float)*6*8,
-        .usage = AMGL_BUFFER_USAGE_STATIC,
-    });
-
-    cube_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
-        .data = (am_uint32[]){
-            0,1,2,0,2,3,
-            4,5,6,4,6,7,
-            8,9,10,8,10,11,
-            12,13,14,12,14,15,
-            16,17,18,16, 18,19,
-            //20,22, 21,20,23,22
-            20, 21, 22, 20, 22, 23
-        },
-        .size = sizeof(am_uint32)*36,
-        .offset = 0,
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });*/
-
-    cube_coords_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = obj1->vertices,
-        .size = am_dyn_array_get_size(obj1->vertices),
-        .usage = AMGL_BUFFER_USAGE_STATIC,
-    });
-
-    cube_uvs_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = obj1->texture_coords,
-        .size = am_dyn_array_get_size(obj1->texture_coords),
-        .usage = AMGL_BUFFER_USAGE_STATIC,
-    });
-
-    cube_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
-        .data = obj1->indices,
-        .size = am_dyn_array_get_size(obj1->indices),
-        .offset = 0,
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    cube_pipeline_id = amgl_pipeline_create((amgl_pipeline_info){
-        .raster = {
-            .shader_id = cube_shader_id,
-            .face_culling = AMGL_FACE_CULL_BACK
-        },
-        .depth = {.func = AMGL_DEPTH_FUNC_LESS},
-        .layout = {
-            .num_attribs = 3,
-            .attributes = (amgl_vertex_buffer_attribute[]){
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 0},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 0, .stride = 2*sizeof(float), .buffer_index = 1},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 3*sizeof(float), .buffer_index = 2}
-            }
-        }
-    });
-
-    am_float32 cube_normals_t[18] = {0};
-    compute_surface_normals(cube_coords, 24, cube_normals_t);
-
-    am_float32 cube_normals[6*4*3] = {
-        cube_normals_t[0], cube_normals_t[1], cube_normals_t[2],
-        cube_normals_t[0], cube_normals_t[1], cube_normals_t[2],
-        cube_normals_t[0], cube_normals_t[1], cube_normals_t[2],
-        cube_normals_t[0],cube_normals_t[1], cube_normals_t[2],
-
-        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
-        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
-        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
-        cube_normals_t[3], cube_normals_t[4], cube_normals_t[5],
-
-        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
-        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
-        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
-        cube_normals_t[6], cube_normals_t[7], cube_normals_t[8],
-
-        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
-        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
-        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
-        cube_normals_t[9], cube_normals_t[10], cube_normals_t[11],
-
-        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
-        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
-        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
-        cube_normals_t[12], cube_normals_t[13], cube_normals_t[14],
-
-        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
-        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
-        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
-        cube_normals_t[15], cube_normals_t[16], cube_normals_t[17],
-    };
-
-    am_float32 display_normals[144] = {0};
-    compute_display_normals(cube_coords, cube_normals, 24, display_normals);
-
-    cube_norm_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = obj1->normals,
-        .size = am_dyn_array_get_size(obj1->normals),
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    normal_shader_id = amgl_shader_create((amgl_shader_info){
-        .num_sources = 2,
-        .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "../test-shaders/normal_vis_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/normal_vis_f.glsl"}
-        }
-    });
-
-    normal_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = display_normals,
-        .size = sizeof(float)*144,
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    //Pipeline for normal drawing
-    normal_pipeline_id = amgl_pipeline_create((amgl_pipeline_info) {
-        .raster = {
-            .primitive = AMGL_PRIMITIVE_LINES,
-            .shader_id = normal_shader_id
-        },
-        .depth = {.func = AMGL_DEPTH_FUNC_LESS},
-        .layout = {
-            .num_attribs = 1,
-            .attributes = &(amgl_vertex_buffer_attribute) {
-                .format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3,
-                .offset = 0*sizeof(float),
-                .stride = 3*sizeof(float)
-            }
-        }
-    });
-
-    plane_shader_id = amgl_shader_create((amgl_shader_info){
-        .num_sources = 2,
-        .sources = (amgl_shader_source_info[]) {
-            {.type = AMGL_SHADER_VERTEX, .path = "../test-shaders/cube_v.glsl"},
-            {.type = AMGL_SHADER_FRAGMENT, .path = "../test-shaders/cube_f.glsl"},
-        }
-    });
-
-    plane_idx_id = amgl_index_buffer_create((amgl_index_buffer_info){
-        .data = (int[]) {
-            0,1,2,
-            0,2,3
-        },
-        .size = 6*sizeof(int),
-        .offset = 0,
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    plane1_tex_id = amgl_texture_create((amgl_texture_info){
-        .format = AMGL_TEXTURE_FORMAT_RGBA,
-        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
-        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .mip_num = 3,
-        .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "../pics/mud_texture/Stylized_Dry_Mud_001_basecolor.jpg"
-    });
-
-    plane1_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = (float[]) {
-            //Vertex coords                 //Texture coords   //Normals
-            -8.0f, -3.0f, 8.0f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-            8.0f,-3.0f,8.0f,  1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-            8.0f,-3.0f,-8.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-            -8.0f,-3.0f,-8.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-        },
-        .size = sizeof(float)*32,
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    plane2_tex_id = amgl_texture_create((amgl_texture_info){
-        .format = AMGL_TEXTURE_FORMAT_RGBA,
-        .mag_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .min_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .wrap_s = AMGL_TEXTURE_WRAP_REPEAT,
-        .wrap_t = AMGL_TEXTURE_WRAP_REPEAT,
-        .mip_num = 3,
-        .mip_filter = AMGL_TEXTURE_FILTER_LINEAR,
-        .path = "../pics/wall_texture/Substance_graph_BaseColor.jpg"
-    });
-
-    plane2_vbo_id = amgl_vertex_buffer_create((amgl_vertex_buffer_info){
-        .data = (float[]) {
-            //Vertex coords                 //Texture coords   //Normals
-            -8.0f,5.0f,8.0f, 0.0f, 1.0f, 0.0f, 0.0f, -1.0f,
-            8.0f,5.0f,8.0f, 1.0f, 1.0f, 0.0f, 0.0f, -1.0f,
-            8.0f,-3.0f,8.0f,  1.0f, 0.0f, 0.0f, 0.0f, -1.0f,
-            -8.0f, -3.0f, 8.0f,  0.0f, 0.0f, 0.0f, 0.0f, -1.0f,
-
-
-        },
-        .size = sizeof(float)*32,
-        .usage = AMGL_BUFFER_USAGE_STATIC
-    });
-
-    plane_pipeline_id = amgl_pipeline_create((amgl_pipeline_info) {
-        .raster = {
-            .primitive = AMGL_PRIMITIVE_TRIANGLES,
-            .shader_id = plane_shader_id,
-            .face_culling = AMGL_FACE_CULL_BACK
-        },
-        .depth = {.func = AMGL_DEPTH_FUNC_LESS},
-        .layout = {
-            .num_attribs = 3,
-            .attributes = (amgl_vertex_buffer_attribute[]) {
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 0, .stride = 8*sizeof(float)},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT2, .offset = 3*sizeof(float), .stride = 8*sizeof(float)},
-                {.format = AMGL_VERTEX_BUFFER_ATTRIBUTE_FLOAT3, .offset = 5*sizeof(float), .stride = 8*sizeof(float)}
-            }
-        }
-    });
-
-    sampler_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_tex1",
-        .type = AMGL_UNIFORM_TYPE_SAMPLER2D
-    });
-
-    view_mat_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_view",
-        .type = AMGL_UNIFORM_TYPE_MAT4
-    });
-
-    point_light_id1 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.position",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-    point_light_id2 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.constant",
-        .type = AMGL_UNIFORM_TYPE_FLOAT
-    });
-    point_light_id3 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.linear",
-        .type = AMGL_UNIFORM_TYPE_FLOAT
-    });
-    point_light_id4 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.quadratic",
-        .type = AMGL_UNIFORM_TYPE_FLOAT
-    });
-    point_light_id5 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.ambient",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-    point_light_id6 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.specular",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-    point_light_id7 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light1.diffuse",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-
-    point_light_id11 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.position",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-    point_light_id12 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.constant",
-        .type = AMGL_UNIFORM_TYPE_FLOAT
-    });
-    point_light_id13 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.linear",
-        .type = AMGL_UNIFORM_TYPE_FLOAT
-    });
-    point_light_id14 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.quadratic",
-        .type = AMGL_UNIFORM_TYPE_FLOAT
-    });
-    point_light_id15 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.ambient",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-    point_light_id16 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.specular",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-    point_light_id17 = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_point_light2.diffuse",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-
-
-    camera_pos_id = amgl_uniform_create((amgl_uniform_info){
-        .name = "u_cam_pos",
-        .type = AMGL_UNIFORM_TYPE_VEC3
-    });
-
-    rp_id = amgl_render_pass_create((amgl_render_pass_info){0});
-};
-
-void update() {
-    if (am_platform_key_pressed(AM_KEYCODE_ESCAPE)) am_engine_quit();
-    if (am_platform_key_pressed(AM_KEYCODE_T)) toggle_phong = !toggle_phong;
-
-    am_platform *platform = am_engine_get_subsystem(platform);
-    am_window *main = am_packed_array_get_ptr(platform->windows, 1);
-
-    update_cam(&cam);
-    view = am_camera_get_view_projection(&cam, (am_int32)main->width, (am_int32)main->height);
-
-
-    amgl_bindings_info cube_binds = {
-        .vertex_buffers = {
-            .size = 3*sizeof(amgl_vertex_buffer_bind_info),
-            .info = (amgl_vertex_buffer_bind_info[]) {
-                {.vertex_buffer_id = cube_coords_vbo_id},
-                {.vertex_buffer_id = cube_uvs_vbo_id},
-                {.vertex_buffer_id = cube_norm_vbo_id}
-            }
-        },
-        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = cube_idx_id}},
-        .uniforms = {
-            .size = 17*sizeof(amgl_uniform_bind_info),
-            .info = (amgl_uniform_bind_info[]) {
-                {.uniform_id = view_mat_id, .data = view.elements},
-                {.uniform_id = sampler_id, .data = &cube_tex_id},
-                {.uniform_id = point_light_id1, .data = point_light1.position.xyz},
-                {.uniform_id = point_light_id2, .data = &point_light1.constant},
-                {.uniform_id = point_light_id3, .data = &point_light1.linear},
-                {.uniform_id = point_light_id4, .data = &point_light1.quadratic},
-                {.uniform_id = point_light_id5, .data = &point_light1.ambient.xyz},
-                {.uniform_id = point_light_id6, .data = &point_light1.specular.xyz},
-                {.uniform_id = point_light_id7, .data = &point_light1.diffuse.xyz},
-                {.uniform_id = point_light_id11, .data = point_light2.position.xyz},
-                {.uniform_id = point_light_id12, .data = &point_light2.constant},
-                {.uniform_id = point_light_id13, .data = &point_light2.linear},
-                {.uniform_id = point_light_id14, .data = &point_light2.quadratic},
-                {.uniform_id = point_light_id15, .data = &point_light2.ambient.xyz},
-                {.uniform_id = point_light_id16, .data = &point_light2.specular.xyz},
-                {.uniform_id = point_light_id17, .data = &point_light2.diffuse.xyz},
-                {.uniform_id = camera_pos_id, .data = cam.transform.position.xyz},
-            }
-        }
-    };
-
-    amgl_bindings_info normal_binds = {
-        .vertex_buffers = {
-            .size = sizeof(amgl_vertex_buffer_bind_info),
-            .info = (amgl_vertex_buffer_bind_info[]) {
-                {.vertex_buffer_id = normal_vbo_id}
-            }
-        },
-        .uniforms = {
-            .size = sizeof(amgl_uniform_bind_info),
-            .info = &(amgl_uniform_bind_info){.uniform_id = view_mat_id, .data = view.elements}
-        }
-    };
-
-    amgl_bindings_info plane1_binds = {
-        .vertex_buffers = {
-            .size = sizeof(amgl_vertex_buffer_bind_info),
-            .info = &(amgl_vertex_buffer_bind_info) {
-                .vertex_buffer_id = plane1_vbo_id
-            }
-        },
-        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = plane_idx_id}},
-        .uniforms = {
-            .size = 17*sizeof(amgl_uniform_bind_info),
-            .info = (amgl_uniform_bind_info[]) {
-                {.uniform_id = view_mat_id, .data = view.elements},
-                {.uniform_id = sampler_id, .data = &plane1_tex_id},
-                {.uniform_id = point_light_id1, .data = point_light1.position.xyz},
-                {.uniform_id = point_light_id2, .data = &point_light1.constant},
-                {.uniform_id = point_light_id3, .data = &point_light1.linear},
-                {.uniform_id = point_light_id4, .data = &point_light1.quadratic},
-                {.uniform_id = point_light_id5, .data = &point_light1.ambient.xyz},
-                {.uniform_id = point_light_id6, .data = &point_light1.specular.xyz},
-                {.uniform_id = point_light_id7, .data = &point_light1.diffuse.xyz},
-                {.uniform_id = point_light_id11, .data = point_light2.position.xyz},
-                {.uniform_id = point_light_id12, .data = &point_light2.constant},
-                {.uniform_id = point_light_id13, .data = &point_light2.linear},
-                {.uniform_id = point_light_id14, .data = &point_light2.quadratic},
-                {.uniform_id = point_light_id15, .data = &point_light2.ambient.xyz},
-                {.uniform_id = point_light_id16, .data = &point_light2.specular.xyz},
-                {.uniform_id = point_light_id17, .data = &point_light2.diffuse.xyz},
-                {.uniform_id = camera_pos_id, .data = cam.transform.position.xyz},
-            }
-        }
-    };
-
-    amgl_bindings_info plane2_binds = {
-        .vertex_buffers = {
-            .size = sizeof(amgl_vertex_buffer_bind_info),
-            .info = &(amgl_vertex_buffer_bind_info) {
-                .vertex_buffer_id = plane2_vbo_id
-            }
-        },
-        .index_buffers = {.info = &(amgl_index_buffer_bind_info){.index_buffer_id = plane_idx_id}},
-        .uniforms = {
-            .size = 17*sizeof(amgl_uniform_bind_info),
-            .info = (amgl_uniform_bind_info[]) {
-                {.uniform_id = view_mat_id, .data = view.elements},
-                {.uniform_id = sampler_id, .data = &plane2_tex_id},
-                {.uniform_id = point_light_id1, .data = point_light1.position.xyz},
-                {.uniform_id = point_light_id2, .data = &point_light1.constant},
-                {.uniform_id = point_light_id3, .data = &point_light1.linear},
-                {.uniform_id = point_light_id4, .data = &point_light1.quadratic},
-                {.uniform_id = point_light_id5, .data = &point_light1.ambient.xyz},
-                {.uniform_id = point_light_id6, .data = &point_light1.specular.xyz},
-                {.uniform_id = point_light_id7, .data = &point_light1.diffuse.xyz},
-                {.uniform_id = point_light_id11, .data = point_light2.position.xyz},
-                {.uniform_id = point_light_id12, .data = &point_light2.constant},
-                {.uniform_id = point_light_id13, .data = &point_light2.linear},
-                {.uniform_id = point_light_id14, .data = &point_light2.quadratic},
-                {.uniform_id = point_light_id15, .data = &point_light2.ambient.xyz},
-                {.uniform_id = point_light_id16, .data = &point_light2.specular.xyz},
-                {.uniform_id = point_light_id17, .data = &point_light2.diffuse.xyz},
-                {.uniform_id = camera_pos_id, .data = cam.transform.position.xyz},
-            }
-        }
-    };
-
-    amgl_start_render_pass(rp_id);
-    amgl_clear((amgl_clear_desc) {
-        .color = {0.0f, 0.0f, 0.0f, 0.0f},
-        .num = 2,
-        .types = (amgl_clear_type[]){AMGL_CLEAR_COLOR, AMGL_CLEAR_DEPTH}
-    });
-
-    amgl_bind_pipeline(cube_pipeline_id);
-    amgl_set_bindings(&cube_binds);
-    amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1->indices)});
-
-    amgl_bind_pipeline(normal_pipeline_id);
-    amgl_set_bindings(&normal_binds);
-    amgl_draw(&(amgl_draw_info){.start = 0, .count = 72});
-
-    amgl_bind_pipeline(plane_pipeline_id);
-    amgl_set_bindings(&plane1_binds);
-    amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
-
-    amgl_bind_pipeline(plane_pipeline_id);
-    amgl_set_bindings(&plane2_binds);
-    amgl_draw(&(amgl_draw_info){.start = 0, .count = 6});
-
-    amgl_end_render_pass(rp_id);
-
-};
-
-void am_shutdown() {
-    am_util_obj_delete(obj1);
-};
-
-void update_cam(am_camera *camera) {
-    am_platform *platform = am_engine_get_subsystem(platform);
-    am_float64 dt = platform->time.delta;
-    am_vec2 dm = am_platform_mouse_get_delta();
-
-    am_camera_offset_orientation(camera, -0.1f * dm.x, -0.1f * dm.y);
-
-    am_vec3 vel = {0};
-    if (am_platform_key_down(AM_KEYCODE_W)) vel = am_vec3_add(vel, am_camera_forward(camera));
-    if (am_platform_key_down(AM_KEYCODE_S)) vel = am_vec3_add(vel, am_camera_backward(camera));
-    if (am_platform_key_down(AM_KEYCODE_A)) vel = am_vec3_add(vel, am_camera_left(camera));
-    if (am_platform_key_down(AM_KEYCODE_D)) vel = am_vec3_add(vel, am_camera_right(camera));
-    if (am_platform_key_down(AM_KEYCODE_SPACE)) vel = am_vec3_add(vel, am_camera_up(camera));
-    if (am_platform_key_down(AM_KEYCODE_LEFT_CONTROL)) vel = am_vec3_add(vel, am_camera_down(camera));
-
-    camera->transform.position = am_vec3_add(camera->transform.position, am_vec3_scale((am_float32)(5000.0f * dt), am_vec3_norm(vel)));
-};
-
-int main() {
-    am_engine_create((am_engine_info) {
-        .init = init,
-        .update = update,
-        .shutdown = am_shutdown,
-        .win_fullscreen = false,
-        .win_height = 800,
-        .win_width = 800,
-        .win_x = 50,
-        .win_y = 50,
-        .vsync_enabled = false,
-        .desired_fps = 60,
-        .is_running = true
-        //.win_name = "Testing"
-    });
-
-    while (am_engine_get_instance()->is_running) am_engine_frame();
-
-    return 0;
-};
