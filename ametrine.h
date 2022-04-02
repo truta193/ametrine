@@ -1,10 +1,13 @@
+#ifndef AMETRINE_FW
+#define AMETRINE_FW
+
 //REVIEW: Could change int num_* property of some structs to size_t size, so it matches with the other ones
 
 //TODO: Compute shaders, instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
 //REVIEW: More defined default values perhaps? More detailed warns
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
-//REVIEW: Line 5128ish, pass id instead of buffer index?
+//REVIEW: Line 5128ish, pass id instead of buffer index? //outdated index
 //TODO: 3D textures
 
 //----------------------------------------------------------------------------//
@@ -26,9 +29,9 @@
 #include "external/stb_image/stb_image.h"
 #if (defined _WIN32 || defined _WIN64)
 #define OEMRESOURCE
-    #define AM_WINDOWS
-    #include <windows.h>
-    #include <GL/glext.h>
+#define AM_WINDOWS
+#include <windows.h>
+#include <GL/glext.h>
 #else
 #define AM_LINUX
 #include <X11/Xatom.h>
@@ -71,7 +74,7 @@ typedef am_uint32 am_id;
 #define amgl_get_proc_address(str) glXGetProcAddress((unsigned char*)(str))
 #else
 #define AM_CALL __stdcall*
-    #define amgl_get_proc_address(str) wglGetProcAddress((str))
+#define amgl_get_proc_address(str) wglGetProcAddress((str))
 #endif
 
 //HACK: Temporary
@@ -549,7 +552,7 @@ typedef struct am_window {
     GLXContext context;
 #else
     HDC hdc;
-        HGLRC context;
+    HGLRC context;
 #endif
 } am_window;
 
@@ -885,6 +888,7 @@ typedef struct amgl_texture_info {
     am_uint32 mip_num;
     amgl_texture_wrap wrap_s;
     amgl_texture_wrap wrap_t;
+    am_bool save_reference;
 } amgl_texture_info;
 
 typedef struct amgl_texture {
@@ -892,6 +896,13 @@ typedef struct amgl_texture {
     am_uint32 handle;
     am_id id;
     amgl_texture_format format;
+    struct {
+        am_bool is_saved;
+        am_uint32 width;
+        am_uint32 height;
+        void *image;
+    } refference;
+
     //NOTE: Ignore for now
     //am_bool render_target;
 } amgl_texture;
@@ -1105,7 +1116,6 @@ typedef struct amgl_bindings_info {
     } textures;
 } amgl_bindings_info;
 
-//REVIEW: Should perhaps hold IDs instead?
 typedef struct amgl_frame_cache {
     amgl_index_buffer index_buffer;
     size_t index_element_size;
@@ -1277,7 +1287,6 @@ typedef struct am_engine {
     amgl_ctx_data ctx_data;
     //IDEA: A scene structure, maybe scenegraph?
     //am_audio audio; TODO: Implement
-    //am_pfngl pfngl; TODO: Implement
 } am_engine;
 
 //The only one that should exist
@@ -1358,7 +1367,6 @@ void am_dyn_array_resize(void **array, size_t add_size) {
         };
         header->capacity = new_capacity;
         *array = (size_t*)header + 2;
-        //*array = (size_t*)header + sizeof(am_dyn_array_header);
     };
 };
 
@@ -1687,7 +1695,7 @@ static inline am_mat3 am_mat3_rotateq(am_vec4 q) {
     m.m[3] = 2 * (xy - wz);     m.m[4] = 1 - 2 * (x2 + z2); m.m[5] = 2 * (yz + wx);
     m.m[6] = 2 * (xz + wy);     m.m[7] = 2 * (yz - wx);     m.m[8] = 1 - 2 * (x2 + y2);
     return m;
-}
+};
 
 static inline am_mat3 am_mat3_rsq(am_vec4 q, am_vec3 s) {
     am_mat3 mr = am_mat3_rotateq(q);
@@ -1700,7 +1708,8 @@ static inline am_mat3 am_mat3_inverse(am_mat3 m) {
 
     am_float64 det = (am_float64)(m.m[0 * 3 + 0] * (m.m[1 * 3 + 1] * m.m[2 * 3 + 2] - m.m[2 * 3 + 1] * m.m[1 * 3 + 2]) -
                                   m.m[0 * 3 + 1] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 2] - m.m[1 * 3 + 2] * m.m[2 * 3 + 0]) +
-                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0]));
+                                  m.m[0 * 3 + 2] * (m.m[1 * 3 + 0] * m.m[2 * 3 + 1] - m.m[1 * 3 + 1] * m.m[2 * 3 + 0])
+    );
 
     am_float64 inv_det = det ? 1.0 / det : 0.0;
 
@@ -2512,150 +2521,150 @@ am_platform *am_platform_create() {
     XFree(key_syms);
 #else
     platform->input.keyboard.keycodes[0x00B] = AM_KEYCODE_0;
-        platform->input.keyboard.keycodes[0x002] = AM_KEYCODE_1;
-        platform->input.keyboard.keycodes[0x003] = AM_KEYCODE_2;
-        platform->input.keyboard.keycodes[0x004] = AM_KEYCODE_3;
-        platform->input.keyboard.keycodes[0x005] = AM_KEYCODE_4;
-        platform->input.keyboard.keycodes[0x006] = AM_KEYCODE_5;
-        platform->input.keyboard.keycodes[0x007] = AM_KEYCODE_6;
-        platform->input.keyboard.keycodes[0x008] = AM_KEYCODE_7;
-        platform->input.keyboard.keycodes[0x009] = AM_KEYCODE_8;
-        platform->input.keyboard.keycodes[0x00A] = AM_KEYCODE_9;
-        platform->input.keyboard.keycodes[0x01E] = AM_KEYCODE_A;
-        platform->input.keyboard.keycodes[0x030] = AM_KEYCODE_B;
-        platform->input.keyboard.keycodes[0x02E] = AM_KEYCODE_C;
-        platform->input.keyboard.keycodes[0x020] = AM_KEYCODE_D;
-        platform->input.keyboard.keycodes[0x012] = AM_KEYCODE_E;
-        platform->input.keyboard.keycodes[0x021] = AM_KEYCODE_F;
-        platform->input.keyboard.keycodes[0x022] = AM_KEYCODE_G;
-        platform->input.keyboard.keycodes[0x023] = AM_KEYCODE_H;
-        platform->input.keyboard.keycodes[0x017] = AM_KEYCODE_I;
-        platform->input.keyboard.keycodes[0x024] = AM_KEYCODE_J;
-        platform->input.keyboard.keycodes[0x025] = AM_KEYCODE_K;
-        platform->input.keyboard.keycodes[0x026] = AM_KEYCODE_L;
-        platform->input.keyboard.keycodes[0x032] = AM_KEYCODE_M;
-        platform->input.keyboard.keycodes[0x031] = AM_KEYCODE_N;
-        platform->input.keyboard.keycodes[0x018] = AM_KEYCODE_O;
-        platform->input.keyboard.keycodes[0x019] = AM_KEYCODE_P;
-        platform->input.keyboard.keycodes[0x010] = AM_KEYCODE_Q;
-        platform->input.keyboard.keycodes[0x013] = AM_KEYCODE_R;
-        platform->input.keyboard.keycodes[0x01F] = AM_KEYCODE_S;
-        platform->input.keyboard.keycodes[0x014] = AM_KEYCODE_T;
-        platform->input.keyboard.keycodes[0x016] = AM_KEYCODE_U;
-        platform->input.keyboard.keycodes[0x02F] = AM_KEYCODE_V;
-        platform->input.keyboard.keycodes[0x011] = AM_KEYCODE_W;
-        platform->input.keyboard.keycodes[0x02D] = AM_KEYCODE_X;
-        platform->input.keyboard.keycodes[0x015] = AM_KEYCODE_Y;
-        platform->input.keyboard.keycodes[0x02C] = AM_KEYCODE_Z;
-        platform->input.keyboard.keycodes[0x028] = AM_KEYCODE_APOSTROPHE;
-        platform->input.keyboard.keycodes[0x02B] = AM_KEYCODE_BACKSLASH;
-        platform->input.keyboard.keycodes[0x033] = AM_KEYCODE_COMMA;
-        platform->input.keyboard.keycodes[0x00D] = AM_KEYCODE_EQUAL;
-        platform->input.keyboard.keycodes[0x029] = AM_KEYCODE_ACCENT_GRAVE;
-        platform->input.keyboard.keycodes[0x01A] = AM_KEYCODE_LEFT_SQUARE_BRACKET;
-        platform->input.keyboard.keycodes[0x00C] = AM_KEYCODE_MINUS;
-        platform->input.keyboard.keycodes[0x034] = AM_KEYCODE_PERIOD;
-        platform->input.keyboard.keycodes[0x01B] = AM_KEYCODE_RIGHT_SQUARE_BRACKET;
-        platform->input.keyboard.keycodes[0x027] = AM_KEYCODE_SEMICOLON;
-        platform->input.keyboard.keycodes[0x035] = AM_KEYCODE_SLASH;
-        platform->input.keyboard.keycodes[0x00E] = AM_KEYCODE_BACKSPACE;
-        platform->input.keyboard.keycodes[0x153] = AM_KEYCODE_DELETE;
-        platform->input.keyboard.keycodes[0x14F] = AM_KEYCODE_END;
-        platform->input.keyboard.keycodes[0x01C] = AM_KEYCODE_ENTER;
-        platform->input.keyboard.keycodes[0x001] = AM_KEYCODE_ESCAPE;
-        platform->input.keyboard.keycodes[0x147] = AM_KEYCODE_HOME;
-        platform->input.keyboard.keycodes[0x152] = AM_KEYCODE_INSERT;
-        platform->input.keyboard.keycodes[0x15D] = AM_KEYCODE_MENU;
-        platform->input.keyboard.keycodes[0x151] = AM_KEYCODE_PAGE_DOWN;
-        platform->input.keyboard.keycodes[0x149] = AM_KEYCODE_PAGE_UP;
-        platform->input.keyboard.keycodes[0x045] = AM_KEYCODE_PAUSE;
-        platform->input.keyboard.keycodes[0x146] = AM_KEYCODE_PAUSE;
-        platform->input.keyboard.keycodes[0x039] = AM_KEYCODE_SPACE;
-        platform->input.keyboard.keycodes[0x00F] = AM_KEYCODE_TAB;
-        platform->input.keyboard.keycodes[0x03A] = AM_KEYCODE_CAPS_LOCK;
-        platform->input.keyboard.keycodes[0x145] = AM_KEYCODE_NUMPAD_NUM;
-        platform->input.keyboard.keycodes[0x046] = AM_KEYCODE_SCROLL_LOCK;
-        platform->input.keyboard.keycodes[0x03B] = AM_KEYCODE_F1;
-        platform->input.keyboard.keycodes[0x03C] = AM_KEYCODE_F2;
-        platform->input.keyboard.keycodes[0x03D] = AM_KEYCODE_F3;
-        platform->input.keyboard.keycodes[0x03E] = AM_KEYCODE_F4;
-        platform->input.keyboard.keycodes[0x03F] = AM_KEYCODE_F5;
-        platform->input.keyboard.keycodes[0x040] = AM_KEYCODE_F6;
-        platform->input.keyboard.keycodes[0x041] = AM_KEYCODE_F7;
-        platform->input.keyboard.keycodes[0x042] = AM_KEYCODE_F8;
-        platform->input.keyboard.keycodes[0x043] = AM_KEYCODE_F9;
-        platform->input.keyboard.keycodes[0x044] = AM_KEYCODE_F10;
-        platform->input.keyboard.keycodes[0x057] = AM_KEYCODE_F11;
-        platform->input.keyboard.keycodes[0x058] = AM_KEYCODE_F12;
-        platform->input.keyboard.keycodes[0x064] = AM_KEYCODE_F13;
-        platform->input.keyboard.keycodes[0x065] = AM_KEYCODE_F14;
-        platform->input.keyboard.keycodes[0x066] = AM_KEYCODE_F15;
-        platform->input.keyboard.keycodes[0x067] = AM_KEYCODE_F16;
-        platform->input.keyboard.keycodes[0x068] = AM_KEYCODE_F17;
-        platform->input.keyboard.keycodes[0x069] = AM_KEYCODE_F18;
-        platform->input.keyboard.keycodes[0x06A] = AM_KEYCODE_F19;
-        platform->input.keyboard.keycodes[0x06B] = AM_KEYCODE_F20;
-        platform->input.keyboard.keycodes[0x06C] = AM_KEYCODE_F21;
-        platform->input.keyboard.keycodes[0x06D] = AM_KEYCODE_F22;
-        platform->input.keyboard.keycodes[0x06E] = AM_KEYCODE_F23;
-        platform->input.keyboard.keycodes[0x076] = AM_KEYCODE_F24;
-        platform->input.keyboard.keycodes[0x038] = AM_KEYCODE_LEFT_ALT;
-        platform->input.keyboard.keycodes[0x01D] = AM_KEYCODE_LEFT_CONTROL;
-        platform->input.keyboard.keycodes[0x02A] = AM_KEYCODE_LEFT_SHIFT;
-        platform->input.keyboard.keycodes[0x15B] = AM_KEYCODE_LEFT_META;
-        platform->input.keyboard.keycodes[0x137] = AM_KEYCODE_PRINT_SCREEN;
-        platform->input.keyboard.keycodes[0x138] = AM_KEYCODE_RIGHT_ALT;
-        platform->input.keyboard.keycodes[0x11D] = AM_KEYCODE_RIGHT_CONTROL;
-        platform->input.keyboard.keycodes[0x036] = AM_KEYCODE_RIGHT_SHIFT;
-        platform->input.keyboard.keycodes[0x15C] = AM_KEYCODE_RIGHT_META;
-        platform->input.keyboard.keycodes[0x150] = AM_KEYCODE_DOWN_ARROW;
-        platform->input.keyboard.keycodes[0x14B] = AM_KEYCODE_LEFT_ARROW;
-        platform->input.keyboard.keycodes[0x14D] = AM_KEYCODE_RIGHT_ARROW;
-        platform->input.keyboard.keycodes[0x148] = AM_KEYCODE_UP_ARROW;
-        platform->input.keyboard.keycodes[0x052] = AM_KEYCODE_NUMPAD_0;
-        platform->input.keyboard.keycodes[0x04F] = AM_KEYCODE_NUMPAD_1;
-        platform->input.keyboard.keycodes[0x050] = AM_KEYCODE_NUMPAD_2;
-        platform->input.keyboard.keycodes[0x051] = AM_KEYCODE_NUMPAD_3;
-        platform->input.keyboard.keycodes[0x04B] = AM_KEYCODE_NUMPAD_4;
-        platform->input.keyboard.keycodes[0x04C] = AM_KEYCODE_NUMPAD_5;
-        platform->input.keyboard.keycodes[0x04D] = AM_KEYCODE_NUMPAD_6;
-        platform->input.keyboard.keycodes[0x047] = AM_KEYCODE_NUMPAD_7;
-        platform->input.keyboard.keycodes[0x048] = AM_KEYCODE_NUMPAD_8;
-        platform->input.keyboard.keycodes[0x049] = AM_KEYCODE_NUMPAD_9;
-        platform->input.keyboard.keycodes[0x04E] = AM_KEYCODE_NUMPAD_ADD;
-        platform->input.keyboard.keycodes[0x053] = AM_KEYCODE_NUMPAD_DECIMAL;
-        platform->input.keyboard.keycodes[0x135] = AM_KEYCODE_NUMPAD_DIVIDE;
-        platform->input.keyboard.keycodes[0x11C] = AM_KEYCODE_NUMPAD_ENTER;
-        platform->input.keyboard.keycodes[0x059] = AM_KEYCODE_NUMPAD_EQUAL;
-        platform->input.keyboard.keycodes[0x037] = AM_KEYCODE_NUMPAD_MULTIPLY;
-        platform->input.keyboard.keycodes[0x04A] = AM_KEYCODE_NUMPAD_SUBTRACT;
+    platform->input.keyboard.keycodes[0x002] = AM_KEYCODE_1;
+    platform->input.keyboard.keycodes[0x003] = AM_KEYCODE_2;
+    platform->input.keyboard.keycodes[0x004] = AM_KEYCODE_3;
+    platform->input.keyboard.keycodes[0x005] = AM_KEYCODE_4;
+    platform->input.keyboard.keycodes[0x006] = AM_KEYCODE_5;
+    platform->input.keyboard.keycodes[0x007] = AM_KEYCODE_6;
+    platform->input.keyboard.keycodes[0x008] = AM_KEYCODE_7;
+    platform->input.keyboard.keycodes[0x009] = AM_KEYCODE_8;
+    platform->input.keyboard.keycodes[0x00A] = AM_KEYCODE_9;
+    platform->input.keyboard.keycodes[0x01E] = AM_KEYCODE_A;
+    platform->input.keyboard.keycodes[0x030] = AM_KEYCODE_B;
+    platform->input.keyboard.keycodes[0x02E] = AM_KEYCODE_C;
+    platform->input.keyboard.keycodes[0x020] = AM_KEYCODE_D;
+    platform->input.keyboard.keycodes[0x012] = AM_KEYCODE_E;
+    platform->input.keyboard.keycodes[0x021] = AM_KEYCODE_F;
+    platform->input.keyboard.keycodes[0x022] = AM_KEYCODE_G;
+    platform->input.keyboard.keycodes[0x023] = AM_KEYCODE_H;
+    platform->input.keyboard.keycodes[0x017] = AM_KEYCODE_I;
+    platform->input.keyboard.keycodes[0x024] = AM_KEYCODE_J;
+    platform->input.keyboard.keycodes[0x025] = AM_KEYCODE_K;
+    platform->input.keyboard.keycodes[0x026] = AM_KEYCODE_L;
+    platform->input.keyboard.keycodes[0x032] = AM_KEYCODE_M;
+    platform->input.keyboard.keycodes[0x031] = AM_KEYCODE_N;
+    platform->input.keyboard.keycodes[0x018] = AM_KEYCODE_O;
+    platform->input.keyboard.keycodes[0x019] = AM_KEYCODE_P;
+    platform->input.keyboard.keycodes[0x010] = AM_KEYCODE_Q;
+    platform->input.keyboard.keycodes[0x013] = AM_KEYCODE_R;
+    platform->input.keyboard.keycodes[0x01F] = AM_KEYCODE_S;
+    platform->input.keyboard.keycodes[0x014] = AM_KEYCODE_T;
+    platform->input.keyboard.keycodes[0x016] = AM_KEYCODE_U;
+    platform->input.keyboard.keycodes[0x02F] = AM_KEYCODE_V;
+    platform->input.keyboard.keycodes[0x011] = AM_KEYCODE_W;
+    platform->input.keyboard.keycodes[0x02D] = AM_KEYCODE_X;
+    platform->input.keyboard.keycodes[0x015] = AM_KEYCODE_Y;
+    platform->input.keyboard.keycodes[0x02C] = AM_KEYCODE_Z;
+    platform->input.keyboard.keycodes[0x028] = AM_KEYCODE_APOSTROPHE;
+    platform->input.keyboard.keycodes[0x02B] = AM_KEYCODE_BACKSLASH;
+    platform->input.keyboard.keycodes[0x033] = AM_KEYCODE_COMMA;
+    platform->input.keyboard.keycodes[0x00D] = AM_KEYCODE_EQUAL;
+    platform->input.keyboard.keycodes[0x029] = AM_KEYCODE_ACCENT_GRAVE;
+    platform->input.keyboard.keycodes[0x01A] = AM_KEYCODE_LEFT_SQUARE_BRACKET;
+    platform->input.keyboard.keycodes[0x00C] = AM_KEYCODE_MINUS;
+    platform->input.keyboard.keycodes[0x034] = AM_KEYCODE_PERIOD;
+    platform->input.keyboard.keycodes[0x01B] = AM_KEYCODE_RIGHT_SQUARE_BRACKET;
+    platform->input.keyboard.keycodes[0x027] = AM_KEYCODE_SEMICOLON;
+    platform->input.keyboard.keycodes[0x035] = AM_KEYCODE_SLASH;
+    platform->input.keyboard.keycodes[0x00E] = AM_KEYCODE_BACKSPACE;
+    platform->input.keyboard.keycodes[0x153] = AM_KEYCODE_DELETE;
+    platform->input.keyboard.keycodes[0x14F] = AM_KEYCODE_END;
+    platform->input.keyboard.keycodes[0x01C] = AM_KEYCODE_ENTER;
+    platform->input.keyboard.keycodes[0x001] = AM_KEYCODE_ESCAPE;
+    platform->input.keyboard.keycodes[0x147] = AM_KEYCODE_HOME;
+    platform->input.keyboard.keycodes[0x152] = AM_KEYCODE_INSERT;
+    platform->input.keyboard.keycodes[0x15D] = AM_KEYCODE_MENU;
+    platform->input.keyboard.keycodes[0x151] = AM_KEYCODE_PAGE_DOWN;
+    platform->input.keyboard.keycodes[0x149] = AM_KEYCODE_PAGE_UP;
+    platform->input.keyboard.keycodes[0x045] = AM_KEYCODE_PAUSE;
+    platform->input.keyboard.keycodes[0x146] = AM_KEYCODE_PAUSE;
+    platform->input.keyboard.keycodes[0x039] = AM_KEYCODE_SPACE;
+    platform->input.keyboard.keycodes[0x00F] = AM_KEYCODE_TAB;
+    platform->input.keyboard.keycodes[0x03A] = AM_KEYCODE_CAPS_LOCK;
+    platform->input.keyboard.keycodes[0x145] = AM_KEYCODE_NUMPAD_NUM;
+    platform->input.keyboard.keycodes[0x046] = AM_KEYCODE_SCROLL_LOCK;
+    platform->input.keyboard.keycodes[0x03B] = AM_KEYCODE_F1;
+    platform->input.keyboard.keycodes[0x03C] = AM_KEYCODE_F2;
+    platform->input.keyboard.keycodes[0x03D] = AM_KEYCODE_F3;
+    platform->input.keyboard.keycodes[0x03E] = AM_KEYCODE_F4;
+    platform->input.keyboard.keycodes[0x03F] = AM_KEYCODE_F5;
+    platform->input.keyboard.keycodes[0x040] = AM_KEYCODE_F6;
+    platform->input.keyboard.keycodes[0x041] = AM_KEYCODE_F7;
+    platform->input.keyboard.keycodes[0x042] = AM_KEYCODE_F8;
+    platform->input.keyboard.keycodes[0x043] = AM_KEYCODE_F9;
+    platform->input.keyboard.keycodes[0x044] = AM_KEYCODE_F10;
+    platform->input.keyboard.keycodes[0x057] = AM_KEYCODE_F11;
+    platform->input.keyboard.keycodes[0x058] = AM_KEYCODE_F12;
+    platform->input.keyboard.keycodes[0x064] = AM_KEYCODE_F13;
+    platform->input.keyboard.keycodes[0x065] = AM_KEYCODE_F14;
+    platform->input.keyboard.keycodes[0x066] = AM_KEYCODE_F15;
+    platform->input.keyboard.keycodes[0x067] = AM_KEYCODE_F16;
+    platform->input.keyboard.keycodes[0x068] = AM_KEYCODE_F17;
+    platform->input.keyboard.keycodes[0x069] = AM_KEYCODE_F18;
+    platform->input.keyboard.keycodes[0x06A] = AM_KEYCODE_F19;
+    platform->input.keyboard.keycodes[0x06B] = AM_KEYCODE_F20;
+    platform->input.keyboard.keycodes[0x06C] = AM_KEYCODE_F21;
+    platform->input.keyboard.keycodes[0x06D] = AM_KEYCODE_F22;
+    platform->input.keyboard.keycodes[0x06E] = AM_KEYCODE_F23;
+    platform->input.keyboard.keycodes[0x076] = AM_KEYCODE_F24;
+    platform->input.keyboard.keycodes[0x038] = AM_KEYCODE_LEFT_ALT;
+    platform->input.keyboard.keycodes[0x01D] = AM_KEYCODE_LEFT_CONTROL;
+    platform->input.keyboard.keycodes[0x02A] = AM_KEYCODE_LEFT_SHIFT;
+    platform->input.keyboard.keycodes[0x15B] = AM_KEYCODE_LEFT_META;
+    platform->input.keyboard.keycodes[0x137] = AM_KEYCODE_PRINT_SCREEN;
+    platform->input.keyboard.keycodes[0x138] = AM_KEYCODE_RIGHT_ALT;
+    platform->input.keyboard.keycodes[0x11D] = AM_KEYCODE_RIGHT_CONTROL;
+    platform->input.keyboard.keycodes[0x036] = AM_KEYCODE_RIGHT_SHIFT;
+    platform->input.keyboard.keycodes[0x15C] = AM_KEYCODE_RIGHT_META;
+    platform->input.keyboard.keycodes[0x150] = AM_KEYCODE_DOWN_ARROW;
+    platform->input.keyboard.keycodes[0x14B] = AM_KEYCODE_LEFT_ARROW;
+    platform->input.keyboard.keycodes[0x14D] = AM_KEYCODE_RIGHT_ARROW;
+    platform->input.keyboard.keycodes[0x148] = AM_KEYCODE_UP_ARROW;
+    platform->input.keyboard.keycodes[0x052] = AM_KEYCODE_NUMPAD_0;
+    platform->input.keyboard.keycodes[0x04F] = AM_KEYCODE_NUMPAD_1;
+    platform->input.keyboard.keycodes[0x050] = AM_KEYCODE_NUMPAD_2;
+    platform->input.keyboard.keycodes[0x051] = AM_KEYCODE_NUMPAD_3;
+    platform->input.keyboard.keycodes[0x04B] = AM_KEYCODE_NUMPAD_4;
+    platform->input.keyboard.keycodes[0x04C] = AM_KEYCODE_NUMPAD_5;
+    platform->input.keyboard.keycodes[0x04D] = AM_KEYCODE_NUMPAD_6;
+    platform->input.keyboard.keycodes[0x047] = AM_KEYCODE_NUMPAD_7;
+    platform->input.keyboard.keycodes[0x048] = AM_KEYCODE_NUMPAD_8;
+    platform->input.keyboard.keycodes[0x049] = AM_KEYCODE_NUMPAD_9;
+    platform->input.keyboard.keycodes[0x04E] = AM_KEYCODE_NUMPAD_ADD;
+    platform->input.keyboard.keycodes[0x053] = AM_KEYCODE_NUMPAD_DECIMAL;
+    platform->input.keyboard.keycodes[0x135] = AM_KEYCODE_NUMPAD_DIVIDE;
+    platform->input.keyboard.keycodes[0x11C] = AM_KEYCODE_NUMPAD_ENTER;
+    platform->input.keyboard.keycodes[0x059] = AM_KEYCODE_NUMPAD_EQUAL;
+    platform->input.keyboard.keycodes[0x037] = AM_KEYCODE_NUMPAD_MULTIPLY;
+    platform->input.keyboard.keycodes[0x04A] = AM_KEYCODE_NUMPAD_SUBTRACT;
 
-        WNDCLASS window_class = {0};
-        window_class.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-        window_class.hCursor = LoadCursor(NULL, IDC_ARROW);
-        //REVIEW: Might not be necessary, come back after OpenGL is implemented
-        window_class.style = CS_HREDRAW | CS_VREDRAW;
-        window_class.hInstance = GetModuleHandle(NULL);
-        window_class.lpfnWndProc = am_platform_event_handler;
-        window_class.cbClsExtra = 0;
-        window_class.cbWndExtra = 0;
-        window_class.lpszMenuName = NULL;
-        window_class.hbrBackground = NULL;
-        //HACK: Colored here just for visuals
-        window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
-        window_class.lpszClassName = "AM_ROOT";
-        if (!RegisterClass(&window_class)) {
-            printf("[FAIL] Failed to register root class!\n");
-            return NULL;
-        };
-        //HACK: Colored here just for visuals
-        window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
-        window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
-        window_class.lpszClassName = "AM_CHILD";
-        if (!RegisterClass(&window_class)) {
-            printf("[FAIL] Failed to register child class!\n");
-            return NULL;
-        };
+    WNDCLASS window_class = {0};
+    window_class.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    window_class.hCursor = LoadCursor(NULL, IDC_ARROW);
+    //REVIEW: Might not be necessary, come back after OpenGL is implemented
+    window_class.style = CS_HREDRAW | CS_VREDRAW;
+    window_class.hInstance = GetModuleHandle(NULL);
+    window_class.lpfnWndProc = am_platform_event_handler;
+    window_class.cbClsExtra = 0;
+    window_class.cbWndExtra = 0;
+    window_class.lpszMenuName = NULL;
+    window_class.hbrBackground = NULL;
+    //HACK: Colored here just for visuals
+    window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 0));
+    window_class.lpszClassName = "AM_ROOT";
+    if (!RegisterClass(&window_class)) {
+        printf("[FAIL] Failed to register root class!\n");
+        return NULL;
+    };
+    //HACK: Colored here just for visuals
+    window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 255));
+    window_class.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
+    window_class.lpszClassName = "AM_CHILD";
+    if (!RegisterClass(&window_class)) {
+        printf("[FAIL] Failed to register child class!\n");
+        return NULL;
+    };
 #endif
 
     platform->input.mouse.wheel_delta = 0;
@@ -2687,10 +2696,10 @@ void am_platform_poll_events() {
     };
 #else
     MSG msg;
-        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
-                TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-        };
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    };
 #endif
 
     //HACK: Coords are bound to main window
@@ -2699,7 +2708,7 @@ void am_platform_poll_events() {
         am_platform_mouse_set_position(am_packed_array_get_ptr(platform->windows, 1)->width/2, am_packed_array_get_ptr(platform->windows, 1)->height/2);
 #else
         am_vec2u pos = am_platform_window_get_size(1);
-                am_platform_mouse_set_position(pos.x/2, pos.y/2);
+        am_platform_mouse_set_position(pos.x/2, pos.y/2);
 #endif
     };
 };
@@ -2892,7 +2901,7 @@ void am_platform_terminate(am_platform *platform) {
     am_platform_update(am_engine_get_subsystem(platform));
 #else
     UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
-        UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
+    UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
 #endif
 
     am_packed_array_destroy(platform->windows);
@@ -2996,9 +3005,9 @@ void am_platform_mouse_set_position(am_uint32 x, am_uint32 y) {
     XFlush(platform->display);
 #else
     POINT pos = { (am_int32)x, (am_int32)y};
-        //HACK:
-        ClientToScreen((HWND)am_packed_array_get_ptr(platform->windows, 1)->handle, &pos);
-        SetCursorPos(pos.x, pos.y);
+    //HACK:
+    ClientToScreen((HWND)am_packed_array_get_ptr(platform->windows, 1)->handle, &pos);
+    SetCursorPos(pos.x, pos.y);
 #endif
 };
 
@@ -3037,18 +3046,18 @@ void am_platform_mouse_lock(am_bool lock) {
     };
 #else
     if (lock) {
-            platform->input.mouse.locked = lock;
-            am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
-            RECT clipRect;
-            GetClientRect((HWND)window_to_lock->handle, &clipRect);
-            ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.left);
-            ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.right);
-            ClipCursor(&clipRect);
-        } else {
-            platform->input.mouse.locked = lock;
-            ClipCursor(NULL);
-            am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
-        }
+        platform->input.mouse.locked = lock;
+        am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
+        RECT clipRect;
+        GetClientRect((HWND)window_to_lock->handle, &clipRect);
+        ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.left);
+        ClientToScreen((HWND)window_to_lock->handle, (POINT*) &clipRect.right);
+        ClipCursor(&clipRect);
+    } else {
+        platform->input.mouse.locked = lock;
+        ClipCursor(NULL);
+        am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
+    }
 #endif
 
 };
@@ -3217,35 +3226,35 @@ am_id am_platform_window_create(am_window_info window_info) {
 
 #else
     DWORD dwExStyle = WS_EX_LEFT; // 0
-        DWORD dwStyle = WS_OVERLAPPED; // 0
-        if (window_info.parent == AM_WINDOW_DEFAULT_PARENT) {
-            dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
-            dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-        };
+    DWORD dwStyle = WS_OVERLAPPED; // 0
+    if (window_info.parent == AM_WINDOW_DEFAULT_PARENT) {
+        dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
+        dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
+    };
 
-        RECT window_rect = {
+    RECT window_rect = {
             .left = 0,
             .right = (long)window_info.width,
             .top = 0,
             .bottom = (long)window_info.height
-        };
-        AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
-        am_int32 rect_width = window_rect.right - window_rect.left;
-        am_int32 rect_height = window_rect.bottom - window_rect.top;
+    };
+    AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
+    am_int32 rect_width = window_rect.right - window_rect.left;
+    am_int32 rect_height = window_rect.bottom - window_rect.top;
 
-        new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_DEFAULT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS,
-                                                       window_info.name, dwStyle, (am_int32)window_info.x, (am_int32)window_info.y, rect_width, rect_height,
-                                                       NULL, NULL, GetModuleHandle(NULL), NULL
-                                                       );
-        if (new_window->handle == 0) {
-            printf("[FAIL] am_platform_window_create (id: %u): Could not create window!\n", new_window->id);
-            return AM_PA_INVALID_ID;
-        };
-        if ((window_info.parent != AM_WINDOW_DEFAULT_PARENT)) {
-            SetParent((HWND)new_window->handle, (HWND)window_info.parent);
-            SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
-        };
-        ShowWindow((HWND)new_window->handle, 1);
+    new_window->handle = (am_uint64)CreateWindowEx(dwExStyle, window_info.parent == AM_WINDOW_DEFAULT_PARENT ? AM_ROOT_WIN_CLASS:AM_CHILD_WIN_CLASS,
+                                                   window_info.name, dwStyle, (am_int32)window_info.x, (am_int32)window_info.y, rect_width, rect_height,
+                                                   NULL, NULL, GetModuleHandle(NULL), NULL
+    );
+    if (new_window->handle == 0) {
+        printf("[FAIL] am_platform_window_create (id: %u): Could not create window!\n", new_window->id);
+        return AM_PA_INVALID_ID;
+    };
+    if ((window_info.parent != AM_WINDOW_DEFAULT_PARENT)) {
+        SetParent((HWND)new_window->handle, (HWND)window_info.parent);
+        SetWindowLong((HWND)new_window->handle, GWL_STYLE, 0);
+    };
+    ShowWindow((HWND)new_window->handle, 1);
 #endif
 
     new_window->x = window_info.x;
@@ -3268,22 +3277,22 @@ am_id am_platform_window_create(am_window_info window_info) {
     glXMakeCurrent(platform->display, new_window->handle, new_window->context);
 #else
     new_window->hdc = GetDC((HWND)new_window->handle);
-        PIXELFORMATDESCRIPTOR pixel_format_desc = {
+    PIXELFORMATDESCRIPTOR pixel_format_desc = {
             sizeof(PIXELFORMATDESCRIPTOR),1,
             PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA,
             32,0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0,
             24,8,0, PFD_MAIN_PLANE, 0, 0, 0, 0
-        };
+    };
 
-        am_int32 suggested_pf_index = ChoosePixelFormat(new_window->hdc, &pixel_format_desc);
-        PIXELFORMATDESCRIPTOR suggested_pf;
-        DescribePixelFormat(new_window->hdc, suggested_pf_index, sizeof(suggested_pf), &suggested_pf);
-        SetPixelFormat(new_window->hdc, suggested_pf_index, &suggested_pf);
+    am_int32 suggested_pf_index = ChoosePixelFormat(new_window->hdc, &pixel_format_desc);
+    PIXELFORMATDESCRIPTOR suggested_pf;
+    DescribePixelFormat(new_window->hdc, suggested_pf_index, sizeof(suggested_pf), &suggested_pf);
+    SetPixelFormat(new_window->hdc, suggested_pf_index, &suggested_pf);
 
-        new_window->context = wglCreateContext(new_window->hdc);
-        wglMakeCurrent(new_window->hdc, new_window->context);
-        wglShareLists(new_window->context, main_window->context);
+    new_window->context = wglCreateContext(new_window->hdc);
+    wglMakeCurrent(new_window->hdc, new_window->context);
+    wglShareLists(new_window->context, main_window->context);
 #endif
 
     //Have to do this here unfortunately
@@ -3317,13 +3326,13 @@ void am_platform_window_resize(am_id id, am_uint32 width, am_uint32 height) {
             .top = 0,
             .bottom = (long)window->height,
             .right = (long)window->width
-        };
-        if (window->parent == AM_WINDOW_DEFAULT_PARENT)
-            AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
-        else
-            AdjustWindowRectEx(&rect, 0, false, 0);
+    };
+    if (window->parent == AM_WINDOW_DEFAULT_PARENT)
+        AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
+    else
+        AdjustWindowRectEx(&rect, 0, false, 0);
 
-        SetWindowPos((HWND)window->handle, 0, 0, 0 , rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
+    SetWindowPos((HWND)window->handle, 0, 0, 0 , rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
 #endif
 };
 
@@ -3345,12 +3354,12 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
             .top = (long)y,
             .bottom = (long)window->height,
             .right = (long)window->width
-        };
-        if (window->parent == AM_WINDOW_DEFAULT_PARENT)
-            AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
-        else
-            AdjustWindowRectEx(&rect, 0, false, 0);
-        SetWindowPos((HWND)window->handle, 0, rect.left, rect.top, 0, 0, SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
+    };
+    if (window->parent == AM_WINDOW_DEFAULT_PARENT)
+        AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
+    else
+        AdjustWindowRectEx(&rect, 0, false, 0);
+    SetWindowPos((HWND)window->handle, 0, rect.left, rect.top, 0, 0, SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
 #endif
 };
 
@@ -3401,22 +3410,22 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
     memcpy(&window->cache, &temp_info, sizeof(am_window_info));
 #else
     DWORD dw_style = GetWindowLong((HWND)window->handle, GWL_STYLE);
-        if (window->is_fullscreen) {
-            printf("Going fullscreen\n");
-            MONITORINFO monitor_info = {sizeof(monitor_info)};
-            GetMonitorInfo(MonitorFromWindow((HWND)window->handle, MONITOR_DEFAULTTONEAREST), &monitor_info);
-            SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style & ~WS_OVERLAPPEDWINDOW);
-            SetWindowPos((HWND)window->handle, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
-                         monitor_info.rcMonitor.right - monitor_info.rcMonitor.left, monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
-                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED
-                         );
-            memcpy(&window->cache, &temp_info, sizeof(am_window_info));
-        } else {
-            printf("Going not is_fullscreen\n");
-            SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style | WS_OVERLAPPEDWINDOW);
-            am_platform_window_resize(id, temp_cache.width, temp_cache.height);
-            am_platform_window_move(id, temp_cache.x, temp_cache.y);
-        };
+    if (window->is_fullscreen) {
+        printf("Going fullscreen\n");
+        MONITORINFO monitor_info = {sizeof(monitor_info)};
+        GetMonitorInfo(MonitorFromWindow((HWND)window->handle, MONITOR_DEFAULTTONEAREST), &monitor_info);
+        SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style & ~WS_OVERLAPPEDWINDOW);
+        SetWindowPos((HWND)window->handle, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
+                     monitor_info.rcMonitor.right - monitor_info.rcMonitor.left, monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+        );
+        memcpy(&window->cache, &temp_info, sizeof(am_window_info));
+    } else {
+        printf("Going not is_fullscreen\n");
+        SetWindowLong((HWND)window->handle, GWL_STYLE, dw_style | WS_OVERLAPPEDWINDOW);
+        am_platform_window_resize(id, temp_cache.width, temp_cache.height);
+        am_platform_window_move(id, temp_cache.x, temp_cache.y);
+    };
 #endif
 };
 
@@ -3426,9 +3435,9 @@ am_vec2u am_platform_window_get_size(am_id id) {
 #if defined(AM_LINUX)
 #else
     RECT area;
-        GetClientRect((HWND)window->handle, &area);
-        am_vec2u ret = {area.right, area.bottom};
-        return ret;
+    GetClientRect((HWND)window->handle, &area);
+    am_vec2u ret = {area.right, area.bottom};
+    return ret;
 #endif
 };
 
@@ -3461,7 +3470,7 @@ void am_platform_timer_create() {
     platform->time.frequency = 1000000000;
 #else
     QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
-        QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
+    QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
 #endif
 };
 
@@ -3470,8 +3479,8 @@ void am_platform_timer_sleep(am_float32 ms) {
     usleep((__useconds_t)(ms*1000.0f));
 #else
     timeBeginPeriod(1);
-        Sleep((uint64_t)ms);
-        timeEndPeriod(1);
+    Sleep((uint64_t)ms);
+    timeEndPeriod(1);
 #endif
 };
 
@@ -3482,8 +3491,8 @@ am_uint64 am_platform_timer_value() {
     return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
 #else
     am_uint64 value;
-        QueryPerformanceCounter((LARGE_INTEGER*)&value);
-        return value;
+    QueryPerformanceCounter((LARGE_INTEGER*)&value);
+    return value;
 #endif
 };
 
@@ -3766,15 +3775,6 @@ am_id amgl_uniform_create(amgl_uniform_info info) {
     return ret_id;
 };
 
-/*
-void amgl_uniform_update(am_int32 id, amgl_uniform_info info) {
-    amgl_uniform *uniform = amgl_uniform_lookup(id);
-    uniform->info = info;
-    uniform->location = glGetUniformLocation(uniform->info.cube_shader_id, uniform->info.win_name);
-    glUniform1fv(uniform->location, 1, (float*)uniform->info.data);
-};
-*/
-
 void amgl_uniform_destroy(am_id id) {
     am_engine *engine = am_engine_get_instance();
     am_packed_array_erase(engine->ctx_data.uniforms, id);
@@ -3869,7 +3869,7 @@ am_id amgl_texture_create(amgl_texture_info info) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t);
 
-    //TODO: Research if this is needed for every texture, might not be needed if using shaders as far as I understand
+    //REVIEW: Research if this is needed for every texture, might not be needed if using shaders as far as I understand
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -3880,7 +3880,15 @@ am_id amgl_texture_create(amgl_texture_info info) {
     };
     snprintf(texture->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
-    am_free(info.data);
+    if (info.save_reference) {
+        printf("[OK] amgl_texture_create (id: %u): Saving reference in memory!\n", texture->id);
+        texture->refference.image = info.data;
+        texture->refference.is_saved = true;
+        texture->refference.width = info.width;
+        texture->refference.height = info.height;
+    } else {
+        am_free(info.data);
+    };
     return ret_id;
 };
 
@@ -3932,10 +3940,10 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
         rd_size = st.st_size;
 #else
         HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-                LARGE_INTEGER size;
-                GetFileSizeEx(file_hwnd, &size);
-                rd_size = (am_int32) size.QuadPart;
-                CloseHandle(file_hwnd);
+        LARGE_INTEGER size;
+        GetFileSizeEx(file_hwnd, &size);
+        rd_size = (am_int32) size.QuadPart;
+        CloseHandle(file_hwnd);
 #endif
         buffer = (char*)am_malloc(rd_size+1);
         if (buffer) fread(buffer, 1, rd_size, file);
@@ -3945,7 +3953,6 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
     amgl_texture_load_from_memory(buffer, info, rd_size, flip);
 };
 
-//REVIEW: Needed? Could merge with above
 void amgl_texture_load_from_memory(const void *memory, amgl_texture_info *info, size_t size, am_bool flip) {
     am_int32 num_comps = 0;
     stbi_set_flip_vertically_on_load(flip);
@@ -3966,6 +3973,7 @@ void amgl_texture_destroy(am_id id) {
         return;
     }
     glDeleteTextures(1, &texture->handle);
+    if (texture->refference.is_saved) am_free(texture->refference.image);
     am_packed_array_erase(engine->ctx_data.textures, id);
 };
 
@@ -4300,7 +4308,7 @@ void amgl_vsync(am_id window_id, am_bool state) {
     glSwapInterval(platform->display, window->handle, state);
 #else
     if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
-            glSwapInterval(state == true ? 1:0);
+    glSwapInterval(state == true ? 1:0);
 #endif
 };
 
@@ -4852,7 +4860,9 @@ void am_engine_quit() {
 
 void am_engine_terminate(){
     am_engine *engine = am_engine_get_instance();
+#if defined(AM_LINUX)
     XFlush(am_engine_get_subsystem(platform)->display);
+#endif
     am_platform_terminate(am_engine_get_subsystem(platform));
 
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.pipelines); i++) amgl_pipeline_destroy(engine->ctx_data.pipelines->elements[i].id);
@@ -4911,6 +4921,7 @@ char* am_util_read_file(const char *path) {
     return buffer;
 };
 
+//TODO: Memory leak in case of failure
 am_util_obj* am_util_obj_create(char* path) {
     am_util_obj *object = (am_util_obj*)malloc(sizeof(am_util_obj));
     object->vertices = NULL;
@@ -4932,6 +4943,10 @@ am_util_obj* am_util_obj_create(char* path) {
     size_t diff = 0;
 
     FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        printf("[FAIL] am_util_obj_create (id: ?): Could not open file %s!\n", path);
+        return NULL;
+    };
 
     buffer = (char*)malloc(2*sizeof(char)*AM_UTIL_OBJ_MAX_BUFFER_SIZE);
     start = buffer;
@@ -5084,9 +5099,11 @@ void am_util_obj_interpret_buffer(char *start, char *end, am_util_obj *object) {
                 break;
             };
             case 'f': {
+                if (*(ptr + 1) != ' ') break;
                 ptr++;
                 int v = 0, n = 0, t = 0;
-                while (*ptr != '\n') {
+                //REVIEW: Check if the \r condition does anything bad on linux
+                while (*ptr != '\n' && *ptr != '\r') {
                     value = strtof(ptr, &ptr_end);
                     ptr = ptr_end;
                     v = (am_int32) value;
@@ -5127,3 +5144,4 @@ void am_util_obj_interpret_buffer(char *start, char *end, am_util_obj *object) {
 //----------------------------------------------------------------------------//
 //                               END  UTIL IMPL                               //
 //----------------------------------------------------------------------------//
+#endif

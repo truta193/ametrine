@@ -68,7 +68,7 @@ typedef am_uint32 am_id;
 
 #if defined(AM_LINUX)
 #define AM_CALL *
-    #define amgl_get_proc_address(str) glXGetProcAddress((unsigned char*)(str))
+#define amgl_get_proc_address(str) glXGetProcAddress((unsigned char*)(str))
 #else
 #define AM_CALL __stdcall*
 #define amgl_get_proc_address(str) wglGetProcAddress((str))
@@ -545,8 +545,8 @@ typedef struct am_window {
 
 #if defined(AM_LINUX)
     Colormap colormap;
-        XVisualInfo *visual_info;
-        GLXContext context;
+    XVisualInfo *visual_info;
+    GLXContext context;
 #else
     HDC hdc;
     HGLRC context;
@@ -885,6 +885,7 @@ typedef struct amgl_texture_info {
     am_uint32 mip_num;
     amgl_texture_wrap wrap_s;
     amgl_texture_wrap wrap_t;
+    am_bool save_reference;
 } amgl_texture_info;
 
 typedef struct amgl_texture {
@@ -892,6 +893,13 @@ typedef struct amgl_texture {
     am_uint32 handle;
     am_id id;
     amgl_texture_format format;
+    struct {
+        am_bool is_saved;
+        am_uint32 width;
+        am_uint32 height;
+        void *image;
+    } refference;
+
     //NOTE: Ignore for now
     //am_bool render_target;
 } amgl_texture;
@@ -1642,9 +1650,9 @@ static inline am_mat3 am_mat3_mul(am_mat3 m0, am_mat3 m1) {
 
 static inline am_vec3 am_mat3_mul_vec3(am_mat3 m, am_vec3 v) {
     return am_vec3_create(
-            m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
-            m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
-            m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z
+        m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
+        m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
+        m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z
     );
 };
 
@@ -2501,13 +2509,13 @@ am_platform *am_platform_create() {
 
 #if defined(AM_LINUX)
     platform->display = XOpenDisplay(NULL);
-        memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
-        am_int32 min, max;
-        XDisplayKeycodes(platform->display, &min, &max);
-        am_int32 width;
-        KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
-        for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
-        XFree(key_syms);
+    memset(platform->input.keyboard.keycodes, -1, sizeof(platform->input.keyboard.keycodes));
+    am_int32 min, max;
+    XDisplayKeycodes(platform->display, &min, &max);
+    am_int32 width;
+    KeySym *key_syms = XGetKeyboardMapping(platform->display, min, max - min + 1, &width);
+    for (am_int32 i = min; i < max; i++) platform->input.keyboard.keycodes[i] = am_platform_translate_keysym(&key_syms[(i-min)*width], width);
+    XFree(key_syms);
 #else
     platform->input.keyboard.keycodes[0x00B] = AM_KEYCODE_0;
     platform->input.keyboard.keycodes[0x002] = AM_KEYCODE_1;
@@ -2679,10 +2687,10 @@ void am_platform_poll_events() {
     am_platform *platform = am_engine_get_subsystem(platform);
 #if defined(AM_LINUX)
     XEvent xevent;
-        while (XPending(platform->display)) {
-            XNextEvent(platform->display, &xevent);
-            am_platform_event_handler(&xevent);
-        };
+    while (XPending(platform->display)) {
+        XNextEvent(platform->display, &xevent);
+        am_platform_event_handler(&xevent);
+    };
 #else
     MSG msg;
     while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -2887,7 +2895,7 @@ void am_platform_terminate(am_platform *platform) {
     for (am_int32 i = 0; i < am_packed_array_get_count(platform->windows); i++) am_platform_window_destroy(platform->windows->elements[i].id);
 #if defined(AM_LINUX)
     //This sends the proper closing xevents
-        am_platform_update(am_engine_get_subsystem(platform));
+    am_platform_update(am_engine_get_subsystem(platform));
 #else
     UnregisterClass(AM_ROOT_WIN_CLASS, GetModuleHandle(NULL));
     UnregisterClass(AM_CHILD_WIN_CLASS, GetModuleHandle(NULL));
@@ -2991,7 +2999,7 @@ void am_platform_mouse_set_position(am_uint32 x, am_uint32 y) {
 
 #if defined(AM_LINUX)
     XWarpPointer(platform->display, None, am_packed_array_get_ptr(platform->windows, 1)->handle, 0, 0, 0, 0, (am_int32)x, (am_int32)y);
-        XFlush(platform->display);
+    XFlush(platform->display);
 #else
     POINT pos = { (am_int32)x, (am_int32)y};
     //HACK:
@@ -3022,17 +3030,17 @@ void am_platform_mouse_lock(am_bool lock) {
     am_window *window_to_lock = am_packed_array_get_ptr(platform->windows, 1);
 #if defined(AM_LINUX)
     if (lock) {
-            platform->input.mouse.locked = lock;
-            am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
-            XGrabPointer(platform->display, window_to_lock->handle, true,
-                         ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-                         GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
-            );
-        } else {
-            platform->input.mouse.locked = lock;
-            XUngrabPointer(platform->display, 0);
-            am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
-        };
+        platform->input.mouse.locked = lock;
+        am_platform_mouse_get_position(&platform->input.mouse.cached_position.x, &platform->input.mouse.cached_position.y);
+        XGrabPointer(platform->display, window_to_lock->handle, true,
+                     ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                     GrabModeAsync, GrabModeAsync, window_to_lock->handle, 0, 0
+        );
+    } else {
+        platform->input.mouse.locked = lock;
+        XUngrabPointer(platform->display, 0);
+        am_platform_mouse_set_position(platform->input.mouse.cached_position.x, platform->input.mouse.cached_position.y);
+    };
 #else
     if (lock) {
         platform->input.mouse.locked = lock;
@@ -3262,8 +3270,8 @@ am_id am_platform_window_create(am_window_info window_info) {
     am_window *main_window = am_packed_array_get_ptr(platform->windows, 1);
 #if defined(AM_LINUX)
     new_window->context = NULL;
-        new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
-        glXMakeCurrent(platform->display, new_window->handle, new_window->context);
+    new_window->context = glXCreateContext(platform->display, new_window->visual_info, main_window->context, GL_TRUE);
+    glXMakeCurrent(platform->display, new_window->handle, new_window->context);
 #else
     new_window->hdc = GetDC((HWND)new_window->handle);
     PIXELFORMATDESCRIPTOR pixel_format_desc = {
@@ -3367,12 +3375,12 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
     window->cache.is_fullscreen = window->is_fullscreen;
     window->is_fullscreen = state;
     am_window_info temp_info = {
-            .width = window->width,
-            .height = window->height,
-            .x = window->x,
-            .y = window->y,
-            .is_fullscreen = window->is_fullscreen,
-            .parent = window->parent,
+        .width = window->width,
+        .height = window->height,
+        .x = window->x,
+        .y = window->y,
+        .is_fullscreen = window->is_fullscreen,
+        .parent = window->parent,
     };
     snprintf(temp_info.name, AM_MAX_NAME_LENGTH, "%s", window->name);
     //REVIEW: Currently not needed for linux
@@ -3382,21 +3390,21 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
 
 #if defined(AM_LINUX)
     Atom wm_state = XInternAtom(platform->display, "_NET_WM_STATE", false);
-        Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
-        XEvent xevent = {0};
-        xevent.type = ClientMessage;
-        xevent.xclient.window = window->handle;
-        xevent.xclient.message_type = wm_state;
-        xevent.xclient.format = 32;
-        xevent.xclient.data.l[0] = state ? 1:0;
-        xevent.xclient.data.l[1] = (long)wm_fs;
-        xevent.xclient.data.l[3] = 0l;
-        XSendEvent(platform->display, AM_WINDOW_DEFAULT_PARENT, false, SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
-        XFlush(platform->display);
-        XWindowAttributes window_attribs = {0};
-        XGetWindowAttributes(platform->display, window->handle, &window_attribs);
-        printf("Fullscreen toggle\n Pos: %d %d\n Size: %d %d\nFullscreen toggle end\n\n", window_attribs.x, window_attribs.y, window_attribs.width, window_attribs.height);
-        memcpy(&window->cache, &temp_info, sizeof(am_window_info));
+    Atom wm_fs = XInternAtom(platform->display, "_NET_WM_STATE_FULLSCREEN", false);
+    XEvent xevent = {0};
+    xevent.type = ClientMessage;
+    xevent.xclient.window = window->handle;
+    xevent.xclient.message_type = wm_state;
+    xevent.xclient.format = 32;
+    xevent.xclient.data.l[0] = state ? 1:0;
+    xevent.xclient.data.l[1] = (long)wm_fs;
+    xevent.xclient.data.l[3] = 0l;
+    XSendEvent(platform->display, AM_WINDOW_DEFAULT_PARENT, false, SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
+    XFlush(platform->display);
+    XWindowAttributes window_attribs = {0};
+    XGetWindowAttributes(platform->display, window->handle, &window_attribs);
+    printf("Fullscreen toggle\n Pos: %d %d\n Size: %d %d\nFullscreen toggle end\n\n", window_attribs.x, window_attribs.y, window_attribs.width, window_attribs.height);
+    memcpy(&window->cache, &temp_info, sizeof(am_window_info));
 #else
     DWORD dw_style = GetWindowLong((HWND)window->handle, GWL_STYLE);
     if (window->is_fullscreen) {
@@ -3439,11 +3447,11 @@ void am_platform_window_destroy(am_id id) {
     };
 #if defined(AM_LINUX)
     glXDestroyContext(platform->display, window->context);
-        XUnmapWindow(platform->display, window->handle);
-        XDestroyWindow(platform->display, window->handle);
-        XFreeColormap(platform->display, window->colormap);
-        XFree(window->visual_info);
-        XFlush(platform->display);
+    XUnmapWindow(platform->display, window->handle);
+    XDestroyWindow(platform->display, window->handle);
+    XFreeColormap(platform->display, window->colormap);
+    XFree(window->visual_info);
+    XFlush(platform->display);
 #else
     DestroyWindow((HWND)(window->handle));
 #endif
@@ -3453,10 +3461,10 @@ void am_platform_timer_create() {
     am_platform *platform = am_engine_get_subsystem(platform);
 #if defined(AM_LINUX)
     struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    platform->time.offset = (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
 
-        platform->time.frequency = 1000000000;
+    platform->time.frequency = 1000000000;
 #else
     QueryPerformanceFrequency((LARGE_INTEGER*)&platform->time.frequency);
     QueryPerformanceCounter((LARGE_INTEGER*)&platform->time.offset);
@@ -3476,8 +3484,8 @@ void am_platform_timer_sleep(am_float32 ms) {
 am_uint64 am_platform_timer_value() {
 #if defined(AM_LINUX)
     struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (am_uint64)ts.tv_sec * (am_uint64)1000000000 + (am_uint64)ts.tv_nsec;
 #else
     am_uint64 value;
     QueryPerformanceCounter((LARGE_INTEGER*)&value);
@@ -3869,7 +3877,15 @@ am_id amgl_texture_create(amgl_texture_info info) {
     };
     snprintf(texture->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
-    am_free(info.data);
+    if (info.save_reference) {
+        printf("[OK] amgl_texture_create (id: %u): Saving reference in memory!\n", texture->id);
+        texture->refference.image = info.data;
+        texture->refference.is_saved = true;
+        texture->refference.width = info.width;
+        texture->refference.height = info.height;
+    } else {
+        am_free(info.data);
+    };
     return ret_id;
 };
 
@@ -3917,8 +3933,8 @@ void amgl_texture_load_from_file(const char *path, amgl_texture_info *info, am_b
     if (file) {
 #if defined(AM_LINUX)
         struct stat st;
-                stat(path, &st);
-                rd_size = st.st_size;
+        stat(path, &st);
+        rd_size = st.st_size;
 #else
         HANDLE file_hwnd = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         LARGE_INTEGER size;
@@ -3954,6 +3970,7 @@ void amgl_texture_destroy(am_id id) {
         return;
     }
     glDeleteTextures(1, &texture->handle);
+    if (texture->refference.is_saved) am_free(texture->refference.image);
     am_packed_array_erase(engine->ctx_data.textures, id);
 };
 
@@ -4283,9 +4300,9 @@ void amgl_vsync(am_id window_id, am_bool state) {
     //Have to load SwapInterval here because this is called for each window on creation
 #if defined(AM_LINUX)
     am_platform *platform = am_engine_get_subsystem(platform);
-        am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
-        if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
-        glSwapInterval(platform->display, window->handle, state);
+    am_window *window = am_packed_array_get_ptr(platform->windows, window_id);
+    if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("glXSwapIntervalEXT");
+    glSwapInterval(platform->display, window->handle, state);
 #else
     if (glSwapInterval == NULL) glSwapInterval = (PFNGLSWAPINTERVALEXTPROC)amgl_get_proc_address("wglSwapIntervalEXT");
     glSwapInterval(state == true ? 1:0);
@@ -4640,9 +4657,9 @@ am_vec3 am_camera_screen_to_world(am_camera* cam, am_vec3 coords, am_int32 view_
 
     out.w = 1.f / out.w;
     wc = am_vec3_create(
-            out.x * out.w,
-            out.y * out.w,
-            out.z * out.w
+        out.x * out.w,
+        out.y * out.w,
+        out.z * out.w
     );
 
     return wc;
@@ -4677,12 +4694,12 @@ am_mat4 am_camera_get_proj(am_camera* cam, am_int32 view_width, am_int32 view_he
             const am_float32 ortho_scale = cam->ortho_scale;
             const am_float32 aspect_ratio = _ar;
             proj_mat = am_mat4_ortho(
-                    -ortho_scale * aspect_ratio,
-                    ortho_scale * aspect_ratio,
-                    -ortho_scale,
-                    ortho_scale,
-                    -distance,
-                    distance
+                -ortho_scale * aspect_ratio,
+                ortho_scale * aspect_ratio,
+                -ortho_scale,
+                ortho_scale,
+                -distance,
+                distance
             );
         } break;
     };
@@ -4747,12 +4764,12 @@ void am_engine_create(am_engine_info engine_info) {
     am_dyn_array_init((void**)&(engine->ctx_data.frame_cache.vertex_buffers), sizeof(amgl_vertex_buffer));
 
     am_window_info main = {
-            .height = engine_info.win_height,
-            .width = engine_info.win_width,
-            .x = engine_info.win_x,
-            .y = engine_info.win_y,
-            .parent = AM_WINDOW_DEFAULT_PARENT,
-            .is_fullscreen = engine_info.win_fullscreen
+        .height = engine_info.win_height,
+        .width = engine_info.win_width,
+        .x = engine_info.win_x,
+        .y = engine_info.win_y,
+        .parent = AM_WINDOW_DEFAULT_PARENT,
+        .is_fullscreen = engine_info.win_fullscreen
     };
     printf("sl ec %lu\n", strlen(engine_info.win_name));
     if (!strlen(engine_info.win_name)) snprintf(main.name, AM_MAX_NAME_LENGTH, "%s", engine_info.win_name);
@@ -4763,8 +4780,8 @@ void am_engine_create(am_engine_info engine_info) {
 
     //Base framebuffer
     amgl_frame_buffer base_fbo = {
-            .handle = 0, //OpenGL default
-            .id = 1
+        .handle = 0, //OpenGL default
+        .id = 1
     };
     am_packed_array_add(engine->ctx_data.frame_buffers, base_fbo);
 
@@ -4840,9 +4857,9 @@ void am_engine_quit() {
 
 void am_engine_terminate(){
     am_engine *engine = am_engine_get_instance();
-    #if defined(AM_LINUX)
-        XFlush(am_engine_get_subsystem(platform)->display);
-    #endif
+#if defined(AM_LINUX)
+    XFlush(am_engine_get_subsystem(platform)->display);
+#endif
     am_platform_terminate(am_engine_get_subsystem(platform));
 
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.pipelines); i++) amgl_pipeline_destroy(engine->ctx_data.pipelines->elements[i].id);
@@ -4901,6 +4918,7 @@ char* am_util_read_file(const char *path) {
     return buffer;
 };
 
+//TODO: Memory leak in case of failure
 am_util_obj* am_util_obj_create(char* path) {
     am_util_obj *object = (am_util_obj*)malloc(sizeof(am_util_obj));
     object->vertices = NULL;

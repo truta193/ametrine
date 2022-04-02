@@ -3012,7 +3012,7 @@ int main() {
         .wrap_s = GL_REPEAT,
         .wrap_t = GL_REPEAT
     };
-    amgl_texture_load_from_file("pics/t3.png", &tex_info, true);
+    amgl_texture_load_from_file("textures/t3.png", &tex_info, true);
     am_int32 tex_id = amgl_texture_create(tex_info);
 
     
