@@ -770,6 +770,14 @@ typedef struct amgl_vertex_buffer_layout {
     am_uint32 num_attribs;
 } amgl_vertex_buffer_layout;
 
+typedef struct amgl_vertex_buffer_update_info {
+    char name[AM_MAX_NAME_LENGTH];
+    void *data;
+    size_t size;
+    amgl_buffer_usage usage;
+    size_t offset;
+} amgl_vertex_buffer_update_info;
+
 typedef struct amgl_vertex_buffer_info {
     char name[AM_MAX_NAME_LENGTH];
     void *data;
@@ -781,6 +789,10 @@ typedef struct amgl_vertex_buffer {
     char name[AM_MAX_NAME_LENGTH];
     am_uint32 handle;
     am_id id;
+    struct {
+        size_t size;
+        amgl_buffer_usage usage;
+    } update;
 } amgl_vertex_buffer;
 
 /*
@@ -1163,7 +1175,7 @@ void amgl_shader_destroy(am_id id);
 
 //Vertex buffer
 am_id amgl_vertex_buffer_create(amgl_vertex_buffer_info info);
-//void amgl_vertex_buffer_update(am_int32 id, amgl_vertex_buffer_update_info update);
+void amgl_vertex_buffer_update(am_id id, amgl_vertex_buffer_update_info update);
 void amgl_vertex_buffer_destroy(am_id id);
 
 //Index buffer
@@ -3661,7 +3673,30 @@ am_id amgl_vertex_buffer_create(amgl_vertex_buffer_info info) {
     };
     snprintf(v_buffer->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
+    v_buffer->update.size = info.size;
+    v_buffer->update.usage = info.usage;
     return ret_id;
+};
+
+void amgl_vertex_buffer_update(am_id id, amgl_vertex_buffer_update_info update) {
+    am_engine *engine = am_engine_get_instance();
+    if (!am_packed_array_has(engine->ctx_data.vertex_buffers, id)) printf("[FAIL] amgl_vertex_buffer_update (id: %u): No entry found by id!\n", id);
+    amgl_vertex_buffer *buffer = am_packed_array_get_ptr(engine->ctx_data.vertex_buffers, id);
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer->handle);
+    if (update.size > buffer->update.size) {
+        am_int32 usage = 0;
+        switch (update.usage) {
+            case AMGL_BUFFER_USAGE_STATIC: usage = GL_STATIC_DRAW; break;
+            case AMGL_BUFFER_USAGE_STREAM: usage = GL_STREAM_DRAW; break;
+            case AMGL_BUFFER_USAGE_DYNAMIC: usage = GL_DYNAMIC_DRAW; break;
+            default: break;
+        };
+        glBufferData(GL_ARRAY_BUFFER, (long int)update.size, update.data, usage);
+    } else {
+        glBufferSubData(GL_ARRAY_BUFFER, (long int)update.offset, (long int)update.size, update.data);
+    };
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 };
 
 void amgl_vertex_buffer_destroy(am_id id) {
