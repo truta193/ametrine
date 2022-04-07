@@ -708,6 +708,7 @@ am_uint64 am_platform_elapsed_time();
 typedef enum amgl_shader_type {
     AMGL_SHADER_INVALID,
     AMGL_SHADER_VERTEX,
+    AMGL_SHADER_GEOMETRY,
     AMGL_SHADER_FRAGMENT
     //compute
 } amgl_shader_type;
@@ -774,7 +775,6 @@ typedef struct amgl_vertex_buffer_layout {
 } amgl_vertex_buffer_layout;
 
 typedef struct amgl_vertex_buffer_update_info {
-    char name[AM_MAX_NAME_LENGTH];
     void *data;
     size_t size;
     amgl_buffer_usage usage;
@@ -798,13 +798,12 @@ typedef struct amgl_vertex_buffer {
     } update;
 } amgl_vertex_buffer;
 
-/*
-typedef struct amgl_vertex_buffer_update_info {
-    amgl_vertex_buffer_info info;
-    amgl_buffer_update_type update_type;
+typedef struct amgl_index_buffer_update_info {
+    void *data;
+    size_t size;
+    amgl_buffer_usage usage;
     size_t offset;
-} amgl_vertex_buffer_update_info;
-*/
+} amgl_index_buffer_update_info;
 
 typedef struct amgl_index_buffer_info {
     char name[AM_MAX_NAME_LENGTH];
@@ -818,6 +817,10 @@ typedef struct amgl_index_buffer {
     char name[AM_MAX_NAME_LENGTH];
     am_id id;
     am_uint32 handle;
+    struct {
+        size_t size;
+        amgl_buffer_usage usage;
+    } update;
 } amgl_index_buffer;
 
 typedef enum amgl_uniform_type {
@@ -1183,6 +1186,7 @@ void amgl_vertex_buffer_destroy(am_id id);
 
 //Index buffer
 am_id amgl_index_buffer_create(amgl_index_buffer_info info);
+void amgl_index_buffer_update(am_id id, amgl_index_buffer_update_info update);
 void amgl_index_buffer_destroy(am_id id);
 
 //Uniform
@@ -3570,6 +3574,10 @@ am_id amgl_shader_create(amgl_shader_info info) {
                 shader = glCreateShader(GL_VERTEX_SHADER);
                 break;
             };
+            case AMGL_SHADER_GEOMETRY: {
+                shader = glCreateShader(GL_GEOMETRY_SHADER);
+                break;
+            };
             default: break;
         };
         glShaderSource(shader, 1, (const GLchar**)&info.sources[i].source, NULL);
@@ -3696,10 +3704,12 @@ void amgl_vertex_buffer_update(am_id id, amgl_vertex_buffer_update_info update) 
             default: break;
         };
         glBufferData(GL_ARRAY_BUFFER, (long int)update.size, update.data, usage);
+        buffer->update.usage = update.usage;
     } else {
         glBufferSubData(GL_ARRAY_BUFFER, (long int)update.offset, (long int)update.size, update.data);
     };
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    buffer->update.size = update.size;
 };
 
 void amgl_vertex_buffer_destroy(am_id id) {
@@ -3766,7 +3776,32 @@ am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
     };
     snprintf(index_bfr->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
+    index_bfr->update.size = info.size;
+    index_bfr->update.usage = info.usage;
     return ret_id;
+};
+
+void amgl_index_buffer_update(am_id id, amgl_index_buffer_update_info update) {
+    am_engine *engine = am_engine_get_instance();
+    if (!am_packed_array_has(engine->ctx_data.index_buffers, id)) printf("[FAIL] amgl_index_buffer_update (id: %u): No entry found by id!\n", id);
+    amgl_index_buffer *buffer = am_packed_array_get_ptr(engine->ctx_data.index_buffers, id);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->handle);
+    if (update.size > buffer->update.size) {
+        am_int32 usage = 0;
+        switch (update.usage) {
+            case AMGL_BUFFER_USAGE_STATIC: usage = GL_STATIC_DRAW; break;
+            case AMGL_BUFFER_USAGE_STREAM: usage = GL_STREAM_DRAW; break;
+            case AMGL_BUFFER_USAGE_DYNAMIC: usage = GL_DYNAMIC_DRAW; break;
+            default: break;
+        };
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (long int)update.size, update.data, usage);
+        buffer->update.usage = update.usage;
+    } else {
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, (long int)update.offset, (long int)update.size, update.data);
+    };
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    buffer->update.size = update.size;
 };
 
 void amgl_index_buffer_destroy(am_id id) {
