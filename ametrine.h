@@ -1417,12 +1417,11 @@ void am_util_obj_interpret_buffer(char *start, char *end, am_util_obj *object);
 //----------------------------------------------------------------------------//
 
 void am_dyn_array_init(void **array, size_t value_size) {
-    if (*array == NULL) {
-        am_dyn_array_header *data = (am_dyn_array_header*)malloc(value_size + sizeof(am_dyn_array_header));
-        data->capacity = value_size;
-        data->size = 0;
-        *array = ((size_t*)data + 2);
-    };
+    if (*array != NULL) return;
+    am_dyn_array_header *data = (am_dyn_array_header*)malloc(value_size + sizeof(am_dyn_array_header));
+    data->capacity = value_size;
+    data->size = 0;
+    *array = ((size_t*)data + 2);
 };
 
 void am_dyn_array_resize(void **array, size_t add_size) {
