@@ -19,7 +19,7 @@ else()
 
     set(CMAKE_C_STANDARD 11)
 
-    add_executable(ametrine ametrine.c external/glad/src/glad.c)
+    add_executable(ametrine compute_test.c external/glad/src/glad.c)
 
     find_package(OpenGL REQUIRED)
     find_package(X11 REQUIRED)

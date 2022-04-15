@@ -4057,9 +4057,9 @@ am_id amgl_texture_create(amgl_texture_info info) {
         case AMGL_TEXTURE_FORMAT_A8: glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, (am_int32)info.width, (am_int32)info.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, info.data); break;
         case AMGL_TEXTURE_FORMAT_R8: glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, (am_int32)info.width, (am_int32)info.height, 0, GL_RED, GL_UNSIGNED_BYTE, info.data); break;
         case AMGL_TEXTURE_FORMAT_RGB8: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, (am_int32)info.width, (am_int32)info.height, 0, GL_RGB8, GL_UNSIGNED_BYTE, info.data); break;
-        case AMGL_TEXTURE_FORMAT_RGBA8: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA8, GL_UNSIGNED_BYTE, info.data); break;
-        case AMGL_TEXTURE_FORMAT_RGBA16F: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA16, GL_FLOAT, info.data); break;
-        case AMGL_TEXTURE_FORMAT_RGBA32F: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA32F, GL_FLOAT, info.data); break;
+        case AMGL_TEXTURE_FORMAT_RGBA8: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, info.data); break;
+        case AMGL_TEXTURE_FORMAT_RGBA16F: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA, GL_FLOAT, info.data); break;
+        case AMGL_TEXTURE_FORMAT_RGBA32F: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA, GL_FLOAT, info.data); break;
         case AMGL_TEXTURE_FORMAT_RGBA: glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (am_int32)info.width, (am_int32)info.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, info.data); break;
         case AMGL_TEXTURE_FORMAT_DEPTH8: glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, (am_int32)info.width, (am_int32)info.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, info.data); break;
         case AMGL_TEXTURE_FORMAT_DEPTH16: glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, (am_int32)info.width, (am_int32)info.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, info.data); break;
@@ -4073,6 +4073,7 @@ am_id amgl_texture_create(amgl_texture_info info) {
             return AM_PA_INVALID_ID;
         };
     };
+    texture->format = info.format;
 
     am_int32 min_filter = info.min_filter == AMGL_TEXTURE_FILTER_NEAREST ? GL_NEAREST:GL_LINEAR;
     am_int32 mag_filter = info.mag_filter == AMGL_TEXTURE_FILTER_NEAREST ? GL_NEAREST:GL_LINEAR;
@@ -4583,6 +4584,9 @@ void amgl_bind_pipeline(am_id pipeline_id) {
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+
 
         amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, pipeline_id);
         engine->ctx_data.frame_cache.pipeline = *pipeline;
@@ -4663,7 +4667,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     };
 
     for (am_uint32 i = 0; i < index_count; i++) {
-        am_id id = info->index_buffers.info[i].index_buffer_id;;
+        am_id id = info->index_buffers.info[i].index_buffer_id;
         if (!am_packed_array_has(engine->ctx_data.index_buffers, id)) {
             printf("[FAIL] amgl_set_bindings (id: %u): Index buffer could not be found!\n", id);
             break;
@@ -4740,7 +4744,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
                 amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, *((am_int32*)(uniform->data)));
                 glActiveTexture(GL_TEXTURE0 + binding);
                 glBindTexture(GL_TEXTURE_2D, texture->handle);
-                glUniform1i((am_int32)uniform->location, (am_int32)binding); //binding++ for when I add uniform list here
+                glUniform1i((am_int32)uniform->location, (am_int32)binding);
                 break;
             };
             default: {
@@ -5577,13 +5581,6 @@ void init() {
     point_light2.specular = am_vec3_create(0.9f, 0.9f, 1.0f);
 
     obj1 = am_util_obj_create("../resources/objects/cube.obj");
-    /*
-    obj1[0] = create_plane(am_vec3_create(0.0f, 0.0f, -1.0f), 256);
-    obj1[1] = create_plane(am_vec3_create(0.0f, 0.0f, 1.0f), 256);
-    obj1[2] = create_plane(am_vec3_create(0.0f, 1.0f, 0.0f), 256);
-    obj1[3] = create_plane(am_vec3_create(0.0f, -1.0f, 0.0f), 256);
-    obj1[4] = create_plane(am_vec3_create(1.0f, 0.0f, 0.0f), 256);
-    obj1[5] = create_plane(am_vec3_create(-1.0f, 0.0f, 0.0f), 256);*/
 
     //Cube
     cube_shader_id = amgl_shader_create((amgl_shader_info) {
@@ -6100,83 +6097,7 @@ void update() {
 
     amgl_bind_pipeline(cube_pipeline_id);
     amgl_set_bindings(&cube_binds);
-    //amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1->indices)});
-
-    /*
-        amgl_bind_pipeline(cube_pipeline_id);
-        amgl_set_bindings(&cube_binds);
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[2]->vertices),
-            .data = obj1[2]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[2]->normals),
-            .data = obj1[2]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[2]->indices)});
-
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[5]->vertices),
-            .data = obj1[5]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[5]->normals),
-            .data = obj1[5]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[5]->indices)});
-
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[4]->vertices),
-            .data = obj1[4]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[4]->normals),
-            .data = obj1[4]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[5]->indices)});
-
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[3]->vertices),
-            .data = obj1[3]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[3]->normals),
-            .data = obj1[3]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[5]->indices)});
-
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[1]->vertices),
-            .data = obj1[1]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[1]->normals),
-            .data = obj1[1]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[1]->indices)});
-
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[0]->vertices),
-            .data = obj1[0]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[0]->normals),
-            .data = obj1[0]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[0]->indices)});
-*/
-    /*
-    for (am_int32 i = 0; i < 6; i++) {
-        amgl_vertex_buffer_update(cube_coords_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[i]->vertices),
-            .data = obj1[i]->vertices
-        });
-        amgl_vertex_buffer_update(cube_norm_vbo_id, (amgl_vertex_buffer_update_info) {
-            .size = am_dyn_array_get_size(obj1[i]->normals),
-            .data = obj1[i]->normals
-        });
-        amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1[i]->indices)});
-    }*/
+    amgl_draw(&(amgl_draw_info){.start = 0, .count = am_dyn_array_get_count(obj1->indices)});
 
     amgl_bind_pipeline(normal_pipeline_id);
     amgl_set_bindings(&normal_binds);
