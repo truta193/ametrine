@@ -1,6 +1,6 @@
 //REVIEW: Could change int num_* property of some structs to size_t size, so it matches with the other ones
 
-//TODO: Compute shaders, instanced drawing
+//TODO: Instanced drawing
 //TODO: Halve array space once size goes below half of capacity?
 //REVIEW: More defined default values perhaps? More detailed warns
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
@@ -706,6 +706,7 @@ typedef enum amgl_shader_type {
     AMGL_SHADER_INVALID,
     AMGL_SHADER_VERTEX,
     AMGL_SHADER_GEOMETRY,
+    AMGL_SHADER_COMPUTE,
     AMGL_SHADER_FRAGMENT
     //compute
 } amgl_shader_type;
@@ -735,6 +736,13 @@ typedef enum amgl_buffer_usage {
     AMGL_BUFFER_USAGE_DYNAMIC,
     AMGL_BUFFER_USAGE_STREAM
 } amgl_buffer_usage;
+
+typedef enum amgl_buffer_access {
+    AMGL_BUFFER_ACCESS_INVALID,
+    AMGL_BUFFER_ACCESS_READ_ONLY,
+    AMGL_BUFFER_ACCESS_WRITE_ONLY,
+    AMGL_BUFFER_ACCESS_READ_WRITE
+} amgl_buffer_access;
 
 /*
 typedef enum amgl_buffer_update_type {
@@ -819,6 +827,29 @@ typedef struct amgl_index_buffer {
         amgl_buffer_usage usage;
     } update;
 } amgl_index_buffer;
+
+typedef struct amgl_storage_buffer_info {
+    char name[AM_MAX_NAME_LENGTH];
+    void *data;
+    size_t size;
+    amgl_buffer_usage usage;
+    amgl_buffer_access access;
+    am_uint32 binding;
+} amgl_storage_buffer_info;
+
+typedef struct amgl_storage_buffer {
+    char name[AM_MAX_NAME_LENGTH];
+    am_id id;
+    am_uint32 handle;
+    am_uint32 block_index;
+    am_uint32 binding;
+    amgl_buffer_access access;
+    struct {
+        size_t size;
+        amgl_buffer_usage usage;
+    } update;
+} amgl_storage_buffer;
+
 
 typedef enum amgl_uniform_type {
     AMGL_UNIFORM_TYPE_INVALID,
@@ -1048,12 +1079,17 @@ typedef struct amgl_raster_info {
     am_int32 index_buffer_element_size;
 } amgl_raster_info;
 
+typedef struct amgl_compute_info {
+    am_id compute_shader;
+} amgl_compute_info;
+
 typedef struct amgl_pipeline_info {
     char name[AM_MAX_NAME_LENGTH];
     amgl_blend_info blend;
     amgl_depth_info depth;
     amgl_raster_info raster;
     amgl_stencil_info stencil;
+    amgl_compute_info compute;
     amgl_vertex_buffer_layout layout;
 } amgl_pipeline_info;
 
@@ -1064,6 +1100,7 @@ typedef struct amgl_pipeline {
     amgl_depth_info depth;
     amgl_raster_info raster;
     amgl_stencil_info stencil;
+    amgl_compute_info compute;
     amgl_vertex_buffer_layout layout;
 } amgl_pipeline;
 
@@ -1095,9 +1132,15 @@ typedef struct amgl_index_buffer_bind_info {
     am_id index_buffer_id;
 } amgl_index_buffer_bind_info;
 
+typedef struct amgl_storage_buffer_bind_info {
+    am_id storage_buffer_id;
+    am_uint32 binding;
+} amgl_storage_buffer_bind_info;
+
 typedef struct amgl_texture_bind_info {
     am_id texture_id;
     am_uint32 binding;
+    amgl_buffer_access access;
 } amgl_texture_bind_info;
 
 typedef struct amgl_uniform_bind_info {
@@ -1118,6 +1161,11 @@ typedef struct amgl_bindings_info {
     } index_buffers;
 
     struct {
+        amgl_storage_buffer_bind_info *info;
+        size_t size;
+    } storage_buffers;
+
+    struct {
         amgl_uniform_bind_info *info;
         size_t size;
     } uniforms;
@@ -1125,7 +1173,7 @@ typedef struct amgl_bindings_info {
     struct {
         amgl_texture_bind_info *info;
         size_t size;
-    } textures;
+    } images;
 } amgl_bindings_info;
 
 typedef struct amgl_frame_cache {
@@ -1174,6 +1222,7 @@ typedef struct amgl_clear_desc {
 
 //Shaders
 am_id amgl_shader_create(amgl_shader_info info);
+void amgl_shader_compute_dispatch(am_int32 x, am_int32 y, am_int32 z);
 void amgl_shader_destroy(am_id id);
 
 //Vertex buffer
@@ -1185,6 +1234,11 @@ void amgl_vertex_buffer_destroy(am_id id);
 am_id amgl_index_buffer_create(amgl_index_buffer_info info);
 void amgl_index_buffer_update(am_id id, amgl_index_buffer_update_info update);
 void amgl_index_buffer_destroy(am_id id);
+
+//Storage buffer
+am_id amgl_storage_buffer_create(amgl_storage_buffer_info info);
+void amgl_storage_buffer_destroy(am_id id);
+
 
 //Uniform
 am_id amgl_uniform_create(amgl_uniform_info info);
@@ -1281,6 +1335,7 @@ typedef struct amgl_ctx_data {
     am_packed_array(amgl_shader) shaders;
     am_packed_array(amgl_vertex_buffer) vertex_buffers;
     am_packed_array(amgl_index_buffer) index_buffers;
+    am_packed_array(amgl_storage_buffer) storage_buffers;
     am_packed_array(amgl_frame_buffer) frame_buffers;
     am_packed_array(amgl_uniform) uniforms;
     am_packed_array(amgl_render_pass) render_passes;
@@ -3544,6 +3599,8 @@ am_id amgl_shader_create(amgl_shader_info info) {
 
     am_uint32 main_shader = glCreateProgram();
     am_uint32 shader_list[info.num_sources];
+    am_bool is_vertex = false;
+    am_bool is_compute = false;
     for (am_int32 i = 0; i < info.num_sources; i++) {
         am_uint32 shader = 0;
 
@@ -3569,14 +3626,27 @@ am_id amgl_shader_create(amgl_shader_info info) {
             };
             case AMGL_SHADER_VERTEX: {
                 shader = glCreateShader(GL_VERTEX_SHADER);
+                is_vertex = true;
                 break;
             };
             case AMGL_SHADER_GEOMETRY: {
                 shader = glCreateShader(GL_GEOMETRY_SHADER);
                 break;
             };
+            case AMGL_SHADER_COMPUTE: {
+                shader = glCreateShader(GL_COMPUTE_SHADER);
+                is_compute = true;
+                break;
+            }
             default: break;
         };
+
+        if (is_vertex && is_compute) {
+            printf("[FAIL] amgl_shader_create (id: %u): Compute & vertex shaders cannot go into the same program!\n", ret_id);
+            glDeleteShader(shader);
+            break;
+        };
+
         glShaderSource(shader, 1, (const GLchar**)&info.sources[i].source, NULL);
         glCompileShader(shader);
         shader_list[i] = shader;// For detaching after linking
@@ -3622,6 +3692,24 @@ am_id amgl_shader_create(amgl_shader_info info) {
     };
     snprintf(new_shader->name, AM_MAX_NAME_LENGTH, "%s", info.name);
     return ret_id;
+};
+
+void amgl_shader_compute_dispatch(am_int32 x, am_int32 y, am_int32 z) {
+    am_engine *engine = am_engine_get_instance();
+    if (!am_packed_array_has(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id)) {
+        printf("[FAIL] amgl_shader_compute_dispatch (id: %u): Compute pipeline not bound!\n", engine->ctx_data.frame_cache.pipeline.id);
+        return;
+    };
+
+    amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
+    if (!pipeline->compute.compute_shader) {
+        printf("[FAIL] amgl_shader_compute_dispatch (id: %u): Compute shader not bound!\n", engine->ctx_data.frame_cache.pipeline.id);
+        return;
+    };
+
+    glDispatchCompute(x, y, z);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
 };
 
 void amgl_shader_destroy(am_id id) {
@@ -3759,7 +3847,7 @@ am_id amgl_index_buffer_create(amgl_index_buffer_info info) {
             break;
         };
         default: {
-            printf("[FAIL] amgl_vertex_index_create (id: %u): Invalid usage!\n", ret_id);
+            printf("[FAIL] amgl_index_buffer_create (id: %u): Invalid usage!\n", ret_id);
             am_packed_array_erase(engine->ctx_data.index_buffers, ret_id);
             return AM_PA_INVALID_ID;
         };
@@ -3810,6 +3898,77 @@ void amgl_index_buffer_destroy(am_id id) {
     };
     glDeleteBuffers(1, &index_buffer->handle);
     am_packed_array_erase(engine->ctx_data.index_buffers, id);
+};
+
+am_id amgl_storage_buffer_create(amgl_storage_buffer_info info) {
+    am_engine *engine = am_engine_get_instance();
+
+    if (info.data == NULL) printf("[WARN] amgl_storage_buffer_create (id: %u): Data pointer is NULL!\n", engine->ctx_data.storage_buffers->next_id);
+    if (info.size == 0) printf("[WARN] amgl_storage_buffer_create (id: %u): Size is not specified!\n", engine->ctx_data.storage_buffers->next_id);
+
+    amgl_storage_buffer *storage_bfr = (amgl_storage_buffer*)malloc(sizeof(amgl_storage_buffer));
+    if (storage_bfr == NULL) {
+        printf("[FAIL] amgl_vertex_index_create (id: %u): Could not allocate memory for storage buffer!\n", engine->ctx_data.storage_buffers->next_id);
+        return AM_PA_INVALID_ID;
+    };
+
+    am_id ret_id = am_packed_array_add(engine->ctx_data.storage_buffers, *storage_bfr);
+    am_free(storage_bfr);
+    storage_bfr = am_packed_array_get_ptr(engine->ctx_data.storage_buffers, ret_id);
+    storage_bfr->id = ret_id;
+
+    glGenBuffers(1, &storage_bfr->handle);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, storage_bfr->handle);
+
+    if (!info.usage) {
+        printf("[WARN] amgl_storage_buffer_create (id: %u): No usage provided, choosing default!\n", ret_id);
+        info.usage = AMGL_BUFFER_USAGE_STATIC;
+    };
+
+    switch (info.usage) {
+        case AMGL_BUFFER_USAGE_STATIC: {
+            glBufferData(GL_SHADER_STORAGE_BUFFER, (GLsizeiptr)info.size, info.data, GL_STATIC_DRAW);
+            break;
+        };
+        case AMGL_BUFFER_USAGE_STREAM: {
+            glBufferData(GL_SHADER_STORAGE_BUFFER, (GLsizeiptr)info.size, info.data, GL_STREAM_DRAW);
+            break;
+        };
+        case AMGL_BUFFER_USAGE_DYNAMIC: {
+            glBufferData(GL_SHADER_STORAGE_BUFFER, (GLsizeiptr)info.size, info.data, GL_DYNAMIC_DRAW);
+            break;
+        };
+        default: {
+            printf("[FAIL] amgl_storage_buffer_create (id: %u): Invalid usage!\n", ret_id);
+            am_packed_array_erase(engine->ctx_data.storage_buffers, ret_id);
+            return AM_PA_INVALID_ID;
+        };
+    };
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    //REVIEW: Could simplify
+    if (!strlen(info.name)) {
+        snprintf(info.name, AM_MAX_NAME_LENGTH, "%s%d", AMGL_INDEX_BUFFER_DEFAULT_NAME, storage_bfr->id);
+        printf("[WARN] amgl_storage_buffer_create  (id: %u): Choosing default name!\n", storage_bfr->id);
+    };
+    snprintf(storage_bfr->name, AM_MAX_NAME_LENGTH, "%s", info.name);
+
+    storage_bfr->update.size = info.size;
+    storage_bfr->access = info.access;
+    storage_bfr->update.usage = info.usage;
+    return ret_id;
+};
+
+void amgl_storage_buffer_destroy(am_id id) {
+    am_engine *engine = am_engine_get_instance();
+    amgl_storage_buffer *storage_buffer = am_packed_array_get_ptr(engine->ctx_data.storage_buffers, id);
+    if (!storage_buffer) {
+        printf("[FAIL] amgl_storage_buffer_destroy (id: %u): Invalid storage buffer id!\n", id);
+        return;
+    };
+    glDeleteBuffers(1, &storage_buffer->handle);
+    am_packed_array_erase(engine->ctx_data.storage_buffers, id);
 };
 
 
@@ -3893,7 +4052,6 @@ am_id amgl_texture_create(amgl_texture_info info) {
 
     glGenTextures(1, &texture->handle);
     glBindTexture(GL_TEXTURE_2D, texture->handle);
-
 
     switch (info.format) {
         case AMGL_TEXTURE_FORMAT_A8: glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, (am_int32)info.width, (am_int32)info.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, info.data); break;
@@ -4176,6 +4334,8 @@ am_id amgl_pipeline_create(amgl_pipeline_info info) {
     memcpy(pipeline->layout.attributes, info.layout.attributes, info.layout.num_attribs * sizeof(amgl_vertex_buffer_attribute));
     pipeline->layout.num_attribs = info.layout.num_attribs;
 
+    pipeline->compute = info.compute;
+
     pipeline->id = engine->ctx_data.pipelines->next_id;
     //REVIEW: Could simplify
     if (!strlen(info.name)) {
@@ -4427,6 +4587,14 @@ void amgl_bind_pipeline(am_id pipeline_id) {
         amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, pipeline_id);
         engine->ctx_data.frame_cache.pipeline = *pipeline;
 
+        if (pipeline->compute.compute_shader) glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+        if (pipeline->compute.compute_shader) {
+            if (pipeline->compute.compute_shader && am_packed_array_has(engine->ctx_data.shaders, pipeline->compute.compute_shader)) {
+                glUseProgram(am_packed_array_get_ptr(engine->ctx_data.shaders, pipeline->compute.compute_shader)->handle);
+            };
+            return;
+        };
 
         if (!pipeline->depth.func) {
             glDisable(GL_DEPTH_TEST);
@@ -4475,9 +4643,9 @@ void amgl_set_bindings(amgl_bindings_info *info) {
     am_engine *engine = am_engine_get_instance();
     am_uint32 vertex_count = info->vertex_buffers.info ? info->vertex_buffers.size ? info->vertex_buffers.size / sizeof(amgl_vertex_buffer_bind_info) : 1 : 0;
     am_uint32 index_count = info->index_buffers.info ? info->index_buffers.size ? info->index_buffers.size / sizeof(amgl_index_buffer_bind_info) : 1 : 0;
+    am_uint32 storage_count = info->storage_buffers.info ? info->storage_buffers.size ? info->storage_buffers.size / sizeof(amgl_storage_buffer_bind_info) : 1 : 0;
     am_uint32 uniform_count = info->uniforms.info ? info->uniforms.size ? info->uniforms.size / sizeof(amgl_uniform_bind_info) : 1 : 0;
-    am_uint32 texture_count = info->textures.info ? info->textures.size ? info->textures.size / sizeof(amgl_texture_bind_info) : 1 : 0;
-
+    am_uint32 texture_count = info->images.info ? info->images.size ? info->images.size / sizeof(amgl_texture_bind_info) : 1 : 0;
 
     if (vertex_count) {
         am_dyn_array_clear(engine->ctx_data.frame_cache.vertex_buffers);
@@ -4521,7 +4689,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
         amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
         amgl_uniform *uniform = am_packed_array_get_ptr(engine->ctx_data.uniforms, id);
 
-        am_id shader_id = pipeline->raster.shader_id;
+        am_id shader_id = pipeline->compute.compute_shader ? pipeline->compute.compute_shader : pipeline->raster.shader_id;
 
         if (uniform->location == 0xFFFFFFFF || uniform->shader_id != pipeline->raster.shader_id) {
             if (!am_packed_array_has(engine->ctx_data.shaders, shader_id)) {
@@ -4582,8 +4750,43 @@ void amgl_set_bindings(amgl_bindings_info *info) {
         };
     };
 
+    for (am_uint32 i = 0; i < storage_count; i++) {
+        am_id id = info->storage_buffers.info[i].storage_buffer_id;
+        if (!am_packed_array_has(engine->ctx_data.storage_buffers, id)) {
+            printf("[FAIL] amgl_set_bindings (id: %u): Storage buffer could not be found!\n", id);
+            break;
+        };
+        amgl_storage_buffer storage_buffer = am_packed_array_get_val(engine->ctx_data.storage_buffers, id);
+
+        if (!am_packed_array_has(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id)) {
+            printf("[FAIL] amgl_set_bindings (id: (1) %u, (2) %u): Cannot bind storage buffer (1) since pipeline (2) could not be found!\n", id, engine->ctx_data.frame_cache.pipeline.id);
+            break;
+        };
+        amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id);
+
+        am_id shader_id = pipeline->compute.compute_shader ? pipeline->compute.compute_shader : pipeline->raster.shader_id;
+        if (!shader_id || !am_packed_array_has(engine->ctx_data.shaders, shader_id)) {
+            printf("[FAIL] amgl_set_bindings (id: (1) %u, (2) %u): Cannot bind storage buffer (1) since shader (2) could not be found!\n", id, shader_id);
+            break;
+        };
+
+        amgl_shader *shader = am_packed_array_get_ptr(engine->ctx_data.shaders, shader_id);
+        am_uint32 location = 0xFFFFFFFF;
+
+        if (storage_buffer.id == AM_PA_INVALID_ID) {
+            storage_buffer.block_index = glGetProgramResourceIndex(shader->handle, GL_SHADER_STORAGE_BLOCK, storage_buffer.name);
+            am_int32 params[1];
+            GLenum props[1] = {GL_BUFFER_BINDING};
+            glGetProgramResourceiv(shader->handle, GL_SHADER_STORAGE_BLOCK, storage_buffer.block_index, 1, props, 1, NULL, params);
+            location = (am_uint32)params[0];
+        };
+
+        if (storage_buffer.block_index < 0xFFFFFFFF - 1) glShaderStorageBlockBinding(shader->handle, storage_buffer.block_index, location);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, storage_buffer.binding, storage_buffer.handle);
+    };
+
     for (am_uint32 i = 0; i < texture_count; i++) {
-        am_id id = info->textures.info[i].texture_id;
+        am_id id = info->images.info[i].texture_id;
 
         if (!am_packed_array_has(engine->ctx_data.textures, id)) {
             printf("[FAIL] amgl_set_bindings (id: %u): Texture could not be found!\n", id);
@@ -4592,9 +4795,24 @@ void amgl_set_bindings(amgl_bindings_info *info) {
         amgl_texture *texture = am_packed_array_get_ptr(engine->ctx_data.textures, id);
         am_int32 format = amgl_texture_translate_format(texture->format);
 
-        //TODO: READ_WRITE for now, will have to implement some kind of image layer on top of a texture
+        am_int32 access = 0;
+        switch (info[i].images.info->access) {
+            case AMGL_BUFFER_ACCESS_READ_ONLY: {
+                access = GL_READ_ONLY;
+                break;
+            };
+            case AMGL_BUFFER_ACCESS_WRITE_ONLY: {
+                access = GL_WRITE_ONLY;
+                break;
+            };
+            case AMGL_BUFFER_ACCESS_READ_WRITE: {
+                access = GL_READ_WRITE;
+                break;
+            };
+            default: break;
+        };
+        glBindImageTexture(0, texture->handle, 0, GL_FALSE, 0, access, format);
 
-        glBindImageTexture(0, texture->handle, 0, GL_FALSE, 0, GL_READ_WRITE, format);
     };
 };
 
@@ -4822,6 +5040,8 @@ void am_engine_create(am_engine_info engine_info) {
     am_packed_array_init(engine->ctx_data.vertex_buffers, sizeof(amgl_vertex_buffer)*AM_DYN_ARRAY_EMPTY_START_SLOTS);
     engine->ctx_data.index_buffers = NULL;
     am_packed_array_init(engine->ctx_data.index_buffers, sizeof(amgl_index_buffer)*AM_DYN_ARRAY_EMPTY_START_SLOTS);
+    engine->ctx_data.storage_buffers = NULL;
+    am_packed_array_init(engine->ctx_data.storage_buffers, sizeof(amgl_storage_buffer)*AM_DYN_ARRAY_EMPTY_START_SLOTS);
     engine->ctx_data.frame_buffers = NULL;
     am_packed_array_init(engine->ctx_data.frame_buffers, sizeof(amgl_frame_buffer)*AM_DYN_ARRAY_EMPTY_START_SLOTS);
     engine->ctx_data.uniforms = NULL;
@@ -4940,6 +5160,10 @@ void am_engine_terminate(){
     am_packed_array_destroy(engine->ctx_data.vertex_buffers);
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.index_buffers); i++) amgl_index_buffer_destroy(engine->ctx_data.index_buffers->elements[i].id);
     am_packed_array_destroy(engine->ctx_data.index_buffers);
+
+    for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.storage_buffers); i++) amgl_storage_buffer_destroy(engine->ctx_data.storage_buffers->elements[i].id);
+    am_packed_array_destroy(engine->ctx_data.storage_buffers);
+
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.frame_buffers); i++) amgl_frame_buffer_destroy(engine->ctx_data.frame_buffers->elements[i].id);
     am_packed_array_destroy(engine->ctx_data.frame_buffers);
     for (am_int32 i = 0; i < am_packed_array_get_count(engine->ctx_data.uniforms); i++) amgl_uniform_destroy(engine->ctx_data.uniforms->elements[i].id);
