@@ -9,6 +9,7 @@
 //TODO: Mouse locking defaults to main window, should maybe allow some flexibility?
 //REVIEW: Line 5128ish, pass id instead of buffer index? //outdated index
 //TODO: 3D textures
+//TODO: Texture update
 
 //----------------------------------------------------------------------------//
 //                                  INCLUDES                                  //
@@ -62,7 +63,7 @@ typedef signed short am_int16;
 typedef unsigned short am_uint16;
 typedef signed int  am_int32;
 typedef unsigned int  am_uint32;
-typedef signed long long int am_int64; //Can be 4 bytes on 32bit OSes
+typedef signed long long int am_int64;
 typedef unsigned long long int am_uint64;
 typedef float am_float32;
 typedef double am_float64;
@@ -618,7 +619,6 @@ LRESULT CALLBACK am_platform_event_handler(HWND handle, am_uint32 event, WPARAM 
 #else
 void am_platform_event_handler(XEvent *xevent);
 #endif
-//REVIEW: Passing pointer argument is probably unnecessary, only one platform instance should exist
 void am_platform_update(am_platform *platform);
 void am_platform_terminate(am_platform *platform);
 
@@ -685,7 +685,6 @@ am_uint64 am_platform_elapsed_time();
 //                                  START GL                                  //
 //----------------------------------------------------------------------------//
 
-//TODO: Compute Shaders
 //Shader & program
 
 #define AMGL_SHADER_DEFAULT_NAME "amgl_shader"
@@ -715,7 +714,6 @@ typedef enum amgl_shader_type {
 } amgl_shader_type;
 
 typedef struct amgl_shader_source_info {
-    //REVIEW: Would a name here have a use?
     amgl_shader_type type;
     char *source;
     char *path;
@@ -746,13 +744,6 @@ typedef enum amgl_buffer_access {
     AMGL_BUFFER_ACCESS_WRITE_ONLY,
     AMGL_BUFFER_ACCESS_READ_WRITE
 } amgl_buffer_access;
-
-/*
-typedef enum amgl_buffer_update_type {
-    AMGL_BUFFER_UPDATE_SUBDATA,
-    AMGL_BUFFER_UPDATE_RECREATE
-} amgl_buffer_update_type;
-*/
 
 typedef enum amgl_vertex_buffer_attribute_format {
     AMGL_VERTEX_BUFFER_ATTRIBUTE_INVALID,
@@ -831,13 +822,18 @@ typedef struct amgl_index_buffer {
     } update;
 } amgl_index_buffer;
 
+typedef struct amgl_storage_buffer_update_info {
+    void *data;
+    size_t size;
+    amgl_buffer_usage usage;
+    size_t offset;
+} amgl_storage_buffer_update_info;
+
 typedef struct amgl_storage_buffer_info {
     char name[AM_MAX_NAME_LENGTH];
     void *data;
     size_t size;
     amgl_buffer_usage usage;
-    amgl_buffer_access access;
-    am_uint32 binding;
 } amgl_storage_buffer_info;
 
 typedef struct amgl_storage_buffer {
@@ -845,7 +841,6 @@ typedef struct amgl_storage_buffer {
     am_id id;
     am_uint32 handle;
     am_uint32 block_index;
-    am_uint32 binding;
     amgl_buffer_access access;
     struct {
         size_t size;
@@ -1240,21 +1235,18 @@ void amgl_index_buffer_destroy(am_id id);
 
 //Storage buffer
 am_id amgl_storage_buffer_create(amgl_storage_buffer_info info);
+void amgl_storage_buffer_update(am_id id, amgl_storage_buffer_update_info update);
 void amgl_storage_buffer_destroy(am_id id);
 
 
 //Uniform
 am_id amgl_uniform_create(amgl_uniform_info info);
-//NOTE: Ignore for now
-//void amgl_uniform_update(am_int32 id, amgl_uniform_info info);
+//NOTE: uniform_update: I see no need for plain uniforms, uniform buffers will need it
 void amgl_uniform_destroy(am_id id);
-//NOTE: Ignore for now
-//void amgl_uniform_bind(amgl_uniform *uniforms, am_uint32 num);
 
 //Texture
 am_id amgl_texture_create(amgl_texture_info info);
-//NOTE: Ignore for now
-//void amgl_texture_update(am_int32 id, amgl_texture_info info, amgl_texture_update_type type);
+//void amgl_texture_update(am_int32 id, amgl_texture_info info, amgl_texture_update_info info);
 am_int32 amgl_texture_translate_format(amgl_texture_format format);
 am_int32 amgl_texture_translate_wrap(amgl_texture_wrap wrap);
 GLenum amgl_texture_translate_filter(amgl_texture_filter filter);
@@ -2573,7 +2565,6 @@ am_mouse_map am_platform_translate_button(am_uint32 button) {
 am_platform *am_platform_create() {
     am_platform *platform = (am_platform*)am_malloc(sizeof(am_platform));
     if (platform == NULL) printf("[FAIL] am_platform_create: Could not allocate memory!\n");
-    //REVIEW
     assert(platform != NULL);
     platform->windows = NULL;
     am_packed_array_init(platform->windows, sizeof(am_window));
@@ -3433,7 +3424,7 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
 #endif
 };
 
-//REVIEW: Child windows could go "is_fullscreen" by taking the parent's client dimensions
+//IDEA: Child windows could go "is_fullscreen" by taking the parent's client dimensions
 void am_platform_window_fullscreen(am_id id, am_bool state) {
     am_platform *platform = am_engine_get_subsystem(platform);
     am_window *window = am_packed_array_get_ptr(platform->windows, id);
@@ -3957,9 +3948,35 @@ am_id amgl_storage_buffer_create(amgl_storage_buffer_info info) {
     snprintf(storage_bfr->name, AM_MAX_NAME_LENGTH, "%s", info.name);
 
     storage_bfr->update.size = info.size;
-    storage_bfr->access = info.access;
     storage_bfr->update.usage = info.usage;
+    storage_bfr->block_index = 0xFFFFFFFF;
     return ret_id;
+};
+
+void amgl_storage_buffer_update(am_id id, amgl_storage_buffer_update_info update) {
+    am_engine *engine = am_engine_get_instance();
+    if (!am_packed_array_has(engine->ctx_data.storage_buffers, id)) printf("[FAIL] amgl_storage_buffer_update (id: %u): No entry found by id!\n", id);
+    amgl_storage_buffer *buffer = am_packed_array_get_ptr(engine->ctx_data.storage_buffers, id);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->handle);
+    if (update.size > buffer->update.size) {
+        am_int32 usage = 0;
+        switch (update.usage) {
+            case AMGL_BUFFER_USAGE_STATIC: usage = GL_STATIC_DRAW; break;
+            case AMGL_BUFFER_USAGE_STREAM: usage = GL_STREAM_DRAW; break;
+            case AMGL_BUFFER_USAGE_DYNAMIC: usage = GL_DYNAMIC_DRAW; break;
+            default: break;
+        };
+        glBufferData(GL_SHADER_STORAGE_BUFFER, (long int)update.size, update.data, usage);
+        buffer->update.usage = update.usage;
+
+    } else {
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, (long int)update.offset, (long int)update.size, update.data);
+    };
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    buffer->update.size = update.size;
+
 };
 
 void amgl_storage_buffer_destroy(am_id id) {
@@ -4593,6 +4610,7 @@ void amgl_bind_pipeline(am_id pipeline_id) {
         amgl_pipeline *pipeline = am_packed_array_get_ptr(engine->ctx_data.pipelines, pipeline_id);
         engine->ctx_data.frame_cache.pipeline = *pipeline;
 
+        //NOTE: Only unit 0 image is unbound
         if (pipeline->compute.compute_shader) glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
         if (pipeline->compute.compute_shader) {
@@ -4758,12 +4776,12 @@ void amgl_set_bindings(amgl_bindings_info *info) {
 
     for (am_uint32 i = 0; i < storage_count; i++) {
         am_id id = info->storage_buffers.info[i].storage_buffer_id;
+        am_int32 binding = info->storage_buffers.info[i].binding;
         if (!am_packed_array_has(engine->ctx_data.storage_buffers, id)) {
             printf("[FAIL] amgl_set_bindings (id: %u): Storage buffer could not be found!\n", id);
             break;
         };
-        amgl_storage_buffer storage_buffer = am_packed_array_get_val(engine->ctx_data.storage_buffers, id);
-
+        amgl_storage_buffer *storage_buffer = am_packed_array_get_ptr(engine->ctx_data.storage_buffers, id);
         if (!am_packed_array_has(engine->ctx_data.pipelines, engine->ctx_data.frame_cache.pipeline.id)) {
             printf("[FAIL] amgl_set_bindings (id: (1) %u, (2) %u): Cannot bind storage buffer (1) since pipeline (2) could not be found!\n", id, engine->ctx_data.frame_cache.pipeline.id);
             break;
@@ -4779,20 +4797,21 @@ void amgl_set_bindings(amgl_bindings_info *info) {
         amgl_shader *shader = am_packed_array_get_ptr(engine->ctx_data.shaders, shader_id);
         am_uint32 location = 0xFFFFFFFF;
 
-        if (storage_buffer.id == AM_PA_INVALID_ID) {
-            storage_buffer.block_index = glGetProgramResourceIndex(shader->handle, GL_SHADER_STORAGE_BLOCK, storage_buffer.name);
+        if (storage_buffer->id == AM_PA_INVALID_ID) {
+            storage_buffer->block_index = glGetProgramResourceIndex(shader->handle, GL_SHADER_STORAGE_BLOCK, storage_buffer->name);
             am_int32 params[1];
             GLenum props[1] = {GL_BUFFER_BINDING};
-            glGetProgramResourceiv(shader->handle, GL_SHADER_STORAGE_BLOCK, storage_buffer.block_index, 1, props, 1, NULL, params);
+            glGetProgramResourceiv(shader->handle, GL_SHADER_STORAGE_BLOCK, storage_buffer->block_index, 1, props, 1, NULL, params);
             location = (am_uint32)params[0];
         };
 
-        if (storage_buffer.block_index < 0xFFFFFFFF - 1) glShaderStorageBlockBinding(shader->handle, storage_buffer.block_index, location);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, storage_buffer.binding, storage_buffer.handle);
+        if (storage_buffer->block_index < 0xFFFFFFFF - 1) glShaderStorageBlockBinding(shader->handle, storage_buffer->block_index, location);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, storage_buffer->handle);
     };
 
     for (am_uint32 i = 0; i < texture_count; i++) {
         am_id id = info->images.info[i].texture_id;
+        am_uint32 binding = info->images.info[i].binding;
 
         if (!am_packed_array_has(engine->ctx_data.textures, id)) {
             printf("[FAIL] amgl_set_bindings (id: %u): Texture could not be found!\n", id);
@@ -4802,7 +4821,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
         am_int32 format = amgl_texture_translate_format(texture->format);
 
         am_int32 access = 0;
-        switch (info[i].images.info->access) {
+        switch (info->images.info[i].access) {
             case AMGL_BUFFER_ACCESS_READ_ONLY: {
                 access = GL_READ_ONLY;
                 break;
@@ -4817,7 +4836,7 @@ void amgl_set_bindings(amgl_bindings_info *info) {
             };
             default: break;
         };
-        glBindImageTexture(0, texture->handle, 0, GL_FALSE, 0, access, format);
+        glBindImageTexture(binding, texture->handle, 0, GL_FALSE, 0, access, format);
 
     };
 };
@@ -4890,7 +4909,7 @@ am_camera am_camera_default() {
     cam.transform = am_vqs_default();
     cam.transform.position.z = 1.f;
     cam.fov = 60.f;
-    cam.near_plane = 0.1f;
+    cam.near_plane = 0.01f;
     cam.far_plane = 1000.f;
     cam.ortho_scale = 1.f;
     cam.proj_type = AM_PROJECTION_TYPE_ORTHOGRAPHIC;
