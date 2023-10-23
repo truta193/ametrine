@@ -67,7 +67,11 @@ typedef signed long long int am_int64;
 typedef unsigned long long int am_uint64;
 typedef float am_float32;
 typedef double am_float64;
+#ifdef __cplusplus
+typedef bool am_bool;
+#else
 typedef enum {false, true} am_bool;
+#endif
 typedef am_uint32 am_id;
 
 #if defined(AM_LINUX)
@@ -3295,8 +3299,8 @@ am_id am_platform_window_create(am_window_info window_info) {
 
     RECT window_rect = {
             .left = 0,
-            .right = (long)window_info.width,
             .top = 0,
+            .right = (long)window_info.width,
             .bottom = (long)window_info.height
     };
     AdjustWindowRectEx(&window_rect, dwStyle, false, dwExStyle);
@@ -3385,8 +3389,8 @@ void am_platform_window_resize(am_id id, am_uint32 width, am_uint32 height) {
     RECT rect = {
             .left = 0,
             .top = 0,
-            .bottom = (long)window->height,
-            .right = (long)window->width
+            .right = (long)window->width,
+            .bottom = (long)window->height
     };
     if (window->parent == AM_WINDOW_DEFAULT_PARENT)
         AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
@@ -3413,8 +3417,8 @@ void am_platform_window_move(am_id id, am_uint32 x, am_uint32 y) {
     RECT rect = {
             .left = (long)x,
             .top = (long)y,
-            .bottom = (long)window->height,
-            .right = (long)window->width
+            .right = (long)window->width,
+            .bottom = (long)window->height
     };
     if (window->parent == AM_WINDOW_DEFAULT_PARENT)
         AdjustWindowRectEx(&rect, WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME, false, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
@@ -3439,12 +3443,13 @@ void am_platform_window_fullscreen(am_id id, am_bool state) {
     window->cache.is_fullscreen = window->is_fullscreen;
     window->is_fullscreen = state;
     am_window_info temp_info = {
+        .parent = window->parent,
         .width = window->width,
         .height = window->height,
         .x = window->x,
         .y = window->y,
-        .is_fullscreen = window->is_fullscreen,
-        .parent = window->parent,
+        .is_fullscreen = window->is_fullscreen
+
     };
     snprintf(temp_info.name, AM_MAX_NAME_LENGTH, "%s", window->name);
     //REVIEW: Currently not needed for linux
@@ -4284,7 +4289,7 @@ am_id amgl_render_pass_create(amgl_render_pass_info info) {
     render_pass->stencil_texture_id = info.stencil_texture_id;
     if ((!info.num_colors) || info.color_texture_ids == NULL) printf("[WARN] amgl_render_pass_create (id: %u): No color attachments passed!\n", ret_id);
     render_pass->num_colors = info.num_colors;
-    render_pass->color_texture_ids = am_malloc(sizeof(am_id)*info.num_colors);
+    render_pass->color_texture_ids = (am_id*)am_malloc(sizeof(am_id)*info.num_colors);
     memcpy(render_pass->color_texture_ids, info.color_texture_ids, sizeof(am_id)*info.num_colors);
 
 
@@ -4350,7 +4355,7 @@ am_id amgl_pipeline_create(amgl_pipeline_info info) {
     };
     pipeline->raster = info.raster;
 
-    pipeline->layout.attributes = am_malloc(info.layout.num_attribs * sizeof(amgl_vertex_buffer_attribute));
+    pipeline->layout.attributes = (amgl_vertex_buffer_attribute*)am_malloc(info.layout.num_attribs * sizeof(amgl_vertex_buffer_attribute));
     memcpy(pipeline->layout.attributes, info.layout.attributes, info.layout.num_attribs * sizeof(amgl_vertex_buffer_attribute));
     pipeline->layout.num_attribs = info.layout.num_attribs;
 
@@ -5079,11 +5084,11 @@ void am_engine_create(am_engine_info engine_info) {
     am_dyn_array_init((void**)&(engine->ctx_data.frame_cache.vertex_buffers), sizeof(amgl_vertex_buffer));
 
     am_window_info main = {
-        .height = engine_info.win_height,
+        .parent = AM_WINDOW_DEFAULT_PARENT,
         .width = engine_info.win_width,
+        .height = engine_info.win_height,
         .x = engine_info.win_x,
         .y = engine_info.win_y,
-        .parent = AM_WINDOW_DEFAULT_PARENT,
         .is_fullscreen = engine_info.win_fullscreen
     };
     printf("sl ec %lu\n", strlen(engine_info.win_name));
@@ -5095,8 +5100,9 @@ void am_engine_create(am_engine_info engine_info) {
 
     //Base framebuffer
     amgl_frame_buffer base_fbo = {
-        .handle = 0, //OpenGL default
-        .id = 1
+        .id = 1,
+        .handle = 0 //OpenGL default
+
     };
     am_packed_array_add(engine->ctx_data.frame_buffers, base_fbo);
 
